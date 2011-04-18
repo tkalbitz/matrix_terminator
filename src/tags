@@ -1,0 +1,24 @@
+!_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;" to lines/
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/
+!_TAG_PROGRAM_AUTHOR	Darren Hiebert	/dhiebert@users.sourceforge.net/
+!_TAG_PROGRAM_NAME	Exuberant Ctags	//
+!_TAG_PROGRAM_URL	http://ctags.sourceforge.net	/official site/
+!_TAG_PROGRAM_VERSION	5.8	//
+COND_UPPER_LEFT	instance.h	16;"	d
+COND_UPPER_LEFT_LOWER_RIGHT	instance.h	18;"	d
+COND_UPPER_RIGHT	instance.h	17;"	d
+INSTANCE_H_	instance.h	9;"	d
+MATCH_ALL	instance.h	13;"	d
+MATCH_ANY	instance.h	14;"	d
+cond_left	instance.h	/^	uint8_t      cond_left;  \/* left condition *\/$/;"	m	struct:instance
+cond_right	instance.h	/^	uint8_t      cond_right; \/* left condition *\/$/;"	m	struct:instance
+delta	instance.h	/^	double       delta;      \/* numbers in the matrices are multiple the amount *\/$/;"	m	struct:instance
+dim	instance.h	/^	uint16_t     dim;        \/* dimension of the matrix *\/$/;"	m	struct:instance
+instance	instance.h	/^struct instance {$/;"	s
+left	instance.h	/^	char *left;$/;"	m	struct:rule
+main	main.c	/^int main(int argc, char** argv) {$/;"	f
+match	instance.h	/^	uint8_t      match;      \/* match all rules or any of them *\/$/;"	m	struct:instance
+right	instance.h	/^	char *right;$/;"	m	struct:rule
+rule	instance.h	/^struct rule {$/;"	s
+rules	instance.h	/^	struct rule* rules;      \/* rules that must be matched *\/$/;"	m	struct:instance	typeref:struct:instance::rule
+rules_len	instance.h	/^	uint16_t     rules_len;  \/* how many rules are there *\/$/;"	m	struct:instance
