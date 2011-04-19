@@ -1,0 +1,8 @@
+#ifndef MATRIX_COPY_H_
+#define MATRIX_COPY_H_
+
+#include "instance.h"
+
+void copy_parents_dev_to_host(struct instance* inst, void* parent_cpy);
+
+#endif /* MATRIX_COPY_H_ */

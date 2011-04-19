@@ -29,6 +29,8 @@ set(CUDA_ATTACH_VS_BUILD_RULE_TO_CUDA_FILE OFF)
 CUDA_ADD_EXECUTABLE( matrix_generator
   main.cu
   evo.cu
+  matrix_copy.cu
+  matrix_print.cu
   OPTIONS "-arch=sm_13"
 ) 
 

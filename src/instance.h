@@ -8,8 +8,16 @@
 #ifndef INSTANCE_H_
 #define INSTANCE_H_
 
+#include <stdio.h>
 #include <stdint.h>
+
 #include <cuda.h>
+#include <curand_kernel.h>
+
+#define CUDA_CALL(x) do { cudaError_t xxs = (x); \
+	if((xxs) != cudaSuccess) { \
+		fprintf(stderr, "Error '%s' at %s:%d\n", cudaGetErrorString(xxs),__FILE__,__LINE__); \
+		exit(EXIT_FAILURE);}} while(0)
 
 #define MATCH_ALL 0
 #define MATCH_ANY 1
