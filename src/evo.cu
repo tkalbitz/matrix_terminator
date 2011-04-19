@@ -24,8 +24,7 @@ __global__ void setup_rnd_kernel(curandState* rnd_states,
 /*
  * Initialize the parent memory with random values.
  */
-__global__ void
-setup_parent_kernel(struct instance *inst)
+__global__ void setup_parent_kernel(struct instance *inst)
 {
 	if(threadIdx.x >= inst->dim.matrix_height)
 		return;
@@ -38,7 +37,6 @@ setup_parent_kernel(struct instance *inst)
 	size_t slicePitch = pitch * inst->dim.matrix_height;
 
 	int z = blockIdx.x;
-//	int x = threadIdx.x;
 	int y = threadIdx.x;
 
 	char* slice = devPtr + z * slicePitch;

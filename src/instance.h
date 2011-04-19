@@ -45,7 +45,7 @@ struct instance {
 	curandState *rnd_states;   /* random number generator states */
 
 	int num_matrices;          /* number of matrices of the problem */
-	size_t width_per_inst;   /* how many elements are stored for each thread */
+	size_t width_per_inst;     /* how many elements are stored for each thread */
 
 	cudaExtent dev_parent_ext; /* extent for parents */
 	cudaExtent dev_child_ext;  /* extent for childs */

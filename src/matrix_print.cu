@@ -18,8 +18,9 @@ static void print_parent_matrix_line(struct instance *inst, float* parent_cpy)
 void print_parent_matrix(struct instance* inst)
 {
 	float parent_cpy[BLOCKS][MATRIX_HEIGHT][MATRIX_WIDTH * 2 * THREADS];
-
-	copy_parents_dev_to_host(inst, &parent_cpy);
+	memset(parent_cpy, 1, BLOCKS * MATRIX_HEIGHT *
+			      MATRIX_WIDTH * 2 * THREADS);
+	copy_parents_dev_to_host(inst, parent_cpy);
 
 	for (int b = 0; b < inst->dim.blocks; b++) {
 		for (int h = 0; h < inst->dim.matrix_height; h++) {

@@ -5,7 +5,7 @@ void copy_parents_dev_to_host(struct instance* inst, void* parent_cpy)
 	cudaMemcpy3DParms p = { 0 };
 	p.srcPtr = inst->dev_parent;
 	p.dstPtr = make_cudaPitchedPtr(
-			(void*) parent_cpy,
+			parent_cpy,
 			inst->dim.threads * inst->width_per_inst * sizeof(float),
 			inst->dim.threads * inst->width_per_inst,
 			inst->dim.matrix_height);

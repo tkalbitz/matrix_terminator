@@ -31,7 +31,8 @@ CUDA_ADD_EXECUTABLE( matrix_generator
   evo.cu
   matrix_copy.cu
   matrix_print.cu
-  OPTIONS "-arch=sm_13"
+  OPTIONS "-arch=sm_13" -G3
+#  DEBUG -G3 -g -DDEBUG
 ) 
 
 # Or compile the cuda code into a shared library.

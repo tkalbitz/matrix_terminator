@@ -11,6 +11,7 @@
 #include "evo.h"
 
 #include "matrix_print.h"
+#include "matrix_copy.h"
 
 /*
  * Allocate memory for the parent matrices. the memory is layouted for faster
@@ -76,6 +77,7 @@ void set_num_matrices(struct instance* inst)
 		m = max(m, inst->rules[i]);
 
 	inst->num_matrices = m + 1; /* matrices are zero based */
+	printf("num_matrices set to %d\n", inst->num_matrices);
 }
 
 void init_instance(struct instance* inst)
@@ -110,11 +112,30 @@ void init_instance(struct instance* inst)
 	init_rnd_generator(inst, time(0));
 }
 
-void cleanup(struct instance *inst) {
+void cleanup(struct instance *inst, struct instance * dev_inst) {
 	free(inst->rules);
+
+	cudaFree(dev_inst);
+	/* dev_inst-> rules? */
+
 	cudaFree(inst->rnd_states);
 	cudaFree(inst->dev_child.ptr);
 	cudaFree(inst->dev_parent.ptr);
+}
+
+struct instance* create_dev_inst(struct instance *inst)
+{
+	struct instance *dev_inst;
+	int *rules = inst->rules;
+	CUDA_CALL(cudaMalloc(&(inst->rules), inst->rules_len * sizeof(int)));
+	CUDA_CALL(cudaMemcpy(inst->rules, rules, inst->rules_len * sizeof(int),
+					cudaMemcpyHostToDevice));
+	CUDA_CALL(cudaMalloc(&dev_inst, sizeof(*dev_inst)));
+	CUDA_CALL(cudaMemcpy(dev_inst, inst, sizeof(*dev_inst),
+					cudaMemcpyHostToDevice));
+
+	inst->rules = rules;
+	return dev_inst;
 }
 
 int main(int argc, char** argv)
@@ -123,18 +144,15 @@ int main(int argc, char** argv)
 	struct instance *dev_inst;
 
 	init_instance(&inst);
-
-	CUDA_CALL(cudaMalloc(&dev_inst, sizeof(*dev_inst)));
-	CUDA_CALL(cudaMemcpy(dev_inst, &inst, sizeof(*dev_inst),
-				cudaMemcpyHostToDevice));
+	dev_inst = create_dev_inst(&inst);
 
 	setup_parent_kernel<<<BLOCKS, MATRIX_HEIGHT>>>(dev_inst);
 	CUDA_CALL(cudaGetLastError());
-
 	print_parent_matrix(&inst);
-	evo_kernel<<<BLOCKS, THREADS>>>(dev_inst);
+
+//	evo_kernel<<<BLOCKS, THREADS>>>(dev_inst);
+//	CUDA_CALL(cudaGetLastError());
 
 	printf("Clean up and exit.\n");
-	cudaFree(dev_inst);
-	cleanup(&inst);
+	cleanup(&inst, dev_inst);
 }
