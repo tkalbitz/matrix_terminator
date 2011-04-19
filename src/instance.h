@@ -27,17 +27,24 @@ struct dimension
 	int matrix_height;
 };
 
+#define MUL_SEP  -1
+#define MUL_STOP -2
+
 struct instance {
 	struct dimension dim;	   /* dimension of the matrix */
 	cudaPitchedPtr dev_parent; /* device memory for all parents */
 	cudaPitchedPtr dev_child;  /* device memory for all childs */ 
 	curandState *rnd_states;   /* random number generator states */
 
+	int num_matrices;          /* number of matrices of the problem */
+	size_t width_per_inst;   /* how many elements are stored for each thread */
+
 	cudaExtent dev_parent_ext; /* extent for parents */
 	cudaExtent dev_child_ext;  /* extent for childs */
 
 	double delta;		/* numbers in the matrices are multiple the amount */
-	char*  rules;		/* rules that must be matched */
+	int*   rules;		/* rules that must be matched */
+	size_t rules_len;       /* number of elements in rules */
 
 	uint8_t	match:1,	/* match all rules or any of them */
 		cond_left:3,	/* left condition */

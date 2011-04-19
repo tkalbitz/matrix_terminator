@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <time.h>
+#include <assert.h>
 
 #include <cuda.h> 
 #include <curand_kernel.h>
@@ -19,10 +20,16 @@
  * access. The bloc count is the depth of the allocated memory. All threads of
  * one block had to operate on a part of the width.
  */
-void alloc_parent_matrix(struct instance *inst)
+inline void alloc_parent_matrix(struct instance *inst)
 {
+	assert(inst->num_matrices != 0);
+
+	int width = inst->dim.threads    * /* each thread need his own parents */
+		    inst->width_per_inst *
+		    sizeof(float);
+
 	inst->dev_parent_ext = make_cudaExtent(
-		inst->dim.threads * inst->dim.matrix_width * sizeof(float),
+		width,
 		inst->dim.matrix_height, 
 		inst->dim.blocks);
 
@@ -38,10 +45,15 @@ void alloc_parent_matrix(struct instance *inst)
  * access. The bloc count is the depth of the allocated memory. All threads of
  * one block had to operate on a part of the width.
  */
-void alloc_child_matrix(struct instance *inst)
+inline void alloc_child_matrix(struct instance *inst)
 {
+	assert(inst->num_matrices != 0);
+
+	int width = inst->dim.threads * inst->dim.childs * /* each thread should have n childs */
+		    inst->width_per_inst * sizeof(float);
+
 	inst->dev_child_ext = make_cudaExtent(
-		inst->dim.threads * inst->dim.childs * inst->dim.matrix_width * sizeof(float),
+		width,
 		inst->dim.matrix_height, 
 		inst->dim.blocks);
 
@@ -51,7 +63,7 @@ void alloc_child_matrix(struct instance *inst)
 	inst->dev_child = pitched_ptr;
 }
 
-void init_rnd_generator(struct instance *inst, int seed)
+inline void init_rnd_generator(struct instance *inst, int seed)
 {	
 	curandState *rnd_states;
 	int count = inst->dim.blocks * inst->dim.threads * sizeof(curandState);
@@ -62,9 +74,25 @@ void init_rnd_generator(struct instance *inst, int seed)
 	inst->rnd_states = rnd_states;
 }
 
+inline void set_num_matrices(struct instance* inst)
+{
+	int m = INT_MIN;
+	for(int i = 0; i < inst->rules_len; i++)
+		m = max(m, inst->rules[i]);
+
+	inst->num_matrices = m + 1; /* matrices are zero based */
+}
+
 void init_instance(struct instance* inst)
 {
-	inst->rules = "ab,ba";
+	inst->rules_len = 5;
+	inst->rules = (int*)malloc(sizeof(int) * inst->rules_len);
+	inst->rules[0] = 0;
+	inst->rules[1] = 1;
+	inst->rules[2] = MUL_SEP;
+	inst->rules[3] = 1;
+	inst->rules[4] = 0;
+
 	inst->delta = 0.1;
 	inst->match = MATCH_ALL;
 	inst->cond_left  = COND_UPPER_RIGHT;
@@ -76,6 +104,11 @@ void init_instance(struct instance* inst)
 	inst->dim.matrix_width  = MATRIX_WIDTH;
 	inst->dim.matrix_height = MATRIX_HEIGHT;
 	
+	set_num_matrices(inst);
+
+	inst->width_per_inst = inst->num_matrices *    /* there are n matrices needed for the rules */
+			       inst->dim.matrix_width; /* each one has a fixed width */
+
 	alloc_parent_matrix(inst);
 	alloc_child_matrix(inst);
 
@@ -83,28 +116,43 @@ void init_instance(struct instance* inst)
 }
 
 void cleanup(struct instance *inst) {
+	free(inst->rules);
 	cudaFree(inst->rnd_states);
+	cudaFree(inst->dev_child.ptr);
+	cudaFree(inst->dev_parent.ptr);
 }
 
 void printParentMatrix(struct instance inst)
 {
-    float parent_cpy[BLOCKS][MATRIX_HEIGHT][MATRIX_WIDTH*THREADS];
+	float parent_cpy[BLOCKS][MATRIX_HEIGHT][MATRIX_WIDTH * 2 * THREADS];
+	memset(parent_cpy, 127, BLOCKS*MATRIX_HEIGHT*MATRIX_WIDTH * 2 * THREADS*sizeof(float));
 
-    cudaMemcpy3DParms p = {0};
-    p.srcPtr = inst.dev_parent;
-    p.dstPtr = make_cudaPitchedPtr((void*)parent_cpy, inst.dim.threads * inst.dim.matrix_width * sizeof (float), inst.dim.threads * inst.dim.matrix_width, inst.dim.matrix_height);
-    p.extent = inst.dev_parent_ext;
-    p.kind = cudaMemcpyDeviceToHost;
-    CUDA_CALL(cudaMemcpy3D(&p));
-    for(int b = 0;b < inst.dim.blocks;b++){
-        for(int h = 0;h < inst.dim.matrix_height;h++){
-            for(int w = 0;w < inst.dim.threads * inst.dim.matrix_width;w++){
-                printf("%3.2e ", parent_cpy[b][h][w]);
-            }
-            printf("\n");
-        }
+	cudaMemcpy3DParms p = { 0 };
+	p.srcPtr = inst.dev_parent;
+	p.dstPtr = make_cudaPitchedPtr(
+			(void*) parent_cpy,
+			inst.dim.threads * inst.width_per_inst * sizeof(float),
+			inst.dim.threads * inst.width_per_inst,
+			inst.dim.matrix_height);
 
-    }
+	p.extent = inst.dev_parent_ext;
+	p.kind = cudaMemcpyDeviceToHost;
+	CUDA_CALL(cudaMemcpy3D(&p));
+	for (int b = 0; b < inst.dim.blocks; b++) {
+		for (int h = 0; h < inst.dim.matrix_height; h++) {
+			for (int w = 0; w < inst.dim.threads * inst.width_per_inst; w++) {
+				if((w % inst.dim.matrix_width) == 0) {
+					printf(" | ");
+				}
+
+				printf("%3.2e ", parent_cpy[b][h][w]);
+			}
+			printf("\n");
+		}
+
+		printf("----------------------------------------------------------------\n");
+
+	}
 }
 
 int main(int argc, char** argv)
@@ -117,12 +165,13 @@ int main(int argc, char** argv)
 	CUDA_CALL(cudaMalloc(&dev_inst, sizeof(struct instance)));
 	CUDA_CALL(cudaMemcpy(dev_inst, &inst, sizeof(struct instance), cudaMemcpyHostToDevice));
 
-	setup_parent_kernel<<<BLOCKS, THREADS>>>(dev_inst);
+	setup_parent_kernel<<<BLOCKS, MATRIX_HEIGHT>>>(dev_inst);
 	CUDA_CALL(cudaGetLastError());
 
 	printParentMatrix(inst);
-	//evo_kernel<<<BLOCKS, THREADS>>>(dev_inst);
+	evo_kernel<<<BLOCKS, THREADS>>>(dev_inst);
 
-	cudaFree(dev_inst);
 	printf("Clean up and exit.\n");
+	cudaFree(dev_inst);
+	cleanup(&inst);
 }
