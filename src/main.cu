@@ -15,14 +15,14 @@
 
 /*
  * Allocate memory for the parent matrices. the memory is layouted for faster
- * access. The bloc count is the depth of the allocated memory. All threads of
+ * access. The block count is the depth of the allocated memory. All threads of
  * one block had to operate on a part of the width.
  */
 void alloc_parent_matrix(struct instance *inst)
 {
 	assert(inst->num_matrices != 0);
 
-	int width = inst->dim.threads    * /* each thread need his own parents */
+	int width = inst->dim.parents    * /* there are n parents per block */
 		    inst->width_per_inst *
 		    sizeof(float);
 
@@ -46,7 +46,7 @@ void alloc_child_matrix(struct instance *inst)
 {
 	assert(inst->num_matrices != 0);
 
-	int width = inst->dim.threads * inst->dim.childs * /* each thread should have n childs */
+	int width = inst->dim.parents * inst->dim.childs * /* each parent should have n childs */
 		    inst->width_per_inst * sizeof(float);
 
 	inst->dev_child_ext = make_cudaExtent(width,
@@ -98,6 +98,7 @@ void init_instance(struct instance* inst)
 	inst->dim.blocks  = BLOCKS;
 	inst->dim.threads = THREADS;
 	inst->dim.childs  = CHILDS;
+	inst->dim.parents = PARENTS;
 	inst->dim.matrix_width  = MATRIX_WIDTH;
 	inst->dim.matrix_height = MATRIX_HEIGHT;
 	
@@ -146,12 +147,13 @@ int main(int argc, char** argv)
 	init_instance(&inst);
 	dev_inst = create_dev_inst(&inst);
 
-	setup_parent_kernel<<<BLOCKS, MATRIX_HEIGHT>>>(dev_inst);
+	setup_parent_kernel<<<BLOCKS, inst.dim.matrix_height>>>(dev_inst);
 	CUDA_CALL(cudaGetLastError());
 	print_parent_matrix(&inst);
 
-//	evo_kernel<<<BLOCKS, THREADS>>>(dev_inst);
-//	CUDA_CALL(cudaGetLastError());
+	int evo_threads = inst.dim.parents * inst.dim.childs;
+	evo_kernel<<<BLOCKS, evo_threads>>>(dev_inst);
+	CUDA_CALL(cudaGetLastError());
 
 	printf("Clean up and exit.\n");
 	cleanup(&inst, dev_inst);

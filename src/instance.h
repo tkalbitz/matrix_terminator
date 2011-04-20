@@ -31,6 +31,7 @@ struct dimension
 	int blocks;
 	int threads;
 	int childs;
+	int parents;
 	int matrix_width;
 	int matrix_height;
 };

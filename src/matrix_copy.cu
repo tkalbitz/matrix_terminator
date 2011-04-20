@@ -6,8 +6,8 @@ void copy_parents_dev_to_host(struct instance* inst, void* parent_cpy)
 	p.srcPtr = inst->dev_parent;
 	p.dstPtr = make_cudaPitchedPtr(
 			parent_cpy,
-			inst->dim.threads * inst->width_per_inst * sizeof(float),
-			inst->dim.threads * inst->width_per_inst,
+			inst->dev_parent_ext.width,
+			inst->dev_parent_ext.width / sizeof(float),
 			inst->dim.matrix_height);
 
 	p.extent = inst->dev_parent_ext;

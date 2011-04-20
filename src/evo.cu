@@ -42,7 +42,7 @@ __global__ void setup_parent_kernel(struct instance *inst)
 	char* slice = devPtr + z * slicePitch;
 	float* row = (float*) (slice + y * pitch);
 
-	for(int x = 0; x < inst->dim.threads * inst->width_per_inst; x++) {
+	for(int x = 0; x < inst->dim.parents * inst->width_per_inst; x++) {
 		if(curand_uniform(&rnd_state) < MATRIX_TAKEN_POS) {
 			row[x] = curand(&rnd_state);
 		}
@@ -53,7 +53,7 @@ __global__ void setup_parent_kernel(struct instance *inst)
 	if(threadIdx.x != 0)
 		return;
 
-	const int matrices = inst->num_matrices * inst->dim.threads;
+	const int matrices = inst->num_matrices * inst->dim.parents;
 
 	if(inst->cond_left == COND_UPPER_LEFT) {
 		y = 0;
@@ -92,13 +92,22 @@ __global__ void evo_kernel(struct instance *inst)
 {
 	int id = get_thread_id();
 
-	char* dev_ptr = (char*)inst->dev_parent.ptr;
-	size_t pitch = inst->dev_parent.pitch;
-	size_t slice_pitch = pitch * inst->dim.matrix_height;
-	char* slice = dev_ptr + blockIdx.x * slice_pitch;
+	const char* p_dev_ptr = (char*)inst->dev_parent.ptr;
+	const size_t p_pitch = inst->dev_parent.pitch;
+	const size_t p_slice_pitch = p_pitch * inst->dim.matrix_height;
+	const char* p_slice = p_dev_ptr + blockIdx.x /* z */ * p_slice_pitch;
 
-	const int zero = MATRIX_WIDTH * threadIdx.x;
-	const int end  = MATRIX_WIDTH * (threadIdx.x + 1);
+	const char* c_dev_ptr = (char*)inst->dev_child.ptr;
+	const size_t c_pitch = inst->dev_child.pitch;
+	const size_t c_slice_pitch = p_pitch * inst->dim.matrix_height;
+	const char* c_slice = p_dev_ptr + blockIdx.x /* z */ * p_slice_pitch;
+
+	/*
+	 * each thread represent one child which has a
+	 * defined pos in the matrix
+	 */
+	const int zero = inst->width_per_inst * threadIdx.x;
+	const int end  = inst->width_per_inst * (threadIdx.x + 1);
 
 	/* copy global state to local mem for efficiency */
 	curandState rnd_state = inst->rnd_states[id];

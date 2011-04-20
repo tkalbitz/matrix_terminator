@@ -3,6 +3,8 @@
 
 #define BLOCKS  5
 #define THREADS 5
+
+#define PARENTS 30
 #define CHILDS   7 
 
 #define MATRIX_HEIGHT 5

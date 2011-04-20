@@ -5,7 +5,8 @@
 
 static void print_parent_matrix_line(struct instance *inst, float* parent_cpy)
 {
-	for (int w = 0; w < inst->dim.threads * inst->width_per_inst; w++) {
+	int count = inst->dev_parent_ext.width / sizeof(float);
+	for (int w = 0; w < count; w++) {
 		if((w % inst->dim.matrix_width) == 0) {
 			printf(" | ");
 		}
@@ -17,9 +18,10 @@ static void print_parent_matrix_line(struct instance *inst, float* parent_cpy)
 
 void print_parent_matrix(struct instance* inst)
 {
-	float parent_cpy[BLOCKS][MATRIX_HEIGHT][MATRIX_WIDTH * 2 * THREADS];
+	/* TODO: HACK */
+	float parent_cpy[BLOCKS][MATRIX_HEIGHT][MATRIX_WIDTH * 2 * PARENTS];
 	memset(parent_cpy, 1, BLOCKS * MATRIX_HEIGHT *
-			      MATRIX_WIDTH * 2 * THREADS);
+			      MATRIX_WIDTH * 2 * PARENTS);
 	copy_parents_dev_to_host(inst, parent_cpy);
 
 	for (int b = 0; b < inst->dim.blocks; b++) {
