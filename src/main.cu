@@ -59,13 +59,55 @@ void alloc_child_matrix(struct instance *inst)
 	inst->dev_child = pitched_ptr;
 }
 
+/**
+ * Allocate the matrix for each thread which is 
+ * needed for the multiplication and evaluation.
+ */
+void alloc_result_matrix(struct instance *inst)
+{
+	inst->dev_res_ext = make_cudaExtent(inst->dim.childs * inst->dim.parents *
+					    2 * inst->dim.matrix_width * sizeof(float),
+					    inst->dim.matrix_height,
+					    inst->dim.blocks);
+
+	cudaPitchedPtr pitched_ptr;
+	CUDA_CALL(cudaMalloc3D(&pitched_ptr, inst->dev_res_ext));
+	CUDA_CALL(cudaMemset3D(pitched_ptr, 0, inst->dev_res_ext));
+	inst->dev_res = pitched_ptr;
+}
+
+inline int get_evo_threads(struct instance *inst) {
+	return inst->dim.parents * inst->dim.childs;
+}
+
+void alloc_rating(struct instance *inst)
+{
+	inst->dev_crat_ext = make_cudaExtent(2 * get_evo_threads(inst) * sizeof(float),
+	 			    	     1,
+	 			    	     inst->dim.blocks);
+
+	inst->dev_prat_ext = make_cudaExtent(inst->dim.parents * sizeof(float),
+					     1,
+					     inst->dim.blocks);
+
+	cudaPitchedPtr pitched_ptr;
+	CUDA_CALL(cudaMalloc3D(&pitched_ptr, inst->dev_crat_ext));
+	CUDA_CALL(cudaMemset3D(pitched_ptr, 0, inst->dev_crat_ext));
+	inst->dev_crat = pitched_ptr;
+
+	CUDA_CALL(cudaMalloc3D(&pitched_ptr, inst->dev_prat_ext));
+	CUDA_CALL(cudaMemset3D(pitched_ptr, 0, inst->dev_prat_ext));
+	inst->dev_prat = pitched_ptr;
+}
+
 void init_rnd_generator(struct instance *inst, int seed)
 {	
 	curandState *rnd_states;
-	int count = inst->dim.blocks * inst->dim.threads * sizeof(curandState);
+	const int count = get_evo_threads(inst);
 
-	CUDA_CALL(cudaMalloc((void **)&rnd_states, count));
-	setup_rnd_kernel<<<BLOCKS, THREADS>>>(rnd_states, seed);
+	CUDA_CALL(cudaMalloc((void **)&rnd_states, 
+			     count * BLOCKS * sizeof(curandState)));
+	setup_rnd_kernel<<<BLOCKS, count>>>(rnd_states, seed);
 	CUDA_CALL(cudaGetLastError());
 	inst->rnd_states = rnd_states;
 }
@@ -82,13 +124,33 @@ void set_num_matrices(struct instance* inst)
 
 void init_instance(struct instance* inst)
 {
-	inst->rules_len = 5;
+	inst->rule_count = 3;
+	inst->rules_len  = 22;
 	inst->rules = (int*)malloc(sizeof(int) * inst->rules_len);
-	inst->rules[0] = 0;
+	inst->rules[0] = MUL_SEP;
 	inst->rules[1] = 1;
-	inst->rules[2] = MUL_SEP;
+	inst->rules[2] = 1;
 	inst->rules[3] = 1;
-	inst->rules[4] = 0;
+	inst->rules[4] = MUL_SEP;
+	inst->rules[5] = 0;
+	inst->rules[6] = MUL_SEP;
+
+	inst->rules[7] = 0;
+	inst->rules[8] = 0;
+	inst->rules[9] = MUL_SEP;
+	inst->rules[10] = 0;
+	inst->rules[11] = 1;
+	inst->rules[12] = 0;
+	inst->rules[13] = MUL_SEP;
+
+	inst->rules[14] = 0;
+	inst->rules[15] = 0;
+	inst->rules[16] = 0;
+	inst->rules[17] = MUL_SEP;
+	inst->rules[18] = 1;
+	inst->rules[19] = 0;
+	inst->rules[20] = 0;
+	inst->rules[21] = MUL_SEP;
 
 	inst->delta = 0.1;
 	inst->match = MATCH_ALL;
@@ -96,12 +158,13 @@ void init_instance(struct instance* inst)
 	inst->cond_right = COND_UPPER_RIGHT;
 
 	inst->dim.blocks  = BLOCKS;
-	inst->dim.threads = THREADS;
 	inst->dim.childs  = CHILDS;
 	inst->dim.parents = PARENTS;
 	inst->dim.matrix_width  = MATRIX_WIDTH;
 	inst->dim.matrix_height = MATRIX_HEIGHT;
 	
+	inst->rounds = 0;
+
 	set_num_matrices(inst);
 
 	inst->width_per_inst = inst->num_matrices *    /* there are n matrices needed for the rules */
@@ -109,7 +172,8 @@ void init_instance(struct instance* inst)
 
 	alloc_parent_matrix(inst);
 	alloc_child_matrix(inst);
-
+	alloc_result_matrix(inst);
+	alloc_rating(inst);
 	init_rnd_generator(inst, time(0));
 }
 
@@ -122,6 +186,9 @@ void cleanup(struct instance *inst, struct instance * dev_inst) {
 	cudaFree(inst->rnd_states);
 	cudaFree(inst->dev_child.ptr);
 	cudaFree(inst->dev_parent.ptr);
+	cudaFree(inst->dev_res.ptr);
+	cudaFree(inst->dev_crat.ptr);
+	cudaFree(inst->dev_prat.ptr);
 }
 
 struct instance* create_dev_inst(struct instance *inst)
@@ -139,6 +206,13 @@ struct instance* create_dev_inst(struct instance *inst)
 	return dev_inst;
 }
 
+void copy_inst_dev_to_host(struct instance *dev, struct instance *host)
+{
+	int *rules = host->rules;
+	CUDA_CALL(cudaMemcpy(host, dev, sizeof(*dev), cudaMemcpyDeviceToHost));
+	host->rules = rules;
+}
+
 int main(int argc, char** argv)
 {
 	struct instance inst;
@@ -149,11 +223,17 @@ int main(int argc, char** argv)
 
 	setup_parent_kernel<<<BLOCKS, inst.dim.matrix_height>>>(dev_inst);
 	CUDA_CALL(cudaGetLastError());
-	print_parent_matrix(&inst);
+	//print_parent_matrix(&inst);
 
-	int evo_threads = inst.dim.parents * inst.dim.childs;
+	int evo_threads = get_evo_threads(&inst);
 	evo_kernel<<<BLOCKS, evo_threads>>>(dev_inst);
 	CUDA_CALL(cudaGetLastError());
+
+	copy_inst_dev_to_host(dev_inst, &inst);
+
+	printf("Needed rounds: %d\n", inst.rounds);
+	printf("Result is block: %d, parent: %d\n", inst.res_block, inst.res_parent);
+	print_parent_matrix(&inst, inst.res_block, inst.res_parent);
 
 	printf("Clean up and exit.\n");
 	cleanup(&inst, dev_inst);

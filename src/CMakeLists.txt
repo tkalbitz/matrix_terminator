@@ -31,7 +31,7 @@ CUDA_ADD_EXECUTABLE( matrix_generator
   evo.cu
   matrix_copy.cu
   matrix_print.cu
-  OPTIONS "-arch=sm_13" -G3
+  OPTIONS "-arch=sm_13" 
 #  DEBUG -G3 -g -DDEBUG
 ) 
 
