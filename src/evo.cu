@@ -7,6 +7,36 @@
 #include "instance.h"
 #include "config.h"
 
+__device__ void float_memcpy(float* to, float* from, int size)
+{
+//	memcpy(to, from, size * sizeof(float));
+
+	if(((unsigned long long)to   & 0x4) ||
+	   ((unsigned long long)from & 0x4)) {
+		while(size--) {
+			*to = *from;
+			to++;
+			from++;
+		}
+	} else {
+		long long *t = (long long*)to;
+		long long *f = (long long*)from;
+		int s = size >> 1;
+
+		while(s--) {
+			*t = *f;
+			t++;
+			f++;
+		}
+
+		if(size & 1) {
+			to   = (float*)t;
+			from = (float*)f;
+			*to  = *from;
+		}
+	}
+}
+
 /* calculate the thread id for the current block topology */
 inline __device__ int get_thread_id() {
 	return threadIdx.x + blockIdx.x * blockDim.x;
@@ -47,7 +77,9 @@ __global__ void setup_parent_kernel(struct instance *inst)
 
 	for(int x = 0; x < inst->dim.parents * inst->width_per_inst; x++) {
 		if(curand_uniform(&rnd_state) < MATRIX_TAKEN_POS) {
-			row[x] = curand(&rnd_state) % 100;
+			row[x] = curand(&rnd_state) % (int)PARENT_MAX;
+		} else {
+			row[x] = 0;
 		}
 	}
 
@@ -115,9 +147,6 @@ struct memory {
 	float* p_rat;
 };
 
-/* extern device functions can't be inlined, so include them */
-#include "evo_rating.cu"
-
 __device__ void evo_init_mem(struct instance* inst, struct memory *mem)
 {
 	char* p_dev_ptr = (char*)inst->dev_parent.ptr;
@@ -152,7 +181,7 @@ __device__ void evo_init_mem(struct instance* inst, struct memory *mem)
 	mem->r_zero1 = threadIdx.x * 2 * inst->dim.matrix_width;
 	mem->r_end1  = mem->r_zero1 + inst->dim.matrix_width;
 	mem->r_zero2 = mem->r_zero1 + inst->dim.matrix_width;
-	mem->r_end2  = mem->r_zero1 + 2 * inst->dim.matrix_width;
+	mem->r_end2  = mem->r_zero2 + inst->dim.matrix_width;
 
 	char* t_dev_ptr = (char*)inst->dev_crat.ptr;
 	size_t t_pitch = inst->dev_crat.pitch;
@@ -187,7 +216,7 @@ __device__ void evo_recombination(struct instance *inst,
 
 	int p1   = sel[0] * inst->width_per_inst;
 	int p2   = sel[1] * inst->width_per_inst;
-	int cIdx = threadIdx.x * inst->width_per_inst;
+	int cIdx = mem->c_zero;
 
 	for(int r = 0; r < rows; r++) {
 		float* c_row = C_ROW(r);
@@ -223,6 +252,7 @@ __device__ void evo_ensure_constraints(struct instance *inst,
 		{
 			row[start + inst->dim.matrix_width - 1] = val;
 		} else if(inst->cond_right == COND_UPPER_LEFT_LOWER_RIGHT) {
+			row = C_ROW(0);
 			if(row[start] < 1.f)
 				row[start] = val;
 
@@ -240,45 +270,29 @@ __device__ void evo_mutation(struct instance *inst,
 {
 	*s_param = *s_param * exp(curand_normal(rnd_state) / 1000);
 	int rows = inst->dim.matrix_height;
-	int cols = threadIdx.x * inst->width_per_inst + inst->width_per_inst;
 	float delta = inst->delta;
 	float tmp;
 
 	for(int r = 0; r < rows; r++) {
 		float* row = C_ROW(r);
-		int c = threadIdx.x * inst->width_per_inst;
 
-		for(; c < cols; c++) {
-			if(curand_uniform(rnd_state) > MUT_RATE) 
+		for(int c = mem->c_zero; c < mem->c_end; c++) {
+
+			if(curand_uniform(rnd_state) > MUT_RATE)
 				continue;
 
 			tmp = row[c];
 			tmp = tmp + (float)(curand_normal(rnd_state) * (*s_param));
 			/* we want x * delta, where x is an int */  	
 			tmp = ((unsigned long)(tmp / delta)) * delta;
-			tmp = max(tmp, 0.f);
+			tmp = max(tmp, 0.0);
+			tmp = min(PARENT_MAX, tmp);
+
 			row[c] = tmp;
 		}
 	}
 
 	evo_ensure_constraints(inst, mem);
-}
-
-__device__ void copy_child_to_parent(struct instance *inst,
-				     struct memory   *mem,
-				     int child,
-				     int parent)
-{
-	int rows = inst->dim.matrix_height;
-
-	int pidx = parent * inst->width_per_inst;
-	int cidx = mem->c_zero + child * inst->width_per_inst;
-
-	for(int r = 0; r < rows; r++) {
-		memcpy(&(P_ROW(r)[pidx]),
-		       &(C_ROW(r)[cidx]),
-		       inst->width_per_inst * sizeof(float));
-	}
 }
 
 __device__ void evo_parent_selection(struct instance *inst, struct memory *mem)
@@ -306,6 +320,30 @@ __device__ void evo_parent_selection(struct instance *inst, struct memory *mem)
 
 __device__ volatile int cont = 1;
 
+
+__device__ void copy_child_to_parent(struct instance *inst,
+				     struct memory   *mem,
+				     int child,
+				     int parent)
+{
+	int cstart = child * inst->width_per_inst;
+	int pstart = parent * inst->width_per_inst;
+	int rows = inst->dim.matrix_height;
+
+	for(int r = 0; r < rows; r++) {
+		float* prow = P_ROW(r);
+		float* crow = C_ROW(r);
+
+		float_memcpy(&(prow[pstart]),
+		             &(crow[cstart]),
+		             inst->width_per_inst);
+	}
+}
+
+/* extern device functions can't be inlined, so include them */
+//#include "ensure.cu"
+#include "evo_rating.cu"
+
 __global__ void evo_kernel(struct instance *inst)
 {
 	int id = get_thread_id();
@@ -321,12 +359,19 @@ __global__ void evo_kernel(struct instance *inst)
 
 	while(cont && inst->rounds < 10000) {
 		evo_recomb_selection(inst, &rnd_state, p_sel);
+
 		evo_recombination(inst, &mem, &rnd_state, p_sel);
 		evo_mutation(inst, &mem, &rnd_state, &s_param);
+
 		mem.c_rat[2 * threadIdx.x]     = evo_calc_res(inst, &mem);
 		mem.c_rat[2 * threadIdx.x + 1] = threadIdx.x;
+		if(mem.c_rat[2 * threadIdx.x] == 0.f) {
+			inst->res_child_block = blockIdx.x;
+			inst->res_child_idx   = threadIdx.x;
+		}
 
 		__syncthreads();
+
 		/*
 		 * All threads should rated their results here.
 		 * It's time to get the new parents :D
@@ -352,6 +397,71 @@ __global__ void evo_kernel(struct instance *inst)
 					     (int)mem.c_rat[2 * threadIdx.x + 1],
 					     threadIdx.x);
 			mem.p_rat[threadIdx.x] = mem.c_rat[2 * threadIdx.x];
+		}
+
+		__syncthreads();
+	}
+
+	/* backup rnd state to global mem */
+	inst->rnd_states[id] = rnd_state;
+}
+
+__global__ void evo_kernel_test(struct instance *inst)
+{
+	int id = get_thread_id();
+
+	/* copy global state to local mem for efficiency */
+	curandState rnd_state = inst->rnd_states[id];
+
+	struct memory mem;
+	evo_init_mem(inst, &mem);
+
+	int p_sel[2];
+	float s_param = 5.f; /* TODO: For every matrix? */
+
+	evo_recomb_selection(inst, &rnd_state, p_sel);
+	evo_recombination(inst, &mem, &rnd_state, p_sel);
+	evo_mutation(inst, &mem, &rnd_state, &s_param);
+	mem.c_rat[2 * threadIdx.x]     = evo_calc_res(inst, &mem);
+	mem.c_rat[2 * threadIdx.x + 1] = threadIdx.x;
+
+	__syncthreads();
+	/*
+	 * All threads should rated their results here.
+	 * It's time to get the new parents :D
+	 */
+	if(threadIdx.x == 0) {
+		if(blockIdx.x == 0) {
+			inst->rounds++;
+		}
+
+		evo_parent_selection(inst, &mem);
+		if(mem.c_rat[0] == 0.f) {
+			cont = 0;
+			inst->res_block = blockIdx.x;
+			inst->res_parent = threadIdx.x;
+		}
+	}
+
+	__syncthreads();
+
+	while(inst->rounds < 10000) {
+		if(threadIdx.x == 0 && blockIdx.x == 0) {
+			inst->rounds++;
+		}
+
+		/* Parallel copy of memory */
+		if(threadIdx.x < inst->dim.parents) {
+			copy_child_to_parent(inst, &mem,
+					     (int)mem.c_rat[2 * threadIdx.x + 1],
+					     threadIdx.x);
+			mem.p_rat[threadIdx.x] = mem.c_rat[2 * threadIdx.x];
+//			int res = ensure_correct_copy(inst, &mem,
+//					(int) mem.c_rat[2 * threadIdx.x + 1],
+//					threadIdx.x);
+//			if(res) {
+//				atomicAdd(&(inst->isnan), 100000);
+//			}
 		}
 
 		__syncthreads();

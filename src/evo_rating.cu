@@ -11,13 +11,14 @@ __device__ void eval_set_res_matrix_to_zero(struct instance *inst,
 					    struct memory   *mem)
 {
 	int rows = inst->dim.matrix_height;
-	int cols = 2 * inst->dim.matrix_width;
+	int start = mem->r_zero1;
+	int end = mem->r_end2;
 
 	float *row;
 
 	for(int r = 0; r < rows; r++) {
 		row = R_ROW(r);
-		for(int c = 0; c < cols; c++) {
+		for(int c = start; c < end; c++) {
 			row[c] = 0.f;
 		}
 	}
@@ -36,9 +37,9 @@ __device__ void eval_copy_matrix_to_res(struct instance *inst,
 		     rmatrix * inst->dim.matrix_width;
 
 	for(int r = 0; r < rows; r++) {
-		memcpy(&(R_ROW(r)[rstart]),
-		       &(C_ROW(r)[cstart]),
-		       inst->dim.matrix_width * sizeof(float));
+		float_memcpy(&(R_ROW(r)[rstart]),
+			     &(C_ROW(r)[cstart]),
+			     inst->dim.matrix_width);
 	}
 }
 
@@ -52,7 +53,7 @@ __device__ void eval_mul_inplace(struct instance *inst,
 	int cstart = mem->c_zero  + cmatrix * inst->dim.matrix_width;
 	int rstart = mem->r_zero1 + rmatrix * inst->dim.matrix_width;
 
-	float *rrow;
+	float *rrow, *crow;
 	float row[MUL_ROW_LEN];
 
 	/* result rows */
@@ -60,7 +61,7 @@ __device__ void eval_mul_inplace(struct instance *inst,
 		rrow = R_ROW(rridx);
 
 		/* copy current line so we can work inplace */
-		memcpy(row, &(rrow[rstart]), inst->dim.matrix_width * sizeof(float));
+		float_memcpy(row, &(rrow[rstart]), inst->dim.matrix_width);
 
 		/* child column */
 		for(int ccidx = 0; ccidx < rows; ccidx++) {
@@ -69,7 +70,8 @@ __device__ void eval_mul_inplace(struct instance *inst,
 
 			/* child row */
 			for(int cridx = 0; cridx < rows; cridx++) {
-				rrow[pos] += row[cridx] * C_ROW(cridx)[cstart + ccidx];
+				crow = C_ROW(cridx);
+				rrow[pos] += row[cridx] * crow[cstart + ccidx];
 			}
 		}
 	}
@@ -110,31 +112,33 @@ __device__ float evo_result_rating(struct instance *inst,
 	for(int r = 0; r < rows; r++) {
 		row = R_ROW(r);
 		for(int c = 0; c < cols; c++) {
-			rating += fabs(max(row[first + c] - row[sec + c], 0.f));
+			rating += fabs(min(row[first + c] - row[sec + c], 0.f));
 		}
 	}
 
 	row = R_ROW(0);
 	if(inst->cond_right == COND_UPPER_LEFT) {
-		if((row[first] - row[sec]) < 0)
+		if((row[first] - row[sec]) < 1.f)
 			rating += 1e5;
 	} else if(inst->cond_right == COND_UPPER_RIGHT) {
-		if((row[sec - 1] - row[sec + cols - 1]) < 0)
+		if((row[first + cols - 1] - row[sec + cols - 1]) < 1.f)
 			rating += 1e5;
 	} else if(inst->cond_right == COND_UPPER_LEFT_LOWER_RIGHT) {
-		if((row[first] - row[sec]) < 0)
+		if((row[first] - row[sec]) < 1.f)
 			rating += 1e5;
 
 		row = R_ROW(rows-1);
-		if((row[sec-1] - row[sec + cols - 1]) < 0)
+		if((row[first + cols - 1] - row[sec + cols - 1]) < 1.f)
 			rating += 1e5;
+	} else {
+		rating += 1e10;
 	}
 
 	return rating;
 }
 
 __device__ float evo_calc_res(struct instance *inst,
-			      struct memory   *mem)
+			       struct memory   *mem)
 {
 	int* end = inst->rules + inst->rules_len - 1;
 	int* rules = inst->rules;
@@ -146,8 +150,10 @@ __device__ float evo_calc_res(struct instance *inst,
 
 	do {
 		eval_set_res_matrix_to_zero(inst, mem);
+
 		rules++;
 		rules = eval_interpret_rule(inst , mem, rules, 0);
+
 		rules++;
 		rules = eval_interpret_rule(inst , mem, rules, 1);
 

@@ -1,16 +1,18 @@
 #ifndef __M_CONFIG_H__
 #define __M_CONFIG_H__
 
-#define BLOCKS  32
+#define BLOCKS  10
 
-#define PARENTS 30
-#define CHILDS   7 
+#define PARENTS 32
+#define CHILDS   6
 
 #define RECOMB_RATE 0.7
 #define MUT_RATE    0.3 
 
 #define MATRIX_HEIGHT 5
 #define MATRIX_WIDTH  5
+
+#define PARENT_MAX 10000.0f
 
 /* HACK: we can"t allocate memory dynamically, this should be enough */
 #define MUL_ROW_LEN MATRIX_WIDTH

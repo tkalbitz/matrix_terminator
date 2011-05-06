@@ -32,7 +32,7 @@ void alloc_parent_matrix(struct instance *inst)
 
 	cudaPitchedPtr pitched_ptr;
 	CUDA_CALL(cudaMalloc3D(&pitched_ptr, inst->dev_parent_ext));
-	CUDA_CALL(cudaMemset3D(pitched_ptr, 0, inst->dev_parent_ext));
+	//CUDA_CALL(cudaMemset3D(pitched_ptr, 0, inst->dev_parent_ext));
 
 	inst->dev_parent = pitched_ptr;
 }
@@ -55,7 +55,7 @@ void alloc_child_matrix(struct instance *inst)
 
 	cudaPitchedPtr pitched_ptr;
 	CUDA_CALL(cudaMalloc3D(&pitched_ptr, inst->dev_child_ext));
-	CUDA_CALL(cudaMemset3D(pitched_ptr, 0, inst->dev_child_ext));
+	//CUDA_CALL(cudaMemset3D(pitched_ptr, 0, inst->dev_child_ext));
 	inst->dev_child = pitched_ptr;
 }
 
@@ -72,7 +72,7 @@ void alloc_result_matrix(struct instance *inst)
 
 	cudaPitchedPtr pitched_ptr;
 	CUDA_CALL(cudaMalloc3D(&pitched_ptr, inst->dev_res_ext));
-	CUDA_CALL(cudaMemset3D(pitched_ptr, 0, inst->dev_res_ext));
+	//CUDA_CALL(cudaMemset3D(pitched_ptr, 0, inst->dev_res_ext));
 	inst->dev_res = pitched_ptr;
 }
 
@@ -109,6 +109,7 @@ void init_rnd_generator(struct instance *inst, int seed)
 			     count * BLOCKS * sizeof(curandState)));
 	setup_rnd_kernel<<<BLOCKS, count>>>(rnd_states, seed);
 	CUDA_CALL(cudaGetLastError());
+	cudaThreadSynchronize();
 	inst->rnd_states = rnd_states;
 }
 
@@ -124,6 +125,17 @@ void set_num_matrices(struct instance* inst)
 
 void init_instance(struct instance* inst)
 {
+//	inst->rule_count = 1;
+//	inst->rules_len  = 7;
+//	inst->rules = (int*)malloc(sizeof(int) * inst->rules_len);
+//	inst->rules[0] = MUL_SEP;
+//	inst->rules[1] = 1;
+//	inst->rules[2] = 0;
+//	inst->rules[3] = MUL_SEP;
+//	inst->rules[4] = 0;
+//	inst->rules[5] = 1;
+//	inst->rules[6] = MUL_SEP;
+
 	inst->rule_count = 3;
 	inst->rules_len  = 22;
 	inst->rules = (int*)malloc(sizeof(int) * inst->rules_len);
@@ -164,6 +176,12 @@ void init_instance(struct instance* inst)
 	inst->dim.matrix_height = MATRIX_HEIGHT;
 	
 	inst->rounds = 0;
+	inst->isnan = 0;
+
+	inst->res_block = 0;
+	inst->res_parent = 0;
+	inst->res_child_block = 0;
+	inst->res_child_idx = 0;
 
 	set_num_matrices(inst);
 
@@ -195,9 +213,11 @@ struct instance* create_dev_inst(struct instance *inst)
 {
 	struct instance *dev_inst;
 	int *rules = inst->rules;
-	CUDA_CALL(cudaMalloc(&(inst->rules), inst->rules_len * sizeof(int)));
-	CUDA_CALL(cudaMemcpy(inst->rules, rules, inst->rules_len * sizeof(int),
+	int *dev_rules;
+	CUDA_CALL(cudaMalloc(&dev_rules, inst->rules_len * sizeof(int)));
+	CUDA_CALL(cudaMemcpy(dev_rules, rules, inst->rules_len * sizeof(int),
 					cudaMemcpyHostToDevice));
+	inst->rules = dev_rules;
 	CUDA_CALL(cudaMalloc(&dev_inst, sizeof(*dev_inst)));
 	CUDA_CALL(cudaMemcpy(dev_inst, inst, sizeof(*dev_inst),
 					cudaMemcpyHostToDevice));
@@ -215,25 +235,58 @@ void copy_inst_dev_to_host(struct instance *dev, struct instance *host)
 
 int main(int argc, char** argv)
 {
+	/* there is no runtime limit for kernels */
+//	CUDA_CALL(cudaSetDevice(1));
+
 	struct instance inst;
 	struct instance *dev_inst;
 
 	init_instance(&inst);
 	dev_inst = create_dev_inst(&inst);
 
+	printf("Rules: ");
+	print_rules(&inst);
+
 	setup_parent_kernel<<<BLOCKS, inst.dim.matrix_height>>>(dev_inst);
+	cudaThreadSynchronize();
 	CUDA_CALL(cudaGetLastError());
-	//print_parent_matrix(&inst);
 
 	int evo_threads = get_evo_threads(&inst);
+
+	// Prepare
+	cudaEvent_t start, stop;
+	cudaEventCreate(&start);
+	cudaEventCreate(&stop);
+	// Start record
+	cudaEventRecord(start, 0);
+
 	evo_kernel<<<BLOCKS, evo_threads>>>(dev_inst);
 	CUDA_CALL(cudaGetLastError());
+	cudaThreadSynchronize();
+	CUDA_CALL(cudaGetLastError());
+
+	// Stop event
+	cudaEventRecord(stop, 0);
+	cudaEventSynchronize(stop);
+	float elapsedTime;
+	cudaEventElapsedTime(&elapsedTime, start, stop); // that's our time!
+	// Clean up:
+	cudaEventDestroy(start);
+	cudaEventDestroy(stop);
 
 	copy_inst_dev_to_host(dev_inst, &inst);
 
+	print_parent_ratings(&inst);
+	printf("Result:\n");
+	print_result_matrix_pretty(&inst, inst.res_child_block, inst.res_child_idx);
+	printf("Parents:\n");
+	print_parent_matrix_pretty(&inst, inst.res_block, inst.res_parent);
+	print_rules(&inst);
+	printf("Time needed: %f\n", elapsedTime);
 	printf("Needed rounds: %d\n", inst.rounds);
+	printf("Is NaN: %d\n", inst.isnan);
 	printf("Result is block: %d, parent: %d\n", inst.res_block, inst.res_parent);
-	print_parent_matrix(&inst, inst.res_block, inst.res_parent);
+	printf("Result was in block: %d, child: %d\n", inst.res_child_block, inst.res_child_idx);
 
 	printf("Clean up and exit.\n");
 	cleanup(&inst, dev_inst);
