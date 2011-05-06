@@ -63,12 +63,13 @@ struct instance {
 
 	int isnan;
 
+	unsigned int cont;      /* continue search */
 	int rounds;             /* how many rounds we worked on that problem? */
-	int res_block;		/* in which block is the result */
-	int res_parent;		/* which parent is the result */
+	unsigned int res_block; /* in which block is the result */
+	unsigned int res_parent;/* which parent is the result */
 
-	int res_child_block;		/* in which block is the result */
-	int res_child_idx;		/* which parent is the result */
+	unsigned int res_child_block; /* in which block is the result */
+	unsigned int res_child_idx;   /* which parent is the result */
 
 	uint8_t	match:1,	/* match all rules or any of them */
 		cond_left:3,	/* left condition */

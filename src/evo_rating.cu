@@ -64,12 +64,10 @@ __device__ void eval_mul_inplace(struct instance *inst,
 		float_memcpy(row, rrow, inst->dim.matrix_width);
 
 		/* child column */
-		#pragma unroll
 		for(int ccidx = 0; ccidx < rows; ccidx++) {
 			float tmp = 0.f;
 
 			/* child row */
-			#pragma unroll
 			for(int cridx = 0; cridx < rows; cridx++) {
 				const float* const crow = C_ROW(cridx);
 				tmp += row[cridx] * crow[cstart + ccidx];
@@ -141,7 +139,7 @@ __device__ float evo_result_rating(struct instance *inst,
 }
 
 __device__ float evo_calc_res(struct instance *inst,
-			       struct memory   *mem)
+			      struct memory   *mem)
 {
 	const int* end = inst->rules + inst->rules_len - 1;
 	int* rules = inst->rules;

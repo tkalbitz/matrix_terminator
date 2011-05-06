@@ -1,7 +1,7 @@
 #ifndef __M_CONFIG_H__
 #define __M_CONFIG_H__
 
-#define BLOCKS  10
+#define BLOCKS  8
 
 #define PARENTS 32
 #define CHILDS   6
