@@ -12,29 +12,30 @@ __device__ void eval_set_res_matrix_to_zero(struct instance *inst,
 {
 	int rows = inst->dim.matrix_height;
 	int start = mem->r_zero1;
-	int end = mem->r_end2;
 
-	float *row;
+	float *row0;
 
-	for(int r = 0; r < rows; r++) {
-		row = R_ROW(r);
-		for(int c = start; c < end; c++) {
-			row[c] = 0.f;
-		}
+	row0 = R_ROW(0) + start;
+
+	const int width = 2*inst->dim.matrix_width;
+	for(int c = 0; c < width; c++) {
+		row0[c] = 0.f;
+	}
+
+	for(int r = 1; r < rows; r++) {
+		float_memcpy(&(R_ROW(r)[start]), row0, width);
 	}
 }
 
 __device__ void eval_copy_matrix_to_res(struct instance *inst,
 		    	    	    	struct memory *mem,
-		    	    	    	int cmatrix,
-		    	    	    	int rmatrix)
+		    	    	    	const int cmatrix,
+		    	    	    	const int rmatrix)
 {
-	int rows = inst->dim.matrix_height;
+	const int rows = MATRIX_HEIGHT;
 
-	int cstart = mem->c_zero +
-		     cmatrix * inst->dim.matrix_width;
-	int rstart = mem->r_zero1 +
-		     rmatrix * inst->dim.matrix_width;
+	const int cstart = mem->c_zero  + cmatrix * MATRIX_WIDTH;
+	const int rstart = mem->r_zero1 + rmatrix * MATRIX_WIDTH;
 
 	for(int r = 0; r < rows; r++) {
 		float_memcpy(&(R_ROW(r)[rstart]),
@@ -45,34 +46,36 @@ __device__ void eval_copy_matrix_to_res(struct instance *inst,
 
 __device__ void eval_mul_inplace(struct instance *inst,
 				 struct memory *mem,
-				 int cmatrix,
-				 int rmatrix)
+				 const int cmatrix,
+				 const int rmatrix)
 {
-	int rows = inst->dim.matrix_height;
+	const int rows = MATRIX_HEIGHT;
 
-	int cstart = mem->c_zero  + cmatrix * inst->dim.matrix_width;
-	int rstart = mem->r_zero1 + rmatrix * inst->dim.matrix_width;
+	const int cstart = mem->c_zero  + cmatrix * inst->dim.matrix_width;
+	const int rstart = mem->r_zero1 + rmatrix * inst->dim.matrix_width;
 
-	float *rrow, *crow;
 	float row[MUL_ROW_LEN];
 
 	/* result rows */
 	for(int rridx = 0; rridx < rows; rridx++) {
-		rrow = R_ROW(rridx);
+		float* const rrow = &(R_ROW(rridx)[rstart]);
 
 		/* copy current line so we can work inplace */
-		float_memcpy(row, &(rrow[rstart]), inst->dim.matrix_width);
+		float_memcpy(row, rrow, inst->dim.matrix_width);
 
 		/* child column */
+		#pragma unroll
 		for(int ccidx = 0; ccidx < rows; ccidx++) {
-			int pos = rstart + ccidx;
-			rrow[pos] = 0.f;
+			float tmp = 0.f;
 
 			/* child row */
+			#pragma unroll
 			for(int cridx = 0; cridx < rows; cridx++) {
-				crow = C_ROW(cridx);
-				rrow[pos] += row[cridx] * crow[cstart + ccidx];
+				const float* const crow = C_ROW(cridx);
+				tmp += row[cridx] * crow[cstart + ccidx];
 			}
+
+			rrow[ccidx] = tmp;
 		}
 	}
 }
@@ -80,7 +83,7 @@ __device__ void eval_mul_inplace(struct instance *inst,
 __device__ int* eval_interpret_rule(struct instance *inst,
 				    struct memory   *mem,
 				    int*   rule,
-				    int    rmatrix)
+				    const int rmatrix)
 {
 	if(*rule == MUL_SEP)
 		return rule;
@@ -102,10 +105,10 @@ __device__ int* eval_interpret_rule(struct instance *inst,
 __device__ float evo_result_rating(struct instance *inst,
 				   struct memory   *mem)
 {
-	int rows = inst->dim.matrix_height;
-	int cols = inst->dim.matrix_width;
-	int first = mem->r_zero1;
-	int sec = mem->r_zero2;
+	const int rows = MATRIX_HEIGHT;
+	const int cols = MATRIX_WIDTH;
+	const int first = mem->r_zero1;
+	const int sec   = mem->r_zero2;
 	float* row;
 	float rating = 0.f;
 
@@ -140,7 +143,7 @@ __device__ float evo_result_rating(struct instance *inst,
 __device__ float evo_calc_res(struct instance *inst,
 			       struct memory   *mem)
 {
-	int* end = inst->rules + inst->rules_len - 1;
+	const int* end = inst->rules + inst->rules_len - 1;
 	int* rules = inst->rules;
 	float rating = 0.f;
 

@@ -452,10 +452,11 @@ __global__ void evo_kernel_test(struct instance *inst)
 
 		/* Parallel copy of memory */
 		if(threadIdx.x < inst->dim.parents) {
-			copy_child_to_parent(inst, &mem,
-					     (int)mem.c_rat[2 * threadIdx.x + 1],
-					     threadIdx.x);
-			mem.p_rat[threadIdx.x] = mem.c_rat[2 * threadIdx.x];
+			evo_calc_res(inst, &mem);
+//			copy_child_to_parent(inst, &mem,
+//					     (int)mem.c_rat[2 * threadIdx.x + 1],
+//					     threadIdx.x);
+//			mem.p_rat[threadIdx.x] = mem.c_rat[2 * threadIdx.x];
 //			int res = ensure_correct_copy(inst, &mem,
 //					(int) mem.c_rat[2 * threadIdx.x + 1],
 //					threadIdx.x);

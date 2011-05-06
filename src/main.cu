@@ -236,7 +236,7 @@ void copy_inst_dev_to_host(struct instance *dev, struct instance *host)
 int main(int argc, char** argv)
 {
 	/* there is no runtime limit for kernels */
-//	CUDA_CALL(cudaSetDevice(1));
+	CUDA_CALL(cudaSetDevice(0));
 
 	struct instance inst;
 	struct instance *dev_inst;
