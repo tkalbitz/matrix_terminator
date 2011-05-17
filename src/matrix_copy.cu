@@ -7,7 +7,7 @@ void copy_parents_dev_to_host(struct instance* inst, void* parent_cpy)
 	p.dstPtr = make_cudaPitchedPtr(
 			parent_cpy,
 			inst->dev_parent_ext.width,
-			inst->dev_parent_ext.width / sizeof(float),
+			inst->dev_parent_ext.width / sizeof(double),
 			inst->dim.matrix_height);
 
 	p.extent = inst->dev_parent_ext;
@@ -21,7 +21,7 @@ void copy_parent_rating_dev_to_host(struct instance* inst, void* parent_rat_cpy)
 	p.srcPtr = inst->dev_prat;
 	p.dstPtr = make_cudaPitchedPtr(
 			parent_rat_cpy,
-			inst->dim.parents * sizeof(float),
+			inst->dim.parents * sizeof(double),
 			inst->dim.parents,
 			1);
 
@@ -37,7 +37,7 @@ void copy_results_dev_to_host(struct instance* inst, void* result_cpy)
 	p.dstPtr = make_cudaPitchedPtr(
 			result_cpy,
 			inst->dev_res_ext.width,
-			inst->dev_res_ext.width / sizeof(float),
+			inst->dev_res_ext.width / sizeof(double),
 			inst->dim.matrix_height);
 
 	p.extent = inst->dev_res_ext;

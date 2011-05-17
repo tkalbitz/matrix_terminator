@@ -12,7 +12,7 @@ void print_rules(struct instance *inst)
 			if(mul_sep_count == 0)
 				printf("-");
 			else
-				printf("; ");
+				printf(";\n\n");
 
 			mul_sep_count = !mul_sep_count;
 		} else {
@@ -25,9 +25,9 @@ void print_rules(struct instance *inst)
 	printf("\n");
 }
 
-static void print_parent_matrix_line(struct instance *inst, float* parent_cpy)
+static void print_parent_matrix_line(struct instance *inst, double* parent_cpy)
 {
-	int count = inst->dev_parent_ext.width / sizeof(float);
+	int count = inst->dev_parent_ext.width / sizeof(double);
 	for (int w = 0; w < count; w++) {
 		if((w % inst->dim.matrix_width) == 0) {
 			printf(" | ");
@@ -38,7 +38,7 @@ static void print_parent_matrix_line(struct instance *inst, float* parent_cpy)
 	printf("\n");
 }
 
-static void print_parent_matrix_line(struct instance *inst, float* parent_cpy, int parent)
+static void print_parent_matrix_line(struct instance *inst, double* parent_cpy, int parent)
 {
 	int count = parent * inst->width_per_inst + inst->width_per_inst;
 	for (int w = parent * inst->width_per_inst; w < count; w++) {
@@ -55,17 +55,17 @@ void print_parent_matrix(struct instance* inst, int block, int parent)
 {
 	int width = inst->dim.parents    * /* there are n parents per block */
 		    inst->width_per_inst *
-		    sizeof(float) *
+		    sizeof(double) *
 		    inst->dim.matrix_height * inst->dim.blocks;
 
-	float* parent_cpy = (float*)malloc(width);
+	double* parent_cpy = (double*)malloc(width);
 	memset(parent_cpy, 1, width);
 
 	copy_parents_dev_to_host(inst, parent_cpy);
 
 	int line = inst->dim.parents *  inst->width_per_inst;
 	int block_offset = line * inst->dim.matrix_height;
-	float* block_ptr = parent_cpy + block_offset * block;
+	double* block_ptr = parent_cpy + block_offset * block;
 
 	for (int h = 0; h < inst->dim.matrix_height; h++) {
 		print_parent_matrix_line(inst, (block_ptr + h*line), parent);
@@ -75,7 +75,7 @@ void print_parent_matrix(struct instance* inst, int block, int parent)
 	//print_parent_ratings(inst);
 }
 
-static void print_parent_matrix_line_pretty(struct instance *inst, float* parent_cpy, int parent, int m)
+static void print_parent_matrix_line_pretty(struct instance *inst, double* parent_cpy, int parent, int m)
 {
 	int count = parent * inst->width_per_inst + (m + 1) * inst->dim.matrix_width - 1;
 	int w = parent * inst->width_per_inst + m * inst->dim.matrix_width;
@@ -93,17 +93,17 @@ void print_parent_matrix_pretty(struct instance* inst, int block, int parent)
 {
 	int width = inst->dim.parents    * /* there are n parents per block */
 		    inst->width_per_inst *
-		    sizeof(float) *
+		    sizeof(double) *
 		    inst->dim.matrix_height * inst->dim.blocks;
 
-	float* parent_cpy = (float*)malloc(width);
+	double* parent_cpy = (double*)malloc(width);
 	memset(parent_cpy, 1, width);
 
 	copy_parents_dev_to_host(inst, parent_cpy);
 
 	int line = inst->dim.parents *  inst->width_per_inst;
 	int block_offset = line * inst->dim.matrix_height;
-	float* block_ptr = parent_cpy + block_offset * block;
+	double* block_ptr = parent_cpy + block_offset * block;
 
 	for(int m = 0; m < inst->num_matrices; m++) {
 		printf("%c: matrix(\n", 'A'+m);
@@ -122,7 +122,7 @@ void print_parent_matrix_pretty(struct instance* inst, int block, int parent)
 	//print_parent_ratings(inst);
 }
 
-static void print_result_matrix_line_pretty(struct instance *inst, float* result_cpy, int child, int m)
+static void print_result_matrix_line_pretty(struct instance *inst, double* result_cpy, int child, int m)
 {
 	int w =     child * 2 * inst->dim.matrix_width + m * inst->dim.matrix_width;
 	int count = child * 2 * inst->dim.matrix_width + (m + 1) * inst->dim.matrix_width - 1;
@@ -139,10 +139,10 @@ static void print_result_matrix_line_pretty(struct instance *inst, float* result
 void print_result_matrix_pretty(struct instance* inst, int block, int child)
 {
 	int width = inst->dim.childs * inst->dim.parents *
-		    2 * inst->dim.matrix_width * sizeof(float) *
+		    2 * inst->dim.matrix_width * sizeof(double) *
 		    inst->dim.matrix_height * inst->dim.blocks;
 
-	float* result_cpy = (float*)malloc(width);
+	double* result_cpy = (double*)malloc(width);
 	memset(result_cpy, 1, width);
 
 	copy_results_dev_to_host(inst, result_cpy);
@@ -150,7 +150,7 @@ void print_result_matrix_pretty(struct instance* inst, int block, int child)
 	int line = inst->dim.childs * inst->dim.parents *
 		   2 * inst->dim.matrix_width;
 	int block_offset = line * inst->dim.matrix_height;
-	float* block_ptr = result_cpy + block_offset * block;
+	double* block_ptr = result_cpy + block_offset * block;
 
 	for(int m = 0; m < 2; m++) {
 		printf("%c: matrix(\n", 'A'+m);
@@ -171,8 +171,8 @@ void print_result_matrix_pretty(struct instance* inst, int block, int child)
 void print_parent_ratings(struct instance *inst)
 {
 	int width = inst->dim.parents * inst->dim.blocks;
-	float *rating = (float*)malloc(width * sizeof(float));
-	memset(rating, 1, width * sizeof(float));
+	double *rating = (double*)malloc(width * sizeof(double));
+	memset(rating, 1, width * sizeof(double));
 	copy_parent_rating_dev_to_host(inst, rating);
 	printf("-------------------RATINGS-------------------------------\n");
 	int i = 0;
@@ -190,9 +190,9 @@ void print_parent_matrix(struct instance* inst)
 {
 	int width = inst->dim.parents    * /* there are n parents per block */
 		    inst->width_per_inst *
-		    sizeof(float);
+		    sizeof(double);
 
-	float* parent_cpy = (float*)malloc(width * inst->dim.matrix_height * inst->dim.blocks);
+	double* parent_cpy = (double*)malloc(width * inst->dim.matrix_height * inst->dim.blocks);
 	memset(parent_cpy, 1, width * inst->dim.matrix_height * inst->dim.blocks);
 
 	copy_parents_dev_to_host(inst, parent_cpy);
@@ -202,7 +202,7 @@ void print_parent_matrix(struct instance* inst)
 
 	for (int h = 0; h < inst->dim.matrix_height; h++) {
 		for (int b = 0; b < inst->dim.blocks; b++) {
-			float* line_ptr = parent_cpy + (h * line + b * block_offset);
+			double* line_ptr = parent_cpy + (h * line + b * block_offset);
 			print_parent_matrix_line(inst, line_ptr);
 		}
 		printf("--------------------------------------------------\n");

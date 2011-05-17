@@ -7,34 +7,39 @@
 #include "instance.h"
 #include "config.h"
 
-__device__ void float_memcpy(float* to, float* from, int size)
+__device__ void double_memcpy(double* to, double* from, int size)
 {
-//	memcpy(to, from, size * sizeof(float));
-
-	if(((unsigned long long)to   & 0x4) ||
-	   ((unsigned long long)from & 0x4)) {
-		while(size--) {
-			*to = *from;
-			to++;
-			from++;
-		}
-	} else {
-		long long *t = (long long*)to;
-		long long *f = (long long*)from;
-		int s = size >> 1;
-
-		while(s--) {
-			*t = *f;
-			t++;
-			f++;
-		}
-
-		if(size & 1) {
-			to   = (float*)t;
-			from = (float*)f;
-			*to  = *from;
-		}
+//	memcpy(to, from, size * sizeof(double));
+	while(size--) {
+		*to = *from;
+		to++;
+		from++;
 	}
+
+//	if(((unsigned long long)to   & 0x4) ||
+//	   ((unsigned long long)from & 0x4)) {
+//		while(size--) {
+//			*to = *from;
+//			to++;
+//			from++;
+//		}
+//	} else {
+//		long long *t = (long long*)to;
+//		long long *f = (long long*)from;
+//		int s = size >> 1;
+//
+//		while(s--) {
+//			*t = *f;
+//			t++;
+//			f++;
+//		}
+//
+//		if(size & 1) {
+//			to   = (double*)t;
+//			from = (double*)f;
+//			*to  = *from;
+//		}
+//	}
 }
 
 /* calculate the thread id for the current block topology */
@@ -73,7 +78,7 @@ __global__ void setup_parent_kernel(struct instance *inst)
 	int y = threadIdx.x;
 
 	char* slice = devPtr + z * slicePitch;
-	float* row = (float*) (slice + y * pitch);
+	double* row = (double*) (slice + y * pitch);
 
 	for(int x = 0; x < inst->dim.parents * inst->width_per_inst; x++) {
 		if(curand_uniform(&rnd_state) < MATRIX_TAKEN_POS) {
@@ -92,14 +97,14 @@ __global__ void setup_parent_kernel(struct instance *inst)
 
 	if(inst->cond_left == COND_UPPER_LEFT) {
 		y = 0;
-		row = (float*) (slice + y * pitch);
+		row = (double*) (slice + y * pitch);
 
 		for(int i = 0; i < matrices; i++) {
 			row[i * inst->dim.matrix_width] = 1;
 		}
 	} else if(inst->cond_left == COND_UPPER_RIGHT) {
 		y = 0;
-		row = (float*) (slice + y * pitch);
+		row = (double*) (slice + y * pitch);
 
 		for(int i = 0; i < matrices; i++) {
 			int idx = i * inst->dim.matrix_width + (inst->dim.matrix_width - 1);
@@ -107,13 +112,13 @@ __global__ void setup_parent_kernel(struct instance *inst)
 		}
 	} else if(inst->cond_left == COND_UPPER_LEFT_LOWER_RIGHT) {
 		y = 0;
-		row = (float*) (slice + y * pitch);
+		row = (double*) (slice + y * pitch);
 		for(int i = 0; i < matrices; i++) {
 			row[i * inst->dim.matrix_width] = 1;
 		}
 
 		y = (inst->dim.matrix_height - 1);
-		row = (float*) (slice + y * pitch);
+		row = (double*) (slice + y * pitch);
 		for(int i = 0; i < matrices; i++) {
 			int idx = i * inst->dim.matrix_width + (inst->dim.matrix_width - 1);
 			row[idx] = 1;
@@ -121,9 +126,9 @@ __global__ void setup_parent_kernel(struct instance *inst)
 	}
 }
 
-#define C_ROW(y) ((float*) (mem->c_slice + y * mem->c_pitch))
-#define P_ROW(y) ((float*) (mem->p_slice + y * mem->p_pitch))
-#define R_ROW(y) ((float*) (mem->r_slice + y * mem->r_pitch))
+#define C_ROW(y) ((double*) (mem->c_slice + y * mem->c_pitch))
+#define P_ROW(y) ((double*) (mem->p_slice + y * mem->p_pitch))
+#define R_ROW(y) ((double*) (mem->r_slice + y * mem->r_pitch))
 
 struct memory {
 	size_t p_pitch;
@@ -143,8 +148,8 @@ struct memory {
 	int r_end1;
 	int r_end2;
 
-	float* c_rat;
-	float* p_rat;
+	double* c_rat;
+	double* p_rat;
 };
 
 __device__ void evo_init_mem(struct instance* inst, struct memory *mem)
@@ -187,13 +192,13 @@ __device__ void evo_init_mem(struct instance* inst, struct memory *mem)
 	size_t t_pitch = inst->dev_crat.pitch;
 	size_t t_slice_pitch = t_pitch * 1;
 	char* t_slice = t_dev_ptr + blockIdx.x /* z */ * t_slice_pitch;
-	mem->c_rat = (float*) (t_slice + 0 * t_pitch);
+	mem->c_rat = (double*) (t_slice + 0 * t_pitch);
 
 	t_dev_ptr = (char*)inst->dev_prat.ptr;
 	t_pitch = inst->dev_prat.pitch;
 	t_slice_pitch = t_pitch * 1;
 	t_slice = t_dev_ptr + blockIdx.x /* z */ * t_slice_pitch;
-	mem->p_rat = (float*) (t_slice + 0 * t_pitch);
+	mem->p_rat = (double*) (t_slice + 0 * t_pitch);
 }
 
 /*
@@ -219,8 +224,8 @@ __device__ void evo_recombination(struct instance *inst,
 	const int cIdx = mem->c_zero;
 
 	for(int r = 0; r < rows; r++) {
-		float* const c_row = C_ROW(r);
-		float* const p_row = P_ROW(r);
+		double* const c_row = C_ROW(r);
+		double* const p_row = P_ROW(r);
 
 		for(int c = 0; c < cols; c++) {
 			if(curand_uniform(rnd_state) > RECOMB_RATE) {
@@ -235,16 +240,17 @@ __device__ void evo_recombination(struct instance *inst,
 __device__ void evo_ensure_constraints(struct instance *inst,
 				       struct memory   *mem)
 {
-	float* row = C_ROW(0);
+	double* row = C_ROW(0);
 	int end   = mem->c_end;
 
 	int factor = (int)(1.f / inst->delta);
 	if((factor * inst->delta) < 1.f)
 		factor++;
 
-	float val = factor * inst->delta;
+	double val = factor * inst->delta;
 
 	for(int start = mem->c_zero; start < end; start += inst->dim.matrix_width) {
+		row = C_ROW(0);
 		if(inst->cond_right == COND_UPPER_LEFT && row[start] < 1.f) {
 			row[start] = val;
 		} else if(inst->cond_right == COND_UPPER_RIGHT &&
@@ -252,11 +258,10 @@ __device__ void evo_ensure_constraints(struct instance *inst,
 		{
 			row[start + inst->dim.matrix_width - 1] = val;
 		} else if(inst->cond_right == COND_UPPER_LEFT_LOWER_RIGHT) {
-			row = C_ROW(0);
 			if(row[start] < 1.f)
 				row[start] = val;
 
-			row = R_ROW(inst->dim.matrix_height - 1);
+			row = C_ROW(inst->dim.matrix_height - 1);
 			if(row[start + inst->dim.matrix_width - 1] < 1.f)
 				row[start + inst->dim.matrix_width - 1] = val;
 		}
@@ -266,16 +271,16 @@ __device__ void evo_ensure_constraints(struct instance *inst,
 __device__ void evo_mutation(struct instance * const inst,
 			     struct memory   * const mem,
 			     curandState     * const rnd_state,
-                             float           * const s_param)
+                             double          * const s_param)
 {
 	*s_param = *s_param * exp(curand_normal(rnd_state) / 1000);
 	const int rows = MATRIX_HEIGHT;
-	const float delta = inst->delta;
-	float tmp;
+	const double delta = inst->delta;
+	double tmp;
 
 	#pragma unroll
 	for(int r = 0; r < rows; r++) {
-		float* const row = C_ROW(r);
+		double* const row = C_ROW(r);
 
 		for(int c = mem->c_zero; c < mem->c_end; c++) {
 
@@ -283,7 +288,7 @@ __device__ void evo_mutation(struct instance * const inst,
 				continue;
 
 			tmp = row[c];
-			tmp = tmp + (float)(curand_normal(rnd_state) * (*s_param));
+			tmp = tmp + (double)(curand_normal(rnd_state) * (*s_param));
 			/* we want x * delta, where x is an int */  	
 			tmp = ((unsigned long)(tmp / delta)) * delta;
 			tmp = max(tmp, 0.0);
@@ -299,9 +304,9 @@ __device__ void evo_mutation(struct instance * const inst,
 __device__ void evo_parent_selection(struct instance *inst, struct memory *mem)
 {
 	const int elems = 2 * inst->dim.childs * inst->dim.parents;
-	float* const arr = mem->c_rat;
+	double* const arr = mem->c_rat;
 
-	float key, child;
+	double key, child;
 
 	/* insertion sort */
 	for(int i = 2; i < elems; i+=2) {
@@ -329,10 +334,10 @@ __device__ void copy_child_to_parent(struct instance *inst,
 	const int rows = MATRIX_HEIGHT;
 
 	for(int r = 0; r < rows; r++) {
-		float* prow = P_ROW(r);
-		float* crow = C_ROW(r);
+		double* prow = P_ROW(r);
+		double* crow = C_ROW(r);
 
-		float_memcpy(&(prow[pstart]),
+		double_memcpy(&(prow[pstart]),
 		             &(crow[cstart]),
 		             inst->width_per_inst);
 	}
@@ -353,15 +358,15 @@ __global__ void evo_kernel(struct instance *inst)
 	evo_init_mem(inst, &mem);
 
 	int p_sel[2];
-	float s_param = 5.f; /* TODO: For every matrix? */
+	double s_param = 5.f; /* TODO: For every matrix? */
 
-	while(inst->cont && inst->rounds < 10000) {
+	while(inst->cont && inst->rounds < 5000) {
 		evo_recomb_selection(inst, &rnd_state, p_sel);
 
 		evo_recombination(inst, &mem, &rnd_state, p_sel);
 		evo_mutation(inst, &mem, &rnd_state, &s_param);
 
-		mem.c_rat[2 * threadIdx.x]     = evo_calc_res(inst, &mem);
+		//mem.c_rat[2 * threadIdx.x]     = evo_calc_res(inst, &mem);
 		mem.c_rat[2 * threadIdx.x + 1] = threadIdx.x;
 		if(mem.c_rat[2 * threadIdx.x] == 0.f) {
 			atomicExch(&inst->res_child_block, (unsigned int)blockIdx.x);
@@ -415,51 +420,19 @@ __global__ void evo_kernel_test(struct instance *inst)
 	evo_init_mem(inst, &mem);
 
 	int p_sel[2];
-	float s_param = 5.f; /* TODO: For every matrix? */
+	double s_param = 5.f; /* TODO: For every matrix? */
 
-	while(inst->rounds < 1000) {
-		evo_recomb_selection(inst, &rnd_state, p_sel);
+	evo_recomb_selection(inst, &rnd_state, p_sel);
 
-		evo_recombination(inst, &mem, &rnd_state, p_sel);
-		evo_mutation(inst, &mem, &rnd_state, &s_param);
+	evo_recombination(inst, &mem, &rnd_state, p_sel);
+	evo_mutation(inst, &mem, &rnd_state, &s_param);
+
+	while(inst->rounds < 100) {
+		if(threadIdx.x == 0 && blockIdx.x == 0)
+			inst->rounds++;
 
 		mem.c_rat[2 * threadIdx.x]     = evo_calc_res(inst, &mem);
 		mem.c_rat[2 * threadIdx.x + 1] = threadIdx.x;
-		if(mem.c_rat[2 * threadIdx.x] == 0.f) {
-			inst->res_child_block = blockIdx.x;
-			inst->res_child_idx   = threadIdx.x;
-		}
-
-		__syncthreads();
-
-		/*
-		 * All threads should rated their results here.
-		 * It's time to get the new parents :D
-		 */
-		if(threadIdx.x == 0) {
-			if(blockIdx.x == 0) {
-				inst->rounds++;
-			}
-
-			evo_parent_selection(inst, &mem);
-			if(mem.c_rat[0] == 0.f) {
-				inst->cont = 0;
-				inst->res_block = blockIdx.x;
-				inst->res_parent = threadIdx.x;
-			}
-		}
-
-		__syncthreads();
-
-		/* Parallel copy of memory */
-		if(threadIdx.x < inst->dim.parents) {
-			copy_child_to_parent(inst, &mem,
-					     (int)mem.c_rat[2 * threadIdx.x + 1],
-					     threadIdx.x);
-			mem.p_rat[threadIdx.x] = mem.c_rat[2 * threadIdx.x];
-		}
-
-		__syncthreads();
 	}
 
 	/* backup rnd state to global mem */

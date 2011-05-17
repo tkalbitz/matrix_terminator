@@ -56,10 +56,9 @@ struct instance {
 	cudaExtent dev_crat_ext;   /* extend for child rating */
 	cudaExtent dev_prat_ext;   /* extend for parent rating */
 
-	float delta;		/* numbers in the matrices are multiple the amount */
+	double delta;		/* numbers in the matrices are multiple the amount */
 	int*   rules;		/* rules that must be matched */
 	size_t rules_len;       /* number of elements in rules */
-	size_t rule_count;	/* how many rules exists? */
 
 	int isnan;
 

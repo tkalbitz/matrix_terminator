@@ -13,7 +13,7 @@ __device__ void eval_set_res_matrix_to_zero(struct instance *inst,
 	int rows = inst->dim.matrix_height;
 	int start = mem->r_zero1;
 
-	float *row0;
+	double *row0;
 
 	row0 = R_ROW(0) + start;
 
@@ -23,7 +23,7 @@ __device__ void eval_set_res_matrix_to_zero(struct instance *inst,
 	}
 
 	for(int r = 1; r < rows; r++) {
-		float_memcpy(&(R_ROW(r)[start]), row0, width);
+		double_memcpy(&(R_ROW(r)[start]), row0, width);
 	}
 }
 
@@ -38,9 +38,9 @@ __device__ void eval_copy_matrix_to_res(struct instance *inst,
 	const int rstart = mem->r_zero1 + rmatrix * MATRIX_WIDTH;
 
 	for(int r = 0; r < rows; r++) {
-		float_memcpy(&(R_ROW(r)[rstart]),
-			     &(C_ROW(r)[cstart]),
-			     inst->dim.matrix_width);
+		double_memcpy(&(R_ROW(r)[rstart]),
+			      &(C_ROW(r)[cstart]),
+			      inst->dim.matrix_width);
 	}
 }
 
@@ -54,22 +54,22 @@ __device__ void eval_mul_inplace(struct instance *inst,
 	const int cstart = mem->c_zero  + cmatrix * inst->dim.matrix_width;
 	const int rstart = mem->r_zero1 + rmatrix * inst->dim.matrix_width;
 
-	float row[MUL_ROW_LEN];
+	double row[MUL_ROW_LEN];
 
 	/* result rows */
 	for(int rridx = 0; rridx < rows; rridx++) {
-		float* const rrow = &(R_ROW(rridx)[rstart]);
+		double* const rrow = &(R_ROW(rridx)[rstart]);
 
 		/* copy current line so we can work inplace */
-		float_memcpy(row, rrow, inst->dim.matrix_width);
+		double_memcpy(row, rrow, inst->dim.matrix_width);
 
 		/* child column */
 		for(int ccidx = 0; ccidx < rows; ccidx++) {
-			float tmp = 0.f;
+			double tmp = 0.f;
 
 			/* child row */
 			for(int cridx = 0; cridx < rows; cridx++) {
-				const float* const crow = C_ROW(cridx);
+				const double* const crow = C_ROW(cridx);
 				tmp += row[cridx] * crow[cstart + ccidx];
 			}
 
@@ -100,15 +100,15 @@ __device__ int* eval_interpret_rule(struct instance *inst,
 	return rule;
 }
 
-__device__ float evo_result_rating(struct instance *inst,
+__device__ double evo_result_rating(struct instance *inst,
 				   struct memory   *mem)
 {
 	const int rows = MATRIX_HEIGHT;
 	const int cols = MATRIX_WIDTH;
 	const int first = mem->r_zero1;
 	const int sec   = mem->r_zero2;
-	float* row;
-	float rating = 0.f;
+	double* row;
+	double rating = 0.f;
 
 	for(int r = 0; r < rows; r++) {
 		row = R_ROW(r);
@@ -138,12 +138,12 @@ __device__ float evo_result_rating(struct instance *inst,
 	return rating;
 }
 
-__device__ float evo_calc_res(struct instance *inst,
+__device__ double evo_calc_res(struct instance *inst,
 			      struct memory   *mem)
 {
 	const int* end = inst->rules + inst->rules_len - 1;
 	int* rules = inst->rules;
-	float rating = 0.f;
+	double rating = 0.f;
 
 	if(inst->match == MATCH_ANY) {
 		rating = FLT_MAX;

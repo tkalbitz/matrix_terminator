@@ -24,7 +24,7 @@ void alloc_parent_matrix(struct instance *inst)
 
 	int width = inst->dim.parents    * /* there are n parents per block */
 		    inst->width_per_inst *
-		    sizeof(float);
+		    sizeof(double);
 
 	inst->dev_parent_ext = make_cudaExtent(width,
 					       inst->dim.matrix_height,
@@ -47,7 +47,7 @@ void alloc_child_matrix(struct instance *inst)
 	assert(inst->num_matrices != 0);
 
 	int width = inst->dim.parents * inst->dim.childs * /* each parent should have n childs */
-		    inst->width_per_inst * sizeof(float);
+		    inst->width_per_inst * sizeof(double);
 
 	inst->dev_child_ext = make_cudaExtent(width,
 					      inst->dim.matrix_height,
@@ -66,7 +66,7 @@ void alloc_child_matrix(struct instance *inst)
 void alloc_result_matrix(struct instance *inst)
 {
 	inst->dev_res_ext = make_cudaExtent(inst->dim.childs * inst->dim.parents *
-					    2 * inst->dim.matrix_width * sizeof(float),
+					    2 * inst->dim.matrix_width * sizeof(double),
 					    inst->dim.matrix_height,
 					    inst->dim.blocks);
 
@@ -82,11 +82,11 @@ inline int get_evo_threads(struct instance *inst) {
 
 void alloc_rating(struct instance *inst)
 {
-	inst->dev_crat_ext = make_cudaExtent(2 * get_evo_threads(inst) * sizeof(float),
+	inst->dev_crat_ext = make_cudaExtent(2 * get_evo_threads(inst) * sizeof(double),
 	 			    	     1,
 	 			    	     inst->dim.blocks);
 
-	inst->dev_prat_ext = make_cudaExtent(inst->dim.parents * sizeof(float),
+	inst->dev_prat_ext = make_cudaExtent(inst->dim.parents * sizeof(double),
 					     1,
 					     inst->dim.blocks);
 
@@ -123,11 +123,18 @@ void set_num_matrices(struct instance* inst)
 	printf("num_matrices set to %d\n", inst->num_matrices);
 }
 
-void init_instance(struct instance* inst)
+void init_instance(struct instance* inst, char* rules)
 {
-//	inst->rule_count = 1;
-//	inst->rules_len  = 7;
-//	inst->rules = (int*)malloc(sizeof(int) * inst->rules_len);
+	inst->rules_len  = strlen(rules);
+	inst->rules = (int*)malloc(sizeof(int) * inst->rules_len);
+
+	for(int i = 0; i < inst->rules_len; i++) {
+		if(rules[i] > 96)
+			inst->rules[i] = (rules[i] == 'X') ? MUL_SEP : rules[i] - 'a';
+		else
+			inst->rules[i] = (rules[i] == 'X') ? MUL_SEP : rules[i] - '0';
+	}
+
 //	inst->rules[0] = MUL_SEP;
 //	inst->rules[1] = 1;
 //	inst->rules[2] = 0;
@@ -136,38 +143,66 @@ void init_instance(struct instance* inst)
 //	inst->rules[5] = 1;
 //	inst->rules[6] = MUL_SEP;
 
-	inst->rule_count = 3;
-	inst->rules_len  = 22;
-	inst->rules = (int*)malloc(sizeof(int) * inst->rules_len);
-	inst->rules[0] = MUL_SEP;
-	inst->rules[1] = 1;
-	inst->rules[2] = 1;
-	inst->rules[3] = 1;
-	inst->rules[4] = MUL_SEP;
-	inst->rules[5] = 0;
-	inst->rules[6] = MUL_SEP;
+//	inst->rule_count = 3;
+//	inst->rules_len  = 22;
+//	inst->rules = (int*)malloc(sizeof(int) * inst->rules_len);
+//	inst->rules[0] = MUL_SEP;
+//	inst->rules[1] = 1;
+//	inst->rules[2] = 1;
+//	inst->rules[3] = 1;
+//	inst->rules[4] = MUL_SEP;
+//	inst->rules[5] = 0;
+//	inst->rules[6] = MUL_SEP;
+//
+//	inst->rules[7] = 0;
+//	inst->rules[8] = 0;
+//	inst->rules[9] = MUL_SEP;
+//	inst->rules[10] = 0;
+//	inst->rules[11] = 1;
+//	inst->rules[12] = 0;
+//	inst->rules[13] = MUL_SEP;
+//
+//	inst->rules[14] = 0;
+//	inst->rules[15] = 0;
+//	inst->rules[16] = 0;
+//	inst->rules[17] = MUL_SEP;
+//	inst->rules[18] = 1;
+//	inst->rules[19] = 0;
+//	inst->rules[20] = 0;
+//	inst->rules[21] = MUL_SEP;
+///////////////////////////////////////
+//	inst->rule_count = 3;
+//	inst->rules_len  = 22;
+//	inst->rules = (int*)malloc(sizeof(int) * inst->rules_len);
+//	inst->rules[0] = MUL_SEP;
+//	inst->rules[1] = 1;
+//	inst->rules[2] = 1;
+//	inst->rules[3] = MUL_SEP;
+//	inst->rules[4] = 0;
+//	inst->rules[5] = 0;
+//	inst->rules[6] = 0;
+//	inst->rules[7] = MUL_SEP;
+//
+//	inst->rules[8]  = 0;
+//	inst->rules[9]  = 0;
+//	inst->rules[10] = 1;
+//	inst->rules[11] = MUL_SEP;
+//	inst->rules[12] = 1;
+//	inst->rules[13] = MUL_SEP;
+//
+//	inst->rules[14] = 0;
+//	inst->rules[15] = 1;
+//	inst->rules[16] = 0;
+//	inst->rules[17] = MUL_SEP;
+//	inst->rules[18] = 0;
+//	inst->rules[19] = 1;
+//	inst->rules[20] = 1;
+//	inst->rules[21] = MUL_SEP;
 
-	inst->rules[7] = 0;
-	inst->rules[8] = 0;
-	inst->rules[9] = MUL_SEP;
-	inst->rules[10] = 0;
-	inst->rules[11] = 1;
-	inst->rules[12] = 0;
-	inst->rules[13] = MUL_SEP;
-
-	inst->rules[14] = 0;
-	inst->rules[15] = 0;
-	inst->rules[16] = 0;
-	inst->rules[17] = MUL_SEP;
-	inst->rules[18] = 1;
-	inst->rules[19] = 0;
-	inst->rules[20] = 0;
-	inst->rules[21] = MUL_SEP;
-
-	inst->delta = 0.1;
+	inst->delta = 1;
 	inst->match = MATCH_ALL;
-	inst->cond_left  = COND_UPPER_RIGHT;
-	inst->cond_right = COND_UPPER_RIGHT;
+	inst->cond_left  = COND_UPPER_LEFT;
+	inst->cond_right = COND_UPPER_LEFT;
 
 	inst->dim.blocks  = BLOCKS;
 	inst->dim.childs  = CHILDS;
@@ -235,13 +270,18 @@ void copy_inst_dev_to_host(struct instance *dev, struct instance *host)
 
 int main(int argc, char** argv)
 {
+	if(argc < 2) {
+		printf("Please supply a rule\n");
+		exit(1);
+	}
+
 	/* there is no runtime limit for kernels */
 	CUDA_CALL(cudaSetDevice(0));
 
 	struct instance inst;
 	struct instance *dev_inst;
 
-	init_instance(&inst);
+	init_instance(&inst, argv[1]);
 	dev_inst = create_dev_inst(&inst);
 
 	printf("Rules: ");
@@ -260,7 +300,7 @@ int main(int argc, char** argv)
 	// Start record
 	cudaEventRecord(start, 0);
 
-	evo_kernel<<<BLOCKS, evo_threads>>>(dev_inst);
+	evo_kernel_test<<<BLOCKS, evo_threads>>>(dev_inst);
 	CUDA_CALL(cudaGetLastError());
 	cudaThreadSynchronize();
 	CUDA_CALL(cudaGetLastError());
