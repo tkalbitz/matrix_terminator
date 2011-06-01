@@ -7,12 +7,12 @@
 #define CHILDS   6
 
 #define RECOMB_RATE 0.7
-#define MUT_RATE    0.3 
+#define MUT_RATE    0.3
 
 #define MATRIX_HEIGHT 4
 #define MATRIX_WIDTH  4
 
-#define PARENT_MAX 10.0f
+#define PARENT_MAX 100.0f
 
 /* HACK: we can"t allocate memory dynamically, this should be enough */
 #define MUL_ROW_LEN MATRIX_WIDTH

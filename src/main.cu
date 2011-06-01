@@ -316,7 +316,8 @@ int main(int argc, char** argv)
 	int width = inst.dim.parents * inst.dim.blocks;
 	double *rating = (double*)malloc(width * sizeof(double));
 
-	for(int i = 0; i < 1000; i++) {
+	int max_rounds = 1000;
+	for(int i = 0; i < max_rounds; i++) {
 		cudaEventCreate(&start);
 		cudaEventCreate(&stop);
 		// Start record
@@ -345,14 +346,17 @@ int main(int argc, char** argv)
 		cudaEventDestroy(start);
 		cudaEventDestroy(stop);
 
-		print_parent_matrix_pretty(&inst, inst.res_block, inst.res_parent);
-		print_parent_ratings(&inst);
+//		print_parent_matrix_pretty(&inst, inst.res_block, inst.res_parent);
+//		print_parent_ratings(&inst);
 		//print_parent_matrix_pretty(&inst, inst.res_block, inst.res_parent);
 
 		copy_parent_rating_dev_to_host(&inst, rating);
 		for(int j = 0; j < width; j += PARENTS) {
-			if(rating[j] == 0.)
-				j = INT_MAX;
+			if(rating[j] == 0.) {
+				printf("Round: %d\n", i);
+				i = max_rounds;
+				break;
+			}
 		}
 	}
 
