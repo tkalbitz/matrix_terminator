@@ -366,7 +366,7 @@ __global__ void evo_kernel(struct instance *inst)
 		evo_recombination(inst, &mem, &rnd_state, p_sel);
 		evo_mutation(inst, &mem, &rnd_state, &s_param);
 
-		//mem.c_rat[2 * threadIdx.x]     = evo_calc_res(inst, &mem);
+		mem.c_rat[2 * threadIdx.x]     = evo_calc_res(inst, &mem);
 		mem.c_rat[2 * threadIdx.x + 1] = threadIdx.x;
 		if(mem.c_rat[2 * threadIdx.x] == 0.f) {
 			atomicExch(&inst->res_child_block, (unsigned int)blockIdx.x);

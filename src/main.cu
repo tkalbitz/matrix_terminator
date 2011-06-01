@@ -300,7 +300,7 @@ int main(int argc, char** argv)
 	// Start record
 	cudaEventRecord(start, 0);
 
-	evo_kernel_test<<<BLOCKS, evo_threads>>>(dev_inst);
+	evo_kernel<<<BLOCKS, evo_threads>>>(dev_inst);
 	CUDA_CALL(cudaGetLastError());
 	cudaThreadSynchronize();
 	CUDA_CALL(cudaGetLastError());
