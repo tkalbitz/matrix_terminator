@@ -30,6 +30,21 @@ void copy_parent_rating_dev_to_host(struct instance* inst, void* parent_rat_cpy)
 	CUDA_CALL(cudaMemcpy3D(&p));
 }
 
+void copy_sparam_dev_to_host(struct instance* inst, void* sparam_cpy)
+{
+	cudaMemcpy3DParms p = { 0 };
+	p.srcPtr = inst->dev_sparam;
+	p.dstPtr = make_cudaPitchedPtr(
+			sparam_cpy,
+			inst->dim.parents * inst->dim.childs * sizeof(double),
+			inst->dim.parents * inst->dim.childs,
+			1);
+
+	p.extent = inst->dev_sparam_ext;
+	p.kind = cudaMemcpyDeviceToHost;
+	CUDA_CALL(cudaMemcpy3D(&p));
+}
+
 void copy_results_dev_to_host(struct instance* inst, void* result_cpy)
 {
 	cudaMemcpy3DParms p = { 0 };

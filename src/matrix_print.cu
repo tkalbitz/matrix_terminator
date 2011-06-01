@@ -184,6 +184,26 @@ void print_parent_ratings(struct instance *inst)
 		}
 		printf("\n");
 	}
+	free(rating);
+}
+
+void print_sparam(struct instance *inst)
+{
+	int width = inst->dim.parents * inst->dim.childs * inst->dim.blocks;
+	double *sparam = (double*)malloc(width * sizeof(double));
+	memset(sparam, 1, width * sizeof(double));
+	copy_sparam_dev_to_host(inst, sparam);
+	printf("-------------------s param-------------------------------\n");
+	int i = 0;
+	for (int b = 0; b < inst->dim.blocks; b++) {
+		printf("block %3d: ", b);
+
+		for (; i < (b + 1) * (inst->dim.parents * inst->dim.childs); i++) {
+			printf("%3.2e ", sparam[i]);
+		}
+		printf("\n");
+	}
+	free(sparam);
 }
 
 void print_parent_matrix(struct instance* inst)

@@ -3,7 +3,7 @@
 
 #define BLOCKS  8
 
-#define PARENTS  32
+#define PARENTS  14
 #define CHILDS   6
 
 #define RECOMB_RATE 0.7

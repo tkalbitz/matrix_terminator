@@ -85,7 +85,7 @@ __device__ void evo_result_rating(struct instance *inst,
 {
 	const int rows = MATRIX_HEIGHT - 1;
 	const int cols = MATRIX_WIDTH  - 1;
-	double rating = 0.f;
+	double rating = 0.;
 
 	const int tx = threadIdx.x;
 	const int ty = threadIdx.y;
@@ -110,7 +110,7 @@ __device__ void evo_result_rating(struct instance *inst,
 
 	__syncthreads();
 
-	res[0][ty][tx] += fabs(min(res[0][ty][tx] - res[1][ty][tx], 0.f));
+	res[0][ty][tx] = fabs(min(res[0][ty][tx] - res[1][ty][tx], 0.));
 
 	if(tx != 0)
 		return;
@@ -190,7 +190,7 @@ __global__ void evo_calc_res(struct instance *inst)
 	if(threadIdx.x == 0 && threadIdx.y == 0) {
 		evo_init_mem2(inst, &res_mem);
 
-		shrd_rating = 0.f;
+		shrd_rating = 0.;
 		if(inst->match == MATCH_ANY) {
 			shrd_rating = FLT_MAX;
 		}
@@ -208,13 +208,13 @@ __global__ void evo_calc_res(struct instance *inst)
 		rules++;
 		rules = eval_interpret_rule(inst , &res_mem, rules, 1);
 
-		/* copy to test the result */
-		CR_ROW(threadIdx.y)[res_mem.r_zero1 + threadIdx.x] = res[0][threadIdx.y][threadIdx.x];
-		CR_ROW(threadIdx.y)[res_mem.r_zero2 + threadIdx.x] = res[1][threadIdx.y][threadIdx.x];
-
 		evo_result_rating(inst, &res_mem);
 		__syncthreads();
 	} while(rules != end);
+
+	/* copy to test the result */
+//	CR_ROW(threadIdx.y)[res_mem.r_zero1 + threadIdx.x] = res[0][threadIdx.y][threadIdx.x];
+//	CR_ROW(threadIdx.y)[res_mem.r_zero2 + threadIdx.x] = res[1][threadIdx.y][threadIdx.x];
 
 	__syncthreads();
 

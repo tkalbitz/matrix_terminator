@@ -281,7 +281,7 @@ __device__ void evo_mutation(struct instance * const inst,
 			     curandState     * const rnd_state,
                              double          * const s_param)
 {
-	*s_param = *s_param * exp(curand_normal(rnd_state) / 1000);
+	*s_param = *s_param * exp(curand_normal(rnd_state) / 10);
 	const int rows = MATRIX_HEIGHT;
 	const double delta = inst->delta;
 	double tmp;
@@ -443,7 +443,7 @@ __global__ void evo_kernel_test(struct instance *inst, int flag)
 		if(threadIdx.x == 0) {
 			evo_parent_selection(inst, &mem);
 			if(mem.c_rat[0] == 0.f) {
-				atomicExch(&(inst->res_block), blockIdx.x);
+				atomicExch(&(inst->res_block),  blockIdx.x);
 				atomicExch(&(inst->res_parent), threadIdx.x);
 			}
 		}

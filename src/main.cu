@@ -32,7 +32,6 @@ void alloc_parent_matrix(struct instance *inst)
 
 	cudaPitchedPtr pitched_ptr;
 	CUDA_CALL(cudaMalloc3D(&pitched_ptr, inst->dev_parent_ext));
-	//CUDA_CALL(cudaMemset3D(pitched_ptr, 0, inst->dev_parent_ext));
 
 	inst->dev_parent = pitched_ptr;
 }
@@ -55,7 +54,6 @@ void alloc_child_matrix(struct instance *inst)
 
 	cudaPitchedPtr pitched_ptr;
 	CUDA_CALL(cudaMalloc3D(&pitched_ptr, inst->dev_child_ext));
-	//CUDA_CALL(cudaMemset3D(pitched_ptr, 0, inst->dev_child_ext));
 	inst->dev_child = pitched_ptr;
 }
 
@@ -72,7 +70,6 @@ void alloc_result_matrix(struct instance *inst)
 
 	cudaPitchedPtr pitched_ptr;
 	CUDA_CALL(cudaMalloc3D(&pitched_ptr, inst->dev_res_ext));
-	//CUDA_CALL(cudaMemset3D(pitched_ptr, 0, inst->dev_res_ext));
 	inst->dev_res = pitched_ptr;
 }
 
@@ -84,7 +81,6 @@ void alloc_sparam(struct instance *inst)
 
 	cudaPitchedPtr pitched_ptr;
 	CUDA_CALL(cudaMalloc3D(&pitched_ptr, inst->dev_sparam_ext));
-	//CUDA_CALL(cudaMemset3D(pitched_ptr, 0, inst->dev_res_ext));
 	inst->dev_sparam = pitched_ptr;
 }
 inline int get_evo_threads(struct instance *inst) {
@@ -314,16 +310,13 @@ int main(int argc, char** argv)
 
 	// Prepare
 	cudaEvent_t start, stop;
-//	cudaEventCreate(&start);
-//	cudaEventCreate(&stop);
-//	// Start record
-//	cudaEventRecord(start, 0);
 	float elapsedTime;
 	float elapsedTimeTotal = 0.f;
 
-//	evo_kernel_test2<<<BLOCKS, evo_threads>>>(dev_inst);
+	int width = inst.dim.parents * inst.dim.blocks;
+	double *rating = (double*)malloc(width * sizeof(double));
 
-	for(int i = 0; i < 1; i++) {
+	for(int i = 0; i < 1000; i++) {
 		cudaEventCreate(&start);
 		cudaEventCreate(&stop);
 		// Start record
@@ -351,23 +344,19 @@ int main(int argc, char** argv)
 		// Clean up:
 		cudaEventDestroy(start);
 		cudaEventDestroy(stop);
+
+		print_parent_matrix_pretty(&inst, inst.res_block, inst.res_parent);
+		print_parent_ratings(&inst);
+		//print_parent_matrix_pretty(&inst, inst.res_block, inst.res_parent);
+
+		copy_parent_rating_dev_to_host(&inst, rating);
+		for(int j = 0; j < width; j += PARENTS) {
+			if(rating[j] == 0.)
+				j = INT_MAX;
+		}
 	}
 
-//	CUDA_CALL(cudaGetLastError());
-//	cudaThreadSynchronize();
-//	CUDA_CALL(cudaGetLastError());
-//
-//	// Stop event
-//	cudaEventRecord(stop, 0);
-//	cudaEventSynchronize(stop);
-////	float elapsedTime;
-//	cudaEventElapsedTime(&elapsedTime, start, stop); // that's our time!
-//	// Clean up:
-//	cudaEventDestroy(start);
-//	cudaEventDestroy(stop);
-
-//	elapsedTimeTotal = elapsedTime;
-
+	free(rating);
 	copy_inst_dev_to_host(dev_inst, &inst);
 
 	print_parent_ratings(&inst);
