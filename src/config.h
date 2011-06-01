@@ -1,10 +1,10 @@
 #ifndef __M_CONFIG_H__
 #define __M_CONFIG_H__
 
-#define BLOCKS  2
+#define BLOCKS  8
 
-#define PARENTS  2
-#define CHILDS   1
+#define PARENTS  32
+#define CHILDS   6
 
 #define RECOMB_RATE 0.7
 #define MUT_RATE    0.3 
