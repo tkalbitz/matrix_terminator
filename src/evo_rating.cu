@@ -10,7 +10,7 @@
 __device__ void eval_set_res_matrix_to_zero(struct instance *inst,
 					    struct memory   *mem)
 {
-	int rows = inst->dim.matrix_height;
+	int rows = MATRIX_HEIGHT;
 	int start = mem->r_zero1;
 
 	double *row0;
@@ -54,23 +54,25 @@ __device__ void eval_mul_inplace(struct instance *inst,
 	const int cstart = mem->c_zero  + cmatrix * inst->dim.matrix_width;
 	const int rstart = mem->r_zero1 + rmatrix * inst->dim.matrix_width;
 
-	double row[MUL_ROW_LEN];
+	__shared__ double row[PARENTS * CHILDS][MUL_ROW_LEN];
 
 	/* result rows */
 	for(int rridx = 0; rridx < rows; rridx++) {
 		double* const rrow = &(R_ROW(rridx)[rstart]);
 
 		/* copy current line so we can work inplace */
-		double_memcpy(row, rrow, inst->dim.matrix_width);
+		memcpy(row[threadIdx.x], rrow, inst->dim.matrix_width);
 
 		/* child column */
+		#pragma unroll
 		for(int ccidx = 0; ccidx < rows; ccidx++) {
 			double tmp = 0.f;
 
 			/* child row */
+			#pragma unroll
 			for(int cridx = 0; cridx < rows; cridx++) {
 				const double* const crow = C_ROW(cridx);
-				tmp += row[cridx] * crow[cstart + ccidx];
+				tmp += row[threadIdx.x][cridx] * crow[cstart + ccidx];
 			}
 
 			rrow[ccidx] = tmp;
@@ -139,7 +141,7 @@ __device__ double evo_result_rating(struct instance *inst,
 }
 
 __device__ double evo_calc_res(struct instance *inst,
-			      struct memory   *mem)
+			       struct memory   *mem)
 {
 	const int* end = inst->rules + inst->rules_len - 1;
 	int* rules = inst->rules;

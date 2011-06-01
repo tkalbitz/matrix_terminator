@@ -76,6 +76,17 @@ void alloc_result_matrix(struct instance *inst)
 	inst->dev_res = pitched_ptr;
 }
 
+void alloc_sparam(struct instance *inst)
+{
+	inst->dev_sparam_ext = make_cudaExtent(inst->dim.childs * inst->dim.parents * sizeof(double),
+					       1,
+					       inst->dim.blocks);
+
+	cudaPitchedPtr pitched_ptr;
+	CUDA_CALL(cudaMalloc3D(&pitched_ptr, inst->dev_sparam_ext));
+	//CUDA_CALL(cudaMemset3D(pitched_ptr, 0, inst->dev_res_ext));
+	inst->dev_sparam = pitched_ptr;
+}
 inline int get_evo_threads(struct instance *inst) {
 	return inst->dim.parents * inst->dim.childs;
 }
@@ -103,7 +114,7 @@ void alloc_rating(struct instance *inst)
 void init_rnd_generator(struct instance *inst, int seed)
 {	
 	curandState *rnd_states;
-	const int count = get_evo_threads(inst);
+	const int count = max(get_evo_threads(inst), MATRIX_HEIGHT);
 
 	CUDA_CALL(cudaMalloc((void **)&rnd_states, 
 			     count * BLOCKS * sizeof(curandState)));
@@ -227,6 +238,7 @@ void init_instance(struct instance* inst, char* rules)
 	alloc_child_matrix(inst);
 	alloc_result_matrix(inst);
 	alloc_rating(inst);
+	alloc_sparam(inst);
 	init_rnd_generator(inst, time(0));
 }
 
@@ -242,6 +254,7 @@ void cleanup(struct instance *inst, struct instance * dev_inst) {
 	cudaFree(inst->dev_res.ptr);
 	cudaFree(inst->dev_crat.ptr);
 	cudaFree(inst->dev_prat.ptr);
+	cudaFree(inst->dev_sparam.ptr);
 }
 
 struct instance* create_dev_inst(struct instance *inst)
@@ -292,27 +305,68 @@ int main(int argc, char** argv)
 	CUDA_CALL(cudaGetLastError());
 
 	int evo_threads = get_evo_threads(&inst);
+	dim3 blocks(BLOCKS, PARENTS*CHILDS);
+	dim3 threads(MATRIX_WIDTH, MATRIX_HEIGHT);
 
-	// Prepare
-	cudaEvent_t start, stop;
-	cudaEventCreate(&start);
-	cudaEventCreate(&stop);
-	// Start record
-	cudaEventRecord(start, 0);
-
-	evo_kernel_test<<<BLOCKS, evo_threads>>>(dev_inst);
-	CUDA_CALL(cudaGetLastError());
+	init_sparam<<<BLOCKS, evo_threads>>>(dev_inst);
 	cudaThreadSynchronize();
 	CUDA_CALL(cudaGetLastError());
 
-	// Stop event
-	cudaEventRecord(stop, 0);
-	cudaEventSynchronize(stop);
+	// Prepare
+	cudaEvent_t start, stop;
+//	cudaEventCreate(&start);
+//	cudaEventCreate(&stop);
+//	// Start record
+//	cudaEventRecord(start, 0);
 	float elapsedTime;
-	cudaEventElapsedTime(&elapsedTime, start, stop); // that's our time!
-	// Clean up:
-	cudaEventDestroy(start);
-	cudaEventDestroy(stop);
+	float elapsedTimeTotal = 0.f;
+
+//	evo_kernel_test2<<<BLOCKS, evo_threads>>>(dev_inst);
+
+	for(int i = 0; i < 1; i++) {
+		cudaEventCreate(&start);
+		cudaEventCreate(&stop);
+		// Start record
+		cudaEventRecord(start, 0);
+
+		evo_kernel_test<<<BLOCKS, evo_threads>>>(dev_inst, 0);
+		CUDA_CALL(cudaGetLastError());
+		cudaThreadSynchronize();
+		CUDA_CALL(cudaGetLastError());
+
+		evo_calc_res<<<blocks, threads>>>(dev_inst);
+		CUDA_CALL(cudaGetLastError());
+		cudaThreadSynchronize();
+		CUDA_CALL(cudaGetLastError());
+
+		evo_kernel_test<<<BLOCKS, evo_threads>>>(dev_inst, 1);
+		CUDA_CALL(cudaGetLastError());
+		cudaThreadSynchronize();
+		CUDA_CALL(cudaGetLastError());
+
+		cudaEventRecord(stop, 0);
+		cudaEventSynchronize(stop);
+		cudaEventElapsedTime(&elapsedTime, start, stop); // that's our time!
+		elapsedTimeTotal += elapsedTime;
+		// Clean up:
+		cudaEventDestroy(start);
+		cudaEventDestroy(stop);
+	}
+
+//	CUDA_CALL(cudaGetLastError());
+//	cudaThreadSynchronize();
+//	CUDA_CALL(cudaGetLastError());
+//
+//	// Stop event
+//	cudaEventRecord(stop, 0);
+//	cudaEventSynchronize(stop);
+////	float elapsedTime;
+//	cudaEventElapsedTime(&elapsedTime, start, stop); // that's our time!
+//	// Clean up:
+//	cudaEventDestroy(start);
+//	cudaEventDestroy(stop);
+
+//	elapsedTimeTotal = elapsedTime;
 
 	copy_inst_dev_to_host(dev_inst, &inst);
 
@@ -322,7 +376,7 @@ int main(int argc, char** argv)
 	printf("Parents:\n");
 	print_parent_matrix_pretty(&inst, inst.res_block, inst.res_parent);
 	print_rules(&inst);
-	printf("Time needed: %f\n", elapsedTime);
+	printf("Time needed: %f\n", elapsedTimeTotal);
 	printf("Needed rounds: %d\n", inst.rounds);
 	printf("Is NaN: %d\n", inst.isnan);
 	printf("Result is block: %d, parent: %d\n", inst.res_block, inst.res_parent);

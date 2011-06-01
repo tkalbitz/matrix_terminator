@@ -7,6 +7,16 @@
 #include "instance.h"
 #include "config.h"
 
+__device__ double* get_sparam_arr(struct instance* inst)
+{
+	char* s_dev_ptr = (char*)inst->dev_sparam.ptr;
+	size_t s_pitch = inst->dev_sparam.pitch;
+	size_t s_slice_pitch = s_pitch * 1;
+	char* s_slice = s_dev_ptr + blockIdx.x /* z */ * s_slice_pitch;
+	double* sparam = (double*) (s_slice + 0 * s_pitch);
+	return sparam;
+}
+
 __device__ void double_memcpy(double* to, double* from, int size)
 {
 //	memcpy(to, from, size * sizeof(double));
@@ -73,12 +83,8 @@ __global__ void setup_parent_kernel(struct instance *inst)
 	char* devPtr = (char*)inst->dev_parent.ptr;
 	size_t pitch = inst->dev_parent.pitch;
 	size_t slicePitch = pitch * inst->dim.matrix_height;
-
-	int z = blockIdx.x;
-	int y = threadIdx.x;
-
-	char* slice = devPtr + z * slicePitch;
-	double* row = (double*) (slice + y * pitch);
+	char* slice = devPtr + blockIdx.x * slicePitch;
+	double* row = (double*) (slice + threadIdx.x * pitch);
 
 	for(int x = 0; x < inst->dim.parents * inst->width_per_inst; x++) {
 		if(curand_uniform(&rnd_state) < MATRIX_TAKEN_POS) {
@@ -94,6 +100,7 @@ __global__ void setup_parent_kernel(struct instance *inst)
 		return;
 
 	const int matrices = inst->num_matrices * inst->dim.parents;
+	int y;
 
 	if(inst->cond_left == COND_UPPER_LEFT) {
 		y = 0;
@@ -129,6 +136,7 @@ __global__ void setup_parent_kernel(struct instance *inst)
 #define C_ROW(y) ((double*) (mem->c_slice + y * mem->c_pitch))
 #define P_ROW(y) ((double*) (mem->p_slice + y * mem->p_pitch))
 #define R_ROW(y) ((double*) (mem->r_slice + y * mem->r_pitch))
+#define CR_ROW(y) ((double*) (res_mem.r_slice + y * res_mem.r_pitch))
 
 struct memory {
 	size_t p_pitch;
@@ -345,7 +353,12 @@ __device__ void copy_child_to_parent(struct instance *inst,
 
 /* extern device functions can't be inlined, so include them */
 //#include "ensure.cu"
-#include "evo_rating.cu"
+#include "evo_rating2.cu"
+
+__global__ void init_sparam(struct instance *inst)
+{
+	get_sparam_arr(inst)[threadIdx.x] = 5.;
+}
 
 __global__ void evo_kernel(struct instance *inst)
 {
@@ -409,8 +422,48 @@ __global__ void evo_kernel(struct instance *inst)
 	inst->rnd_states[id] = rnd_state;
 }
 
-__global__ void evo_kernel_test(struct instance *inst)
+__global__ void evo_kernel_test(struct instance *inst, int flag)
 {
+	int id = get_thread_id();
+
+	/* copy global state to local mem for efficiency */
+	curandState rnd_state = inst->rnd_states[id];
+
+	struct memory mem;
+	evo_init_mem(inst, &mem);
+
+	int p_sel[2];
+	double* sparam = get_sparam_arr(inst);
+
+	if(flag == 0) {
+		evo_recomb_selection(inst, &rnd_state, p_sel);
+		evo_recombination(inst, &mem, &rnd_state, p_sel);
+		evo_mutation(inst, &mem, &rnd_state, &sparam[threadIdx.x]);
+	} else {
+		if(threadIdx.x == 0) {
+			evo_parent_selection(inst, &mem);
+			if(mem.c_rat[0] == 0.f) {
+				atomicExch(&(inst->res_block), blockIdx.x);
+				atomicExch(&(inst->res_parent), threadIdx.x);
+			}
+		}
+
+		__syncthreads();
+
+		/* Parallel copy of memory */
+		if(threadIdx.x < inst->dim.parents) {
+			copy_child_to_parent(inst, &mem,
+					     (int)mem.c_rat[2 * threadIdx.x + 1],
+					     threadIdx.x);
+			mem.p_rat[threadIdx.x] = mem.c_rat[2 * threadIdx.x];
+		}
+	}
+
+	/* backup rnd state to global mem */
+	inst->rnd_states[id] = rnd_state;
+}
+
+__global__ void evo_kernel_test2(struct instance *inst) {
 	int id = get_thread_id();
 
 	/* copy global state to local mem for efficiency */
@@ -422,17 +475,49 @@ __global__ void evo_kernel_test(struct instance *inst)
 	int p_sel[2];
 	double s_param = 5.f; /* TODO: For every matrix? */
 
-	evo_recomb_selection(inst, &rnd_state, p_sel);
-
-	evo_recombination(inst, &mem, &rnd_state, p_sel);
-	evo_mutation(inst, &mem, &rnd_state, &s_param);
-
 	while(inst->rounds < 100) {
-		if(threadIdx.x == 0 && blockIdx.x == 0)
-			inst->rounds++;
+		evo_recomb_selection(inst, &rnd_state, p_sel);
 
-		mem.c_rat[2 * threadIdx.x]     = evo_calc_res(inst, &mem);
+		evo_recombination(inst, &mem, &rnd_state, p_sel);
+		evo_mutation(inst, &mem, &rnd_state, &s_param);
+
+//		mem.c_rat[2 * threadIdx.x]     = evo_calc_res(inst, &mem);
 		mem.c_rat[2 * threadIdx.x + 1] = threadIdx.x;
+		if(mem.c_rat[2 * threadIdx.x] == 0.f) {
+			atomicExch(&inst->res_child_block, (unsigned int)blockIdx.x);
+			atomicExch(&inst->res_child_idx,   (unsigned int)threadIdx.x);
+			atomicExch(&(inst->cont), 0);
+		}
+
+		__syncthreads();
+
+		/*
+		 * All threads should rated their results here.
+		 * It's time to get the new parents :D
+		 */
+		if(threadIdx.x == 0) {
+			if(blockIdx.x == 0) {
+				inst->rounds++;
+			}
+
+			evo_parent_selection(inst, &mem);
+			if(mem.c_rat[0] == 0.f) {
+				atomicExch(&(inst->res_block), blockIdx.x);
+				atomicExch(&(inst->res_parent), threadIdx.x);
+			}
+		}
+
+		__syncthreads();
+
+		/* Parallel copy of memory */
+		if(threadIdx.x < inst->dim.parents) {
+			copy_child_to_parent(inst, &mem,
+					     (int)mem.c_rat[2 * threadIdx.x + 1],
+					     threadIdx.x);
+			mem.p_rat[threadIdx.x] = mem.c_rat[2 * threadIdx.x];
+		}
+
+		__syncthreads();
 	}
 
 	/* backup rnd state to global mem */

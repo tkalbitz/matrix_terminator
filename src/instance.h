@@ -47,6 +47,10 @@ struct instance {
 	cudaPitchedPtr dev_prat;   /* rating of the parents */
 	curandState *rnd_states;   /* random number generator states */
 
+	cudaPitchedPtr dev_sparam; /* rating of the parents */
+	cudaExtent dev_sparam_ext; /* extend for parent rating */
+
+
 	int num_matrices;          /* number of matrices of the problem */
 	size_t width_per_inst;     /* how many elements are stored for each thread */
 
