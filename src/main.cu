@@ -315,15 +315,18 @@ int main(int argc, char** argv)
 
 	int width = inst.dim.parents * inst.dim.blocks;
 	double *rating = (double*)malloc(width * sizeof(double));
+	int rounds = -1;
 
-	int max_rounds = 1000;
+	int max_rounds = 500;
+	int block = 0; int thread = 0;
+
 	for(int i = 0; i < max_rounds; i++) {
 		cudaEventCreate(&start);
 		cudaEventCreate(&stop);
 		// Start record
 		cudaEventRecord(start, 0);
 
-		evo_kernel_test<<<BLOCKS, evo_threads>>>(dev_inst, 0);
+		evo_kernel<<<BLOCKS, evo_threads>>>(dev_inst, 0);
 		CUDA_CALL(cudaGetLastError());
 		cudaThreadSynchronize();
 		CUDA_CALL(cudaGetLastError());
@@ -333,7 +336,7 @@ int main(int argc, char** argv)
 		cudaThreadSynchronize();
 		CUDA_CALL(cudaGetLastError());
 
-		evo_kernel_test<<<BLOCKS, evo_threads>>>(dev_inst, 1);
+		evo_kernel<<<BLOCKS, evo_threads>>>(dev_inst, 1);
 		CUDA_CALL(cudaGetLastError());
 		cudaThreadSynchronize();
 		CUDA_CALL(cudaGetLastError());
@@ -348,12 +351,17 @@ int main(int argc, char** argv)
 
 //		print_parent_matrix_pretty(&inst, inst.res_block, inst.res_parent);
 //		print_parent_ratings(&inst);
-		//print_parent_matrix_pretty(&inst, inst.res_block, inst.res_parent);
+//		print_parent_matrix_pretty(&inst, inst.res_block, inst.res_parent);
+
+		if(i & 1111 != 0 && i != (max_rounds - 1))
+			continue;
 
 		copy_parent_rating_dev_to_host(&inst, rating);
 		for(int j = 0; j < width; j += PARENTS) {
 			if(rating[j] == 0.) {
-				printf("Round: %d\n", i);
+				block = j / PARENTS;
+				thread = j % PARENTS;
+				rounds = i;
 				i = max_rounds;
 				break;
 			}
@@ -365,16 +373,21 @@ int main(int argc, char** argv)
 
 	print_parent_ratings(&inst);
 	printf("Result:\n");
-	print_result_matrix_pretty(&inst, inst.res_child_block, inst.res_child_idx);
+	print_result_matrix_pretty(&inst, block, thread);
 	printf("Parents:\n");
-	print_parent_matrix_pretty(&inst, inst.res_block, inst.res_parent);
+	print_parent_matrix_pretty(&inst, block, thread);
 	print_rules(&inst);
 	printf("Time needed: %f\n", elapsedTimeTotal);
-	printf("Needed rounds: %d\n", inst.rounds);
+	printf("Needed rounds: %d\n", rounds);
 	printf("Is NaN: %d\n", inst.isnan);
-	printf("Result is block: %d, parent: %d\n", inst.res_block, inst.res_parent);
+	printf("Result is block: %d, parent: %d\n", block, thread);
 	printf("Result was in block: %d, child: %d\n", inst.res_child_block, inst.res_child_idx);
 
 	printf("Clean up and exit.\n");
 	cleanup(&inst, dev_inst);
+
+	if(rounds == -1)
+		return 0;
+
+	return 1;
 }

@@ -281,7 +281,7 @@ __device__ void evo_mutation(struct instance * const inst,
 			     curandState     * const rnd_state,
                              double          * const s_param)
 {
-	*s_param = *s_param * exp(curand_normal(rnd_state) / 10);
+	*s_param = *s_param * exp(curand_normal(rnd_state) / 100);
 	const int rows = MATRIX_HEIGHT;
 	const double delta = inst->delta;
 	double tmp;
@@ -309,11 +309,56 @@ __device__ void evo_mutation(struct instance * const inst,
 	evo_ensure_constraints(inst, mem);
 }
 
-__device__ void evo_parent_selection(struct instance *inst, struct memory *mem)
+__device__ void evo_parent_selection_best(struct instance *inst, struct memory *mem)
 {
 	const int elems = 2 * inst->dim.childs * inst->dim.parents;
 	double* const arr = mem->c_rat;
 
+	double key, child;
+
+	/* insertion sort */
+	for(int i = 2; i < elems; i+=2) {
+		key   = arr[i];
+		child = arr[i+1];
+
+		int j = i - 2;
+		while(j >=0 && arr[j] > key) {
+			arr[j + 2] = arr[j];
+			arr[j + 3] = arr[j+1];
+			j = j - 2;
+		}
+		arr[j + 2] = key;
+		arr[j + 3] = child;
+	}
+}
+
+__device__ void evo_parent_selection_turnier(struct instance *inst, struct memory *mem,
+					     curandState* rnd_state, int q)
+{
+	if(threadIdx.x <= PARENTS)
+		return;
+
+	double* const arr = mem->c_rat;
+	int idx = curand(rnd_state) % (PARENTS * CHILDS);
+
+	for(int t = 0; t < q; t++) {
+		int opponent = curand(rnd_state) % (PARENTS * CHILDS);
+
+		if(arr[opponent * 2] < arr[idx * 2])
+			idx = opponent;
+	}
+
+	double rating = arr[idx * 2];
+	__syncthreads();
+	arr[2 * threadIdx.x] = rating;
+	arr[2 * threadIdx.x + 1] = idx;
+	__syncthreads();
+
+	if(threadIdx.x > 0)
+		return;
+
+	/* sort entries */
+	const int elems = 2 * PARENTS;
 	double key, child;
 
 	/* insertion sort */
@@ -346,8 +391,8 @@ __device__ void copy_child_to_parent(struct instance *inst,
 		double* crow = C_ROW(r);
 
 		double_memcpy(&(prow[pstart]),
-		             &(crow[cstart]),
-		             inst->width_per_inst);
+		              &(crow[cstart]),
+		              inst->width_per_inst);
 	}
 }
 
@@ -360,69 +405,7 @@ __global__ void init_sparam(struct instance *inst)
 	get_sparam_arr(inst)[threadIdx.x] = 5.;
 }
 
-__global__ void evo_kernel(struct instance *inst)
-{
-	int id = get_thread_id();
-
-	/* copy global state to local mem for efficiency */
-	curandState rnd_state = inst->rnd_states[id];
-
-	struct memory mem;
-	evo_init_mem(inst, &mem);
-
-	int p_sel[2];
-	double s_param = 5.f; /* TODO: For every matrix? */
-
-	while(inst->cont && inst->rounds < 5000) {
-		evo_recomb_selection(inst, &rnd_state, p_sel);
-
-		evo_recombination(inst, &mem, &rnd_state, p_sel);
-		evo_mutation(inst, &mem, &rnd_state, &s_param);
-
-		//mem.c_rat[2 * threadIdx.x]     = evo_calc_res(inst, &mem);
-		mem.c_rat[2 * threadIdx.x + 1] = threadIdx.x;
-		if(mem.c_rat[2 * threadIdx.x] == 0.f) {
-			atomicExch(&inst->res_child_block, (unsigned int)blockIdx.x);
-			atomicExch(&inst->res_child_idx,   (unsigned int)threadIdx.x);
-			atomicExch(&(inst->cont), 0);
-		}
-
-		__syncthreads();
-
-		/*
-		 * All threads should rated their results here.
-		 * It's time to get the new parents :D
-		 */
-		if(threadIdx.x == 0) {
-			if(blockIdx.x == 0) {
-				inst->rounds++;
-			}
-
-			evo_parent_selection(inst, &mem);
-			if(mem.c_rat[0] == 0.f) {
-				atomicExch(&(inst->res_block), blockIdx.x);
-				atomicExch(&(inst->res_parent), threadIdx.x);
-			}
-		}
-
-		__syncthreads();
-
-		/* Parallel copy of memory */
-		if(threadIdx.x < inst->dim.parents) {
-			copy_child_to_parent(inst, &mem,
-					     (int)mem.c_rat[2 * threadIdx.x + 1],
-					     threadIdx.x);
-			mem.p_rat[threadIdx.x] = mem.c_rat[2 * threadIdx.x];
-		}
-
-		__syncthreads();
-	}
-
-	/* backup rnd state to global mem */
-	inst->rnd_states[id] = rnd_state;
-}
-
-__global__ void evo_kernel_test(struct instance *inst, int flag)
+__global__ void evo_kernel(struct instance *inst, int flag)
 {
 	int id = get_thread_id();
 
@@ -440,15 +423,17 @@ __global__ void evo_kernel_test(struct instance *inst, int flag)
 		evo_recombination(inst, &mem, &rnd_state, p_sel);
 		evo_mutation(inst, &mem, &rnd_state, &sparam[threadIdx.x]);
 	} else {
-		if(threadIdx.x == 0) {
-			evo_parent_selection(inst, &mem);
-			if(mem.c_rat[0] == 0.f) {
-				atomicExch(&(inst->res_block),  blockIdx.x);
-				atomicExch(&(inst->res_parent), threadIdx.x);
-			}
-		}
-
+		evo_parent_selection_turnier(inst, &mem, &rnd_state, 5);
 		__syncthreads();
+//		if(threadIdx.x == 0) {
+//			evo_parent_selection(inst, &mem);
+//			if(mem.c_rat[0] == 0.f) {
+//				atomicExch(&(inst->res_block),  blockIdx.x);
+//				atomicExch(&(inst->res_parent), threadIdx.x);
+//			}
+//		}
+//
+//		__syncthreads();
 
 		/* Parallel copy of memory */
 		if(threadIdx.x < inst->dim.parents) {
@@ -457,67 +442,6 @@ __global__ void evo_kernel_test(struct instance *inst, int flag)
 					     threadIdx.x);
 			mem.p_rat[threadIdx.x] = mem.c_rat[2 * threadIdx.x];
 		}
-	}
-
-	/* backup rnd state to global mem */
-	inst->rnd_states[id] = rnd_state;
-}
-
-__global__ void evo_kernel_test2(struct instance *inst) {
-	int id = get_thread_id();
-
-	/* copy global state to local mem for efficiency */
-	curandState rnd_state = inst->rnd_states[id];
-
-	struct memory mem;
-	evo_init_mem(inst, &mem);
-
-	int p_sel[2];
-	double s_param = 5.f; /* TODO: For every matrix? */
-
-	while(inst->rounds < 100) {
-		evo_recomb_selection(inst, &rnd_state, p_sel);
-
-		evo_recombination(inst, &mem, &rnd_state, p_sel);
-		evo_mutation(inst, &mem, &rnd_state, &s_param);
-
-//		mem.c_rat[2 * threadIdx.x]     = evo_calc_res(inst, &mem);
-		mem.c_rat[2 * threadIdx.x + 1] = threadIdx.x;
-		if(mem.c_rat[2 * threadIdx.x] == 0.f) {
-			atomicExch(&inst->res_child_block, (unsigned int)blockIdx.x);
-			atomicExch(&inst->res_child_idx,   (unsigned int)threadIdx.x);
-			atomicExch(&(inst->cont), 0);
-		}
-
-		__syncthreads();
-
-		/*
-		 * All threads should rated their results here.
-		 * It's time to get the new parents :D
-		 */
-		if(threadIdx.x == 0) {
-			if(blockIdx.x == 0) {
-				inst->rounds++;
-			}
-
-			evo_parent_selection(inst, &mem);
-			if(mem.c_rat[0] == 0.f) {
-				atomicExch(&(inst->res_block), blockIdx.x);
-				atomicExch(&(inst->res_parent), threadIdx.x);
-			}
-		}
-
-		__syncthreads();
-
-		/* Parallel copy of memory */
-		if(threadIdx.x < inst->dim.parents) {
-			copy_child_to_parent(inst, &mem,
-					     (int)mem.c_rat[2 * threadIdx.x + 1],
-					     threadIdx.x);
-			mem.p_rat[threadIdx.x] = mem.c_rat[2 * threadIdx.x];
-		}
-
-		__syncthreads();
 	}
 
 	/* backup rnd state to global mem */

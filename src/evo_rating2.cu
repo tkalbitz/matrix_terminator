@@ -93,18 +93,18 @@ __device__ void evo_result_rating(struct instance *inst,
 	if(ty == 0 && tx == 0) {
 		if(inst->cond_right == COND_UPPER_LEFT) {
 			if((res[0][0][0] - res[1][0][0]) < 1.f)
-				rating += 1e5;
+				rating += 1e10;
 		} else if(inst->cond_right == COND_UPPER_RIGHT) {
 			if((res[0][0][cols] - res[1][0][cols]) < 1.f)
-				rating += 1e5;
+				rating += 1e10;
 		} else if(inst->cond_right == COND_UPPER_LEFT_LOWER_RIGHT) {
 			if((res[0][0][0] - res[1][0][0]) < 1.f)
-				rating += 1e5;
+				rating += 1e10;
 
 			if((res[0][rows][cols] - res[1][rows][cols]) < 1.f)
-				rating += 1e5;
+				rating += 1e10;
 		} else {
-			rating += 1e10;
+			rating += 1e20;
 		}
 	}
 
