@@ -80,6 +80,31 @@ __device__ int* eval_interpret_rule(struct instance *inst,
 __shared__ struct memory res_mem;
 __shared__ double shrd_rating;
 
+__device__ double get_max_value(struct instance *inst,
+		  	  	struct memory   *mem)
+{
+	double my_max;
+	__shared__ double max_value[MATRIX_HEIGHT];
+
+	if(threadIdx.x == 0) {
+		my_max = res[0][threadIdx.y][0];
+		for(int i = 1; i < MATRIX_WIDTH; i++) {
+			my_max = max(my_max, res[0][threadIdx.y][i]);
+		}
+		max_value[threadIdx.y] = my_max;
+
+		__syncthreads();
+		if(threadIdx.y == 0) {
+			for(int k = 1; k < MATRIX_HEIGHT; k++) {
+				max_value[0] = max(max_value[0], max_value[k]);
+			}
+		}
+		__syncthreads();
+	}
+
+	return max_value[0];
+}
+
 __device__ void evo_result_rating(struct instance *inst,
 				  struct memory   *mem)
 {
@@ -93,30 +118,37 @@ __device__ void evo_result_rating(struct instance *inst,
 	if(ty == 0 && tx == 0) {
 		if(inst->cond_right == COND_UPPER_LEFT) {
 			if((res[0][0][0] - res[1][0][0]) < 1.f)
-				rating += 1e10;
+				rating += 0.5;
 		} else if(inst->cond_right == COND_UPPER_RIGHT) {
 			if((res[0][0][cols] - res[1][0][cols]) < 1.f)
-				rating += 1e10;
+				rating += 0.5;
 		} else if(inst->cond_right == COND_UPPER_LEFT_LOWER_RIGHT) {
 			if((res[0][0][0] - res[1][0][0]) < 1.f)
-				rating += 1e10;
+				rating += 0.5;
 
 			if((res[0][rows][cols] - res[1][rows][cols]) < 1.f)
-				rating += 1e10;
+				rating += 0.5;
 		} else {
-			rating += 1e20;
+			rating += 5;
 		}
 	}
 
 	__syncthreads();
 
+	// keep only negative numbers
 	res[0][ty][tx] = fabs(min(res[0][ty][tx] - res[1][ty][tx], 0.));
 
+	double max_value = get_max_value(inst, mem);
+	max_value = (max_value == 0.0 ? 1 : max_value); // div. by zero is evil...
+	res[0][ty][tx] /= max_value;
+
+	//only lines are processed
 	if(tx != 0)
 		return;
 
+//	res[0][ty][0] *= res[0][ty][0];
 	for(int i = 1; i < MATRIX_WIDTH; i++) {
-		res[0][ty][0] += res[0][ty][i];
+		res[0][ty][0] += res[0][ty][i]; // * res[0][ty][i];
 	}
 
 	if(ty != 0)
@@ -125,6 +157,8 @@ __device__ void evo_result_rating(struct instance *inst,
 	for(int i = 0; i < MATRIX_HEIGHT; i++) {
 		rating += res[0][i][0];
 	}
+
+//	rating = sqrt(rating);
 
 	if(inst->match == MATCH_ALL) {
 		shrd_rating += rating;

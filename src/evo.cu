@@ -107,7 +107,8 @@ __global__ void setup_parent_kernel(struct instance *inst)
 		row = (double*) (slice + y * pitch);
 
 		for(int i = 0; i < matrices; i++) {
-			row[i * inst->dim.matrix_width] = 1;
+			row[i * inst->dim.matrix_width] =
+					(curand(&rnd_state) % ((int)PARENT_MAX - 1)) + 1;
 		}
 	} else if(inst->cond_left == COND_UPPER_RIGHT) {
 		y = 0;
@@ -115,20 +116,21 @@ __global__ void setup_parent_kernel(struct instance *inst)
 
 		for(int i = 0; i < matrices; i++) {
 			int idx = i * inst->dim.matrix_width + (inst->dim.matrix_width - 1);
-			row[idx] = 1;
+			row[idx] = (curand(&rnd_state) % ((int)PARENT_MAX - 1)) + 1;
 		}
 	} else if(inst->cond_left == COND_UPPER_LEFT_LOWER_RIGHT) {
 		y = 0;
 		row = (double*) (slice + y * pitch);
 		for(int i = 0; i < matrices; i++) {
-			row[i * inst->dim.matrix_width] = 1;
+			row[i * inst->dim.matrix_width] =
+					(curand(&rnd_state) % ((int)PARENT_MAX - 1)) + 1;
 		}
 
 		y = (inst->dim.matrix_height - 1);
 		row = (double*) (slice + y * pitch);
 		for(int i = 0; i < matrices; i++) {
 			int idx = i * inst->dim.matrix_width + (inst->dim.matrix_width - 1);
-			row[idx] = 1;
+			row[idx] = (curand(&rnd_state) % ((int)PARENT_MAX - 1)) + 1;
 		}
 	}
 }
@@ -245,13 +247,15 @@ __device__ void evo_recombination(struct instance *inst,
 	}
 }
 
-__device__ void evo_ensure_constraints(struct instance *inst,
-				       struct memory   *mem)
+__device__ void evo_ensure_constraints(struct instance * const inst,
+				       struct memory   * const mem,
+				       curandState     * const rnd_state)
 {
 	double* row = C_ROW(0);
 	int end   = mem->c_end;
 
-	int factor = (int)(1.f / inst->delta);
+	int rnd_val = curand(rnd_state) % ((int)PARENT_MAX - 1) + 1;
+	int factor = (int)(rnd_val / inst->delta);
 	if((factor * inst->delta) < 1.f)
 		factor++;
 
@@ -281,7 +285,7 @@ __device__ void evo_mutation(struct instance * const inst,
 			     curandState     * const rnd_state,
                              double          * const s_param)
 {
-	*s_param = *s_param * exp(curand_normal(rnd_state) / 100);
+	*s_param = *s_param * exp(curand_normal(rnd_state) / MATRIX_HEIGHT);
 	const int rows = MATRIX_HEIGHT;
 	const double delta = inst->delta;
 	double tmp;
@@ -297,7 +301,7 @@ __device__ void evo_mutation(struct instance * const inst,
 
 			tmp = row[c];
 			tmp = tmp + (double)(curand_normal(rnd_state) * (*s_param));
-			/* we want x * delta, where x is an int */  	
+			/* we want x * delta, where x is an int */
 			tmp = ((unsigned long)(tmp / delta)) * delta;
 			tmp = max(tmp, 0.0);
 			tmp = min(PARENT_MAX, tmp);
@@ -306,7 +310,7 @@ __device__ void evo_mutation(struct instance * const inst,
 		}
 	}
 
-	evo_ensure_constraints(inst, mem);
+	evo_ensure_constraints(inst, mem, rnd_state);
 }
 
 __device__ void evo_parent_selection_best(struct instance *inst, struct memory *mem)
@@ -332,10 +336,12 @@ __device__ void evo_parent_selection_best(struct instance *inst, struct memory *
 	}
 }
 
-__device__ void evo_parent_selection_turnier(struct instance *inst, struct memory *mem,
-					     curandState* rnd_state, int q)
+__device__ void evo_parent_selection_turnier(struct instance *inst,
+		                             struct memory *mem,
+					     curandState* rnd_state,
+					     const int q)
 {
-	if(threadIdx.x <= PARENTS)
+	if(threadIdx.x >= PARENTS)
 		return;
 
 	double* const arr = mem->c_rat;
@@ -354,7 +360,7 @@ __device__ void evo_parent_selection_turnier(struct instance *inst, struct memor
 	arr[2 * threadIdx.x + 1] = idx;
 	__syncthreads();
 
-	if(threadIdx.x > 0)
+	if(threadIdx.x != 0)
 		return;
 
 	/* sort entries */
@@ -402,7 +408,7 @@ __device__ void copy_child_to_parent(struct instance *inst,
 
 __global__ void init_sparam(struct instance *inst)
 {
-	get_sparam_arr(inst)[threadIdx.x] = 5.;
+	get_sparam_arr(inst)[threadIdx.x] = PARENT_MAX / 10;
 }
 
 __global__ void evo_kernel(struct instance *inst, int flag)
@@ -423,7 +429,7 @@ __global__ void evo_kernel(struct instance *inst, int flag)
 		evo_recombination(inst, &mem, &rnd_state, p_sel);
 		evo_mutation(inst, &mem, &rnd_state, &sparam[threadIdx.x]);
 	} else {
-		evo_parent_selection_turnier(inst, &mem, &rnd_state, 5);
+		evo_parent_selection_turnier(inst, &mem, &rnd_state, 3);
 		__syncthreads();
 //		if(threadIdx.x == 0) {
 //			evo_parent_selection(inst, &mem);
