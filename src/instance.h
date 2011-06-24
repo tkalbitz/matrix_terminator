@@ -14,6 +14,8 @@
 #include <cuda.h>
 #include <curand_kernel.h>
 
+#include "config.h"
+
 #define CUDA_CALL(x) do { cudaError_t xxs = (x); \
 	if((xxs) != cudaSuccess) { \
 		fprintf(stderr, "Error '%s' at %s:%d\n", cudaGetErrorString(xxs),__FILE__,__LINE__); \

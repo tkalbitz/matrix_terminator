@@ -6,9 +6,11 @@
 #include <cuda.h> 
 #include <curand_kernel.h>
 
-#include "config.h"
 #include "instance.h"
+
 #include "evo.h"
+#include "evo_rating.h"
+#include "evo_setup.h"
 
 #include "matrix_print.h"
 #include "matrix_copy.h"
@@ -142,70 +144,6 @@ void init_instance(struct instance* inst, char* rules)
 			inst->rules[i] = (rules[i] == 'X') ? MUL_SEP : rules[i] - '0';
 	}
 
-//	inst->rules[0] = MUL_SEP;
-//	inst->rules[1] = 1;
-//	inst->rules[2] = 0;
-//	inst->rules[3] = MUL_SEP;
-//	inst->rules[4] = 0;
-//	inst->rules[5] = 1;
-//	inst->rules[6] = MUL_SEP;
-
-//	inst->rule_count = 3;
-//	inst->rules_len  = 22;
-//	inst->rules = (int*)malloc(sizeof(int) * inst->rules_len);
-//	inst->rules[0] = MUL_SEP;
-//	inst->rules[1] = 1;
-//	inst->rules[2] = 1;
-//	inst->rules[3] = 1;
-//	inst->rules[4] = MUL_SEP;
-//	inst->rules[5] = 0;
-//	inst->rules[6] = MUL_SEP;
-//
-//	inst->rules[7] = 0;
-//	inst->rules[8] = 0;
-//	inst->rules[9] = MUL_SEP;
-//	inst->rules[10] = 0;
-//	inst->rules[11] = 1;
-//	inst->rules[12] = 0;
-//	inst->rules[13] = MUL_SEP;
-//
-//	inst->rules[14] = 0;
-//	inst->rules[15] = 0;
-//	inst->rules[16] = 0;
-//	inst->rules[17] = MUL_SEP;
-//	inst->rules[18] = 1;
-//	inst->rules[19] = 0;
-//	inst->rules[20] = 0;
-//	inst->rules[21] = MUL_SEP;
-///////////////////////////////////////
-//	inst->rule_count = 3;
-//	inst->rules_len  = 22;
-//	inst->rules = (int*)malloc(sizeof(int) * inst->rules_len);
-//	inst->rules[0] = MUL_SEP;
-//	inst->rules[1] = 1;
-//	inst->rules[2] = 1;
-//	inst->rules[3] = MUL_SEP;
-//	inst->rules[4] = 0;
-//	inst->rules[5] = 0;
-//	inst->rules[6] = 0;
-//	inst->rules[7] = MUL_SEP;
-//
-//	inst->rules[8]  = 0;
-//	inst->rules[9]  = 0;
-//	inst->rules[10] = 1;
-//	inst->rules[11] = MUL_SEP;
-//	inst->rules[12] = 1;
-//	inst->rules[13] = MUL_SEP;
-//
-//	inst->rules[14] = 0;
-//	inst->rules[15] = 1;
-//	inst->rules[16] = 0;
-//	inst->rules[17] = MUL_SEP;
-//	inst->rules[18] = 0;
-//	inst->rules[19] = 1;
-//	inst->rules[20] = 1;
-//	inst->rules[21] = MUL_SEP;
-
 	inst->delta = 1;
 	inst->match = MATCH_ALL;
 	inst->cond_left  = COND_UPPER_LEFT;
@@ -304,7 +242,7 @@ int main(int argc, char** argv)
 	dim3 blocks(BLOCKS, PARENTS*CHILDS);
 	dim3 threads(MATRIX_WIDTH, MATRIX_HEIGHT);
 
-	init_sparam<<<BLOCKS, evo_threads>>>(dev_inst);
+	setup_sparam<<<BLOCKS, evo_threads>>>(dev_inst);
 	cudaThreadSynchronize();
 	CUDA_CALL(cudaGetLastError());
 
@@ -317,7 +255,7 @@ int main(int argc, char** argv)
 	double *rating = (double*)malloc(width * sizeof(double));
 	int rounds = -1;
 
-	int max_rounds = 5000;
+	int max_rounds = 500;
 	int block = 0; int thread = 0;
 
 	for(int i = 0; i < max_rounds; i++) {

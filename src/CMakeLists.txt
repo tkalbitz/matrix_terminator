@@ -24,11 +24,13 @@ CUDA_INCLUDE_DIRECTORIES(
 # Set CUDA_ATTACH_VS_BUILD_RULE_TO_CUDA_FILE when you want to add the same .cu
 # file to multiple targets.
 set(CUDA_ATTACH_VS_BUILD_RULE_TO_CUDA_FILE OFF)
-
+ 
 # Use one executable only.
 CUDA_ADD_EXECUTABLE( matrix_generator
   main.cu
   evo.cu
+  evo_rating.cu
+  evo_setup.cu
   matrix_copy.cu
   matrix_print.cu
 #  OPTIONS -arch=sm_13 -use_fast_math --ptxas-options=-v  
