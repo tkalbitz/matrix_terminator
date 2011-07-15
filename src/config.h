@@ -9,10 +9,11 @@
 #define RECOMB_RATE 0.7
 #define MUT_RATE    0.3
 
-#define MATRIX_HEIGHT 4
-#define MATRIX_WIDTH  4
+#define MATRIX_HEIGHT 5
+#define MATRIX_WIDTH  5
 
 #define PARENT_MAX 1000.0f
+#define SPARAM     (PARENT_MAX * 0.01)
 
 /* HACK: we can"t allocate memory dynamically, this should be enough */
 #define MUL_ROW_LEN MATRIX_WIDTH

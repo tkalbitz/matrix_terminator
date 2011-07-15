@@ -28,7 +28,7 @@ __device__ void evo_recombination(struct instance * const inst,
 		double* const p_row = P_ROW(r);
 
 		for(int c = 0; c < cols; c++) {
-			if(curand_uniform(rnd_state) > RECOMB_RATE) {
+			if(curand_uniform(rnd_state) > inst->recomb_rate) {
 				c_row[cIdx + c] = p_row[p1 + c];
 			} else {
 				c_row[cIdx + c] = p_row[p2 + c];

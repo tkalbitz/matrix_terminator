@@ -9,6 +9,10 @@
 
 #include "evo_memory.cu"
 
+/**
+ * Works faster by copy 8 byte per copy and not only 1 like the provided version
+ * by Nvidia. The bus width of 128 bit is completly used.
+ */
 __device__ void double_memcpy(double* to, double* from, int size)
 {
 	while(size--) {

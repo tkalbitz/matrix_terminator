@@ -1,10 +1,3 @@
-/*
- * instance.h
- *
- *  Created on: Apr 8, 2011
- *      Author: tkalbitz
- */
-
 #ifndef INSTANCE_H_
 #define INSTANCE_H_
 
@@ -37,8 +30,7 @@ struct dimension
 	int matrix_height;
 };
 
-#define MUL_SEP  -1
-#define MUL_STOP -2
+#define MUL_SEP       -1
 
 struct instance {
 	struct dimension dim;	   /* dimension of the matrix */
@@ -47,6 +39,8 @@ struct instance {
 	cudaPitchedPtr dev_res;    /* result of the evaluation */
 	cudaPitchedPtr dev_crat;   /* rating of the childs */
 	cudaPitchedPtr dev_prat;   /* rating of the parents */
+	cudaPitchedPtr dev_rules;  /* which rules are active */
+
 	curandState *rnd_states;   /* random number generator states */
 
 	cudaPitchedPtr dev_sparam; /* rating of the parents */
@@ -61,25 +55,37 @@ struct instance {
 	cudaExtent dev_res_ext;    /* extend for result */
 	cudaExtent dev_crat_ext;   /* extend for child rating */
 	cudaExtent dev_prat_ext;   /* extend for parent rating */
+	cudaExtent dev_rules_ext;  /* which rules are active */
 
 	double delta;		/* numbers in the matrices are multiple the amount */
 	int*   rules;		/* rules that must be matched */
 	size_t rules_len;       /* number of elements in rules */
+	size_t rules_count;     /* number of rules */
 
-	int isnan;
-
-	unsigned int cont;      /* continue search */
-	int rounds;             /* how many rounds we worked on that problem? */
 	unsigned int res_block; /* in which block is the result */
 	unsigned int res_parent;/* which parent is the result */
 
 	unsigned int res_child_block; /* in which block is the result */
 	unsigned int res_child_idx;   /* which parent is the result */
 
+	double mut_rate;
+	double recomb_rate;
+	double parent_max;
+	double def_sparam;
+
 	uint8_t	match:1,	/* match all rules or any of them */
 		cond_left:3,	/* left condition */
 	        cond_right:3,	/* right condition */
 		reserved:1;
 };
+
+void inst_init(struct instance* const inst);
+void inst_cleanup(struct instance * const inst,
+		      struct instance * const dev_inst);
+
+struct instance* inst_create_dev_inst(struct instance * const inst);
+void inst_copy_dev_to_host(struct instance * const dev,
+		           struct instance * const host);
+int get_evo_threads(const struct instance * const inst);
 
 #endif /* INSTANCE_H_ */

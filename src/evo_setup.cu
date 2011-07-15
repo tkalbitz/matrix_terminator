@@ -20,6 +20,17 @@ __global__ void setup_rnd_kernel(curandState* const rnd_states,
 	curand_init(seed, id, 0, &rnd_states[id]);
 }
 
+__device__ static double evo_mut_new_value(struct instance * const inst,
+					   curandState     * const rnd_state)
+{
+	const int rnd_val = (curand(rnd_state) % ((int)inst->parent_max - 1)) + 1;
+	int factor = (int)(rnd_val / inst->delta);
+	if((factor * inst->delta) < 1.0)
+		factor++;
+
+	return factor * inst->delta;
+}
+
 /*
  * Initialize the parent memory with random values.
  */
@@ -39,7 +50,7 @@ __global__ void setup_parent_kernel(struct instance * const inst)
 
 	for(int x = 0; x < inst->dim.parents * inst->width_per_inst; x++) {
 		if(curand_uniform(&rnd) < MATRIX_TAKEN_POS) {
-			row[x] = curand(&rnd) % (int)PARENT_MAX;
+			row[x] = curand(&rnd) % (int)inst->parent_max;
 		} else {
 			row[x] = 0;
 		}
@@ -58,8 +69,7 @@ __global__ void setup_parent_kernel(struct instance * const inst)
 		row = (double*) (slice + y * pitch);
 
 		for(int i = 0; i < matrices; i++) {
-			row[i * MATRIX_WIDTH] =
-				(curand(&rnd) % ((int)PARENT_MAX - 1)) + 1;
+			row[i * MATRIX_WIDTH] = evo_mut_new_value(inst, &rnd);
 		}
 	} else if(inst->cond_left == COND_UPPER_RIGHT) {
 		y = 0;
@@ -67,21 +77,20 @@ __global__ void setup_parent_kernel(struct instance * const inst)
 
 		for(int i = 0; i < matrices; i++) {
 			int idx = i * MATRIX_WIDTH + (MATRIX_WIDTH - 1);
-			row[idx] = (curand(&rnd) % ((int)PARENT_MAX - 1)) + 1;
+			row[idx] = evo_mut_new_value(inst, &rnd);
 		}
 	} else if(inst->cond_left == COND_UPPER_LEFT_LOWER_RIGHT) {
 		y = 0;
 		row = (double*) (slice + y * pitch);
 		for(int i = 0; i < matrices; i++) {
-			row[i * MATRIX_WIDTH] =
-				(curand(&rnd) % ((int)PARENT_MAX - 1)) + 1;
+			row[i * MATRIX_WIDTH] = evo_mut_new_value(inst, &rnd);
 		}
 
 		y = (inst->dim.matrix_height - 1);
 		row = (double*) (slice + y * pitch);
 		for(int i = 0; i < matrices; i++) {
 			int idx = i * MATRIX_WIDTH + (MATRIX_WIDTH - 1);
-			row[idx] = (curand(&rnd) % ((int)PARENT_MAX - 1)) + 1;
+			row[idx] = evo_mut_new_value(inst, &rnd);
 		}
 	}
 
@@ -90,5 +99,5 @@ __global__ void setup_parent_kernel(struct instance * const inst)
 
 __global__ void setup_sparam(struct instance * const inst)
 {
-	get_sparam_arr(inst)[threadIdx.x] = PARENT_MAX * 0.01;
+	get_sparam_arr(inst)[threadIdx.x] = inst->def_sparam;
 }

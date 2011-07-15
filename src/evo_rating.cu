@@ -134,13 +134,13 @@ __device__ void evo_result_rating(const struct instance * const inst,
 	}
 
 	__syncthreads();
-
 	// keep only negative numbers
 	res[0][ty][tx] = fabs(min(res[0][ty][tx] - res[1][ty][tx], 0.));
 
 	double max_value = get_max_value();
 	max_value = (max_value == 0 ? 1 : max_value); // div. by zero is evil...
 	res[0][ty][tx] /= max_value;
+	__syncthreads();
 
 	//only lines are processed
 	if(tx != 0)
@@ -157,15 +157,11 @@ __device__ void evo_result_rating(const struct instance * const inst,
 		rating += res[0][i][0];
 	}
 
-	if(inst->match == MATCH_ALL) {
-		shrd_rating += rating;
-	} else {
-		shrd_rating = min(shrd_rating, rating);
-	}
+	shrd_rating += rating;
 }
 
-__device__ static void evo_init_mem2(const struct instance* const inst,
-		                     struct memory * const mem)
+__device__ void evo_init_mem2(const struct instance* const inst,
+			      struct memory * const mem)
 {
 	evo_init_mem(inst, mem);
 	/*
@@ -186,18 +182,36 @@ __global__ void evo_calc_res(const struct instance * const inst)
 	const int* end = inst->rules + inst->rules_len - 1;
 	const int* rules = inst->rules;
 
+	char* const r_dev_ptr = (char*)inst->dev_rules.ptr;
+        const size_t r_pitch = inst->dev_rules.pitch;
+        const size_t r_slice_pitch = r_pitch * MATRIX_HEIGHT;
+        char* const r_slice = r_dev_ptr + blockIdx.x /* z */ * r_slice_pitch;
+        uint8_t* const active_rules = (uint8_t*) (r_slice + blockIdx.y * r_pitch);
+
 	if(threadIdx.x == 0 && threadIdx.y == 0) {
 		evo_init_mem2(inst, &res_mem);
-
 		shrd_rating = 0.;
-		if(inst->match == MATCH_ANY) {
-			shrd_rating = FLT_MAX;
-		}
 	}
 
 	__syncthreads();
 
+	uint8_t cur_rule = 0;
+
 	do {
+		/* ignore matched rules */	
+		if(inst->match == MATCH_ANY && !active_rules[cur_rule]) {
+			rules++;
+			while(*rules != MUL_SEP) {
+				rules++;
+			}
+			rules++;
+			while(*rules != MUL_SEP) {
+				rules++;
+			}
+			cur_rule++;
+			continue;
+		}
+
 		eval_set_res_matrix_to_zero();
 		__syncthreads();
 
@@ -207,7 +221,14 @@ __global__ void evo_calc_res(const struct instance * const inst)
 		rules++;
 		rules = eval_interpret_rule(inst , &res_mem, rules, 1);
 
+		const double old_rating = shrd_rating;
 		evo_result_rating(inst, &res_mem);
+		__syncthreads();
+
+		if(inst->match == MATCH_ANY && old_rating == shrd_rating) {
+			active_rules[cur_rule] = 0;
+		}
+		cur_rule++;
 		__syncthreads();
 	} while(rules != end);
 

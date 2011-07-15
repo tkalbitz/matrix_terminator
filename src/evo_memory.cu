@@ -1,10 +1,10 @@
 #ifndef EVO_MEMORY_H_
 #define EVO_MEMORY_H_
 
-#define C_ROW(y) ((double*) (mem->c_slice + y * mem->c_pitch))
-#define P_ROW(y) ((double*) (mem->p_slice + y * mem->p_pitch))
-#define R_ROW(y) ((double*) (mem->r_slice + y * mem->r_pitch))
-#define CR_ROW(y) ((double*) (res_mem.r_slice + y * res_mem.r_pitch))
+#define C_ROW(y) ((double*) (mem->c_slice + (y) * mem->c_pitch))
+#define P_ROW(y) ((double*) (mem->p_slice + (y) * mem->p_pitch))
+#define R_ROW(y) ((double*) (mem->r_slice + (y) * mem->r_pitch))
+#define CR_ROW(y) ((double*) (res_mem.r_slice + (y) * res_mem.r_pitch))
 
 struct memory {
 	size_t p_pitch;
