@@ -270,8 +270,8 @@ int main(int argc, char** argv)
 		cudaEventDestroy(start);
 		cudaEventDestroy(stop);
 
-		if(i & 1111 != 0 && i != (max_rounds - 1))
-			continue;
+//		if((i & 15) != 0 && i != (max_rounds - 1))
+//			continue;
 
 		copy_parent_rating_dev_to_host(&inst, rating);
 		for(int j = 0; j < width; j += PARENTS) {

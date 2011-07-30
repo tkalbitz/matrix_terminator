@@ -76,7 +76,7 @@ void alloc_result_matrix(struct instance *inst)
 
 void alloc_results(struct instance *inst)
 {
-	inst->dev_rules_ext = make_cudaExtent(inst->rules_count * sizeof(char),
+	inst->dev_rules_ext = make_cudaExtent(inst->rules_count * sizeof(uint8_t),
 					      inst->dim.childs * inst->dim.parents,
 					      inst->dim.blocks);
 
@@ -183,6 +183,7 @@ void inst_cleanup(struct instance * const inst,
 	cudaFree(inst->dev_crat.ptr);
 	cudaFree(inst->dev_prat.ptr);
 	cudaFree(inst->dev_sparam.ptr);
+	cudaFree(inst->dev_rules.ptr);
 }
 
 struct instance* inst_create_dev_inst(struct instance *inst)

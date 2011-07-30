@@ -137,27 +137,27 @@ __device__ void evo_result_rating(const struct instance * const inst,
 	// keep only negative numbers
 	res[0][ty][tx] = fabs(min(res[0][ty][tx] - res[1][ty][tx], 0.));
 
-	double max_value = get_max_value();
-	max_value = (max_value == 0 ? 1 : max_value); // div. by zero is evil...
-	res[0][ty][tx] /= max_value;
+//	double max_value = get_max_value();
+//	max_value = (max_value == 0 ? 1 : max_value); // div. by zero is evil...
+//	res[0][ty][tx] /= max_value;
 	__syncthreads();
 
 	//only lines are processed
-	if(tx != 0)
-		return;
+	if(tx == 0) {
 
-	for(int i = 1; i < MATRIX_WIDTH; i++) {
-		res[0][ty][0] += res[0][ty][i];
+		for(int i = 1; i < MATRIX_WIDTH; i++) {
+			res[0][ty][0] += res[0][ty][i];
+		}
+
+		if(ty == 0) {
+			for(int i = 0; i < MATRIX_HEIGHT; i++) {
+				rating += res[0][i][0];
+			}
+
+			shrd_rating += rating;
+		}
 	}
-
-	if(ty != 0)
-		return;
-
-	for(int i = 0; i < MATRIX_HEIGHT; i++) {
-		rating += res[0][i][0];
-	}
-
-	shrd_rating += rating;
+	__syncthreads();
 }
 
 __device__ void evo_init_mem2(const struct instance* const inst,
@@ -184,7 +184,7 @@ __global__ void evo_calc_res(const struct instance * const inst)
 
 	char* const r_dev_ptr = (char*)inst->dev_rules.ptr;
         const size_t r_pitch = inst->dev_rules.pitch;
-        const size_t r_slice_pitch = r_pitch * MATRIX_HEIGHT;
+        const size_t r_slice_pitch = r_pitch * inst->dim.childs * inst->dim.parents;
         char* const r_slice = r_dev_ptr + blockIdx.x /* z */ * r_slice_pitch;
         uint8_t* const active_rules = (uint8_t*) (r_slice + blockIdx.y * r_pitch);
 
@@ -209,6 +209,10 @@ __global__ void evo_calc_res(const struct instance * const inst)
 				rules++;
 			}
 			cur_rule++;
+
+			if(rules == end)
+				break;
+
 			continue;
 		}
 
@@ -225,7 +229,8 @@ __global__ void evo_calc_res(const struct instance * const inst)
 		evo_result_rating(inst, &res_mem);
 		__syncthreads();
 
-		if(inst->match == MATCH_ANY && old_rating == shrd_rating) {
+		if(threadIdx.x == 0 && threadIdx.y == 0 &&
+		   inst->match == MATCH_ANY && old_rating == shrd_rating) {
 			active_rules[cur_rule] = 0;
 		}
 		cur_rule++;

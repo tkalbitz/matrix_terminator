@@ -13,10 +13,10 @@
 #define MATRIX_WIDTH  5
 
 #define PARENT_MAX 1000.0f
-#define SPARAM     (PARENT_MAX * 0.01)
+#define SPARAM     ((PARENT_MAX) * 0.01)
 
 /* HACK: we can"t allocate memory dynamically, this should be enough */
-#define MUL_ROW_LEN MATRIX_WIDTH
+#define MUL_ROW_LEN (MATRIX_WIDTH)
 
 /* how many positions in the matrix should contain a value !+ 0 */
 #define MATRIX_TAKEN_POS 0.3f
