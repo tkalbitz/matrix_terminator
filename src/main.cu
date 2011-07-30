@@ -1,9 +1,11 @@
 #include <stdlib.h>
+#include <unistd.h>
 #include <stdio.h>
 #include <time.h>
 #include <assert.h>
 #include <getopt.h>
 #include <ctype.h>
+#include <errno.h>
 
 #include <cuda.h> 
 #include <curand_kernel.h>
@@ -80,7 +82,8 @@ static int parse_configuration(struct instance* const inst,
 	inst->mut_rate    = MUT_RATE;
 	inst->recomb_rate = RECOMB_RATE;
 	inst->parent_max  = PARENT_MAX;
-	inst->def_sparam = SPARAM;
+	inst->def_sparam  = SPARAM;
+	inst->maxima      = 0;
 	
 	struct option opt[] =
 	{
@@ -94,10 +97,11 @@ static int parse_configuration(struct instance* const inst,
 		{"recombination-rate", required_argument, 0, 'e'},
 		{"parent-max"        , required_argument, 0, 'p'},
 		{"strategy-param"    , required_argument, 0, 's'},
+		{"enable-maxima"     , no_argument,       0, 'x'},
 		{0, 0, 0, 0}
 	};
 
-	while((c = getopt_long(argc, argv, "m:l:r:c:d:hu:e:p:s:",
+	while((c = getopt_long(argc, argv, "m:l:r:c:d:hu:e:p:s:x",
 			      opt, &idx)) != EOF) {
 		switch(c) {
 		case 'm':
@@ -155,6 +159,9 @@ static int parse_configuration(struct instance* const inst,
 			break;
 		case 's':
 			inst->def_sparam = strtod(optarg, NULL);
+			break;
+		case 'x':
+			inst->maxima = 1;
 			break;
 		case '?':
 			switch (optopt) {
@@ -216,7 +223,7 @@ int main(int argc, char** argv)
 	dev_inst = inst_create_dev_inst(&inst);
 
 	printf("Rules: ");
-	print_rules(&inst);
+	print_rules(stdout, &inst);
 
 	setup_parent_kernel<<<BLOCKS, inst.dim.matrix_height>>>(dev_inst);
 	cudaThreadSynchronize();
@@ -291,8 +298,46 @@ int main(int argc, char** argv)
 //	print_sparam(&inst);
 	print_parent_ratings(&inst);
 	printf("Parents:\n");
-	print_parent_matrix_pretty(&inst, block, thread);
-	print_rules(&inst);
+
+	FILE* f;
+	char* fname = strdup("mg_XXXXXX");
+	if(inst.maxima) {
+		int fd = mkstemp(fname);
+		if(fd == -1) {
+			perror("mkstemp: Failed fallback to stdout.");
+			f = stdout;
+			inst.maxima = 0;
+		}
+
+		f = fdopen(fd, "wb");
+		if(f == NULL) {
+			perror("fdopen: Failed fallback to stdout.");
+			close(fd);
+			f = stdout;
+			inst.maxima = 0;
+		}
+	} else {
+		f = stdout;
+	}
+
+	print_parent_matrix_pretty(f, &inst, block, thread);
+	print_rules(f, &inst);
+
+	if(inst.maxima) {
+		fprintf(f, "quit();\n");
+		fflush(f);
+		fclose(f);
+
+		int r = fork();
+
+		if(r > 0)
+			execlp("maxima", "maxima", "--very-quiet", "-b", fname, NULL);
+
+		if(r == -1) {
+			perror("fork failed");
+		}
+	}
+
 	printf("Time needed: %f\n", elapsedTimeTotal);
 	printf("Needed rounds: %d\n", rounds);
 	printf("Result is block: %d, parent: %d\n", block, thread);
@@ -300,6 +345,7 @@ int main(int argc, char** argv)
 			inst.res_child_block, inst.res_child_idx);
 
 	printf("Clean up and exit.\n");
+	free(fname);
 	inst_cleanup(&inst, dev_inst);
 
 	if(rounds == -1)

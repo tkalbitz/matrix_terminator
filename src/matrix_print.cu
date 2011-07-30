@@ -3,25 +3,25 @@
 
 #include "config.h"
 
-void print_rules(struct instance *inst)
+void print_rules(FILE* f, struct instance *inst)
 {
 	bool mul_sep_count = false;
 	for(int i = 1; i < inst->rules_len; i++)
 		if(inst->rules[i] == MUL_SEP) {
 			if(mul_sep_count == 0)
-				printf("-");
+				fprintf(f, "-");
 			else
-				printf(";\n\n");
+				fprintf(f, ";\n\n");
 
 			mul_sep_count = !mul_sep_count;
 		} else {
 			if(inst->rules[i + 1] == MUL_SEP)
-				printf("%c", 'A' + inst->rules[i]);
+				fprintf(f, "%c", 'A' + inst->rules[i]);
 			else
-				printf("%c.", 'A' + inst->rules[i]);
+				fprintf(f, "%c.", 'A' + inst->rules[i]);
 		}
 
-	printf("\n");
+	fprintf(f, "\n");
 }
 
 static void print_parent_matrix_line(struct instance *inst, double* parent_cpy)
@@ -37,61 +37,24 @@ static void print_parent_matrix_line(struct instance *inst, double* parent_cpy)
 	printf("\n");
 }
 
-static void print_parent_matrix_line(struct instance *inst,
-				     double* parent_cpy, int parent)
-{
-	int count = parent * inst->width_per_inst + inst->width_per_inst;
-	for (int w = parent * inst->width_per_inst; w < count; w++) {
-		if((w % inst->dim.matrix_width) == 0) {
-			printf(" | ");
-		}
-
-		printf("%3.2e ", parent_cpy[w]);
-	}
-	printf("\n");
-}
-
-void print_parent_matrix(struct instance* inst, int block, int parent)
-{
-	int width = inst->dim.parents    * /* there are n parents per block */
-		    inst->width_per_inst *
-		    sizeof(double) *
-		    inst->dim.matrix_height * inst->dim.blocks;
-
-	double* parent_cpy = (double*)malloc(width);
-	memset(parent_cpy, 1, width);
-
-	copy_parents_dev_to_host(inst, parent_cpy);
-
-	int line = inst->dim.parents *  inst->width_per_inst;
-	int block_offset = line * inst->dim.matrix_height;
-	double* block_ptr = parent_cpy + block_offset * block;
-
-	for (int h = 0; h < inst->dim.matrix_height; h++) {
-		print_parent_matrix_line(inst, (block_ptr + h*line), parent);
-	}
-	printf("--------------------------------------------------\n");
-	free(parent_cpy);
-	//print_parent_ratings(inst);
-}
-
-static void print_parent_matrix_line_pretty(struct instance *inst,
+static void print_parent_matrix_line_pretty(FILE* f, struct instance *inst,
 					    double* parent_cpy,
 					    int parent, int m)
 {
 	int count = parent * inst->width_per_inst + (m + 1) * MATRIX_WIDTH - 1;
 	int w = parent * inst->width_per_inst + m * inst->dim.matrix_width;
 
-	printf("[ ");
+	fprintf(f, "[ ");
 
 	for (; w < count; w++) {
-		printf("%10.9e, ", parent_cpy[w]);
+		fprintf(f, "%10.9e, ", parent_cpy[w]);
 	}
 
-	printf("%10.9e ]", parent_cpy[w]);
+	fprintf(f, "%10.9e ]", parent_cpy[w]);
 }
 
-void print_parent_matrix_pretty(struct instance* inst, int block, int parent)
+void print_parent_matrix_pretty(FILE* f, struct instance* inst,
+				int block, int parent)
 {
 	int width = inst->dim.parents    * /* there are n parents per block */
 		    inst->width_per_inst *
@@ -108,22 +71,21 @@ void print_parent_matrix_pretty(struct instance* inst, int block, int parent)
 	double* block_ptr = parent_cpy + block_offset * block;
 
 	for(int m = 0; m < inst->num_matrices; m++) {
-		printf("%c: matrix(\n", 'A'+m);
+		fprintf(f, "%c: matrix(\n", 'A'+m);
 		for (int h = 0; h < inst->dim.matrix_height; h++) {
-			print_parent_matrix_line_pretty(inst,
+			print_parent_matrix_line_pretty(f, inst,
 							block_ptr + h*line,
 							parent, m);
 
 			if(h < (inst->dim.matrix_height - 1))
-				printf(",");
-			printf("\n");
+				fprintf(f, ",");
+			fprintf(f, "\n");
 		}
-		printf(");\n\n");
+		fprintf(f, ");\n\n");
 	}
 
-	printf("\n");
+	fprintf(f, "\n");
 	free(parent_cpy);
-	//print_parent_ratings(inst);
 }
 
 static void print_result_matrix_line_pretty(struct instance *inst,

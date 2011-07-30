@@ -76,7 +76,7 @@ struct instance {
 	uint8_t	match:1,	/* match all rules or any of them */
 		cond_left:3,	/* left condition */
 	        cond_right:3,	/* right condition */
-		reserved:1;
+		maxima:1;
 };
 
 void inst_init(struct instance* const inst);

@@ -53,9 +53,9 @@ __device__ void eval_mul_inplace(const struct instance * const inst,
 }
 
 __device__ const int* eval_interpret_rule(const struct instance * const inst,
-				    	  struct memory   * const mem,
-				    	  const int*   rule,
-				    	  const int rmatrix)
+				    	  struct memory		* const mem,
+				    	  const int* rule,
+				    	  const int  rmatrix)
 {
 	if(*rule == MUL_SEP)
 		return rule;
