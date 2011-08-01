@@ -8,6 +8,9 @@
 __device__ void evo_parent_selection_best(struct instance * const inst,
 					  struct memory   * const mem)
 {
+	if(threadIdx.x != 0)
+		return;
+
 	const int elems = 2 * inst->dim.childs * inst->dim.parents;
 	double* const arr = mem->c_rat;
 
@@ -32,48 +35,67 @@ __device__ void evo_parent_selection_best(struct instance * const inst,
 __device__ void evo_parent_selection_turnier(struct instance * const inst,
 		                             struct memory   * const mem,
 					     curandState* rnd_state,
-					     const int q)
+					     const uint8_t q)
 {
 	if(threadIdx.x >= PARENTS)
 		return;
 
-	double* const arr = mem->c_rat;
-	int idx = curand(rnd_state) % (PARENTS * CHILDS);
+	__shared__ double res[2 * PARENTS];
 
-	for(int t = 0; t < q; t++) {
-		int opponent = curand(rnd_state) % (PARENTS * CHILDS);
+	double* const arr = mem->c_rat;
+	uint32_t idx = curand(rnd_state) % (PARENTS * CHILDS);
+
+	for(uint8_t t = 0; t < q; t++) {
+		uint32_t opponent = curand(rnd_state) % (PARENTS * CHILDS);
 
 		if(arr[opponent * 2] < arr[idx * 2])
 			idx = opponent;
 	}
 
-	const double rating = arr[idx * 2];
+	res[2 * threadIdx.x]     = arr[idx * 2];
+	res[2 * threadIdx.x + 1] = arr[idx * 2 + 1];
+
 	__syncthreads();
-	arr[2 * threadIdx.x] = rating;
-	arr[2 * threadIdx.x + 1] = idx;
-	__syncthreads();
 
-	if(threadIdx.x != 0)
-		return;
+	if(threadIdx.x == 0) {
+		/* sort entries */
+		const uint8_t elems = 2 * PARENTS;
+		double key, child;
 
-	/* sort entries */
-	const int elems = 2 * PARENTS;
-	double key, child;
+		/* insertion sort */
+		for(int8_t i = 2; i < elems; i+=2) {
+			key   = res[i];
+			child = res[i+1];
 
-	/* insertion sort */
-	for(int i = 2; i < elems; i+=2) {
-		key   = arr[i];
-		child = arr[i+1];
-
-		int j = i - 2;
-		while(j >=0 && arr[j] > key) {
-			arr[j + 2] = arr[j];
-			arr[j + 3] = arr[j+1];
-			j = j - 2;
+			int8_t j = i - 2;
+			while(j >=0 && res[j] > key) {
+				res[j + 2] = res[j];
+				res[j + 3] = res[j+1];
+				j = j - 2;
+			}
+			res[j + 2] = key;
+			res[j + 3] = child;
 		}
-		arr[j + 2] = key;
-		arr[j + 3] = child;
+
+		#ifdef DEBUG
+		if(res[0] == 0.0) {
+			inst->res_parent = res[1];
+
+			const int off  = inst->width_per_inst;
+			const int off2 = res[1] * inst->width_per_inst;
+			for(uint8_t row = 0; row < MATRIX_HEIGHT; row++) {
+				for(int i = 0; i < inst->width_per_inst; i++) {
+					R_ROW(row)[off + i] =
+							C_ROW(row)[mem->c_zero + off2 + i];
+				}
+			}
+
+		}
+		#endif
 	}
+	__syncthreads();
+	arr[2 * threadIdx.x]     = res[2 * threadIdx.x];
+	arr[2 * threadIdx.x + 1] = res[2 * threadIdx.x + 1];
 }
 
 

@@ -37,7 +37,8 @@ static void print_usage() {
 	printf("  -m|--mutation-rate      <float number>  -- default: %3.2f\n",  MUT_RATE);
 	printf("  -e|--recombination-rate <float number>  -- default: %3.2f\n",  RECOMB_RATE);
 	printf("  -p|--parent-max         <float number>  -- default: %.2f\n",   PARENT_MAX);
-	printf("  -s|--strategy-param     <float number>  -- default: %.2f\n\n", SPARAM);
+	printf("  -s|--strategy-param     <float number>  -- default: %.2f\n", SPARAM);
+	printf("  -x|--enable-maxima\n\n");
 	printf("Rules should be supplied in the form:\n");
 	printf("  X10X01X110X0011X or XbaXabXbbaXaabbX\n");
 	printf("  |<--->|<------>|    |<--->|<------>|\n");
@@ -323,7 +324,23 @@ int main(int argc, char** argv)
 	print_parent_matrix_pretty(f, &inst, block, thread);
 	print_rules(f, &inst);
 
-	if(inst.maxima) {
+	printf("Time needed: %f\n", elapsedTimeTotal);
+	printf("Needed rounds: %d\n", rounds);
+	printf("Result is block: %d, parent: %d\n", block, thread);
+	printf("Result was in block: %d, child: %d, selection: %d\n",
+		inst.res_child_block, inst.res_child_idx, inst.res_parent);
+
+	#ifdef DEBUG
+	if(rounds != -1) {
+		printf("Result Matrix:\n");
+		print_result_matrix_pretty(&inst, block, 0);
+		print_rules(stdout, &inst);
+		print_result_matrix_pretty(&inst, block, 1);
+		print_rules(stdout, &inst);
+	}
+	#endif
+
+	if(rounds != -1 && inst.maxima) {
 		fprintf(f, "quit();\n");
 		fflush(f);
 		fclose(f);
@@ -337,12 +354,6 @@ int main(int argc, char** argv)
 			perror("fork failed");
 		}
 	}
-
-	printf("Time needed: %f\n", elapsedTimeTotal);
-	printf("Needed rounds: %d\n", rounds);
-	printf("Result is block: %d, parent: %d\n", block, thread);
-	printf("Result was in block: %d, child: %d\n",
-			inst.res_child_block, inst.res_child_idx);
 
 	printf("Clean up and exit.\n");
 	free(fname);

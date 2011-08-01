@@ -17,6 +17,17 @@ __device__ inline void eval_set_res_matrix_to_zero()
 	res[1][threadIdx.y][threadIdx.x] = 0.;
 }
 
+__device__ inline void eval_set_res_matrix_to_identity()
+{
+	if(threadIdx.x != threadIdx.y) {
+		res[0][threadIdx.y][threadIdx.x] = 0.;
+		res[1][threadIdx.y][threadIdx.x] = 0.;
+	} else {
+		res[0][threadIdx.y][threadIdx.x] = 1.;
+		res[1][threadIdx.y][threadIdx.x] = 1.;
+	}
+}
+
 __device__ inline void eval_copy_matrix_to_res(struct memory * const mem,
 		    	    	    	       const int cmatrix,
 		    	    	    	       const int rmatrix)
@@ -143,21 +154,21 @@ __device__ void evo_result_rating(const struct instance * const inst,
 	__syncthreads();
 
 	//only lines are processed
-	if(tx == 0) {
+	if(tx != 0)
+		return;
 
-		for(int i = 1; i < MATRIX_WIDTH; i++) {
-			res[0][ty][0] += res[0][ty][i];
-		}
-
-		if(ty == 0) {
-			for(int i = 0; i < MATRIX_HEIGHT; i++) {
-				rating += res[0][i][0];
-			}
-
-			shrd_rating += rating;
-		}
+	for(int i = 1; i < MATRIX_WIDTH; i++) {
+		res[0][ty][0] += res[0][ty][i];
 	}
-	__syncthreads();
+
+	if(ty != 0)
+		return;
+
+	for(int i = 0; i < MATRIX_HEIGHT; i++) {
+		rating += res[0][i][0];
+	}
+
+	shrd_rating += rating;
 }
 
 __device__ void evo_init_mem2(const struct instance* const inst,
@@ -177,7 +188,7 @@ __device__ void evo_init_mem2(const struct instance* const inst,
 	mem->r_end2  = mem->r_zero2 + inst->dim.matrix_width;
 }
 
-__global__ void evo_calc_res(const struct instance * const inst)
+__global__ void evo_calc_res(struct instance * const inst)
 {
 	const int* end = inst->rules + inst->rules_len - 1;
 	const int* rules = inst->rules;
@@ -194,7 +205,6 @@ __global__ void evo_calc_res(const struct instance * const inst)
 	}
 
 	__syncthreads();
-
 	uint8_t cur_rule = 0;
 
 	do {
@@ -209,14 +219,11 @@ __global__ void evo_calc_res(const struct instance * const inst)
 				rules++;
 			}
 			cur_rule++;
-
-			if(rules == end)
-				break;
-
+			__syncthreads();
 			continue;
 		}
 
-		eval_set_res_matrix_to_zero();
+		eval_set_res_matrix_to_identity();
 		__syncthreads();
 
 		rules++;
@@ -229,10 +236,24 @@ __global__ void evo_calc_res(const struct instance * const inst)
 		evo_result_rating(inst, &res_mem);
 		__syncthreads();
 
-		if(threadIdx.x == 0 && threadIdx.y == 0 &&
-		   inst->match == MATCH_ANY && old_rating == shrd_rating) {
+		if(!threadIdx.x && !threadIdx.y &&
+				inst->match == MATCH_ANY && old_rating == shrd_rating) {
 			active_rules[cur_rule] = 0;
 		}
+
+		#ifdef DEBUG
+		if(shrd_rating == 0.) {
+			struct memory *mem = &res_mem;
+			for(int i = 0; i < inst->num_matrices; i++) {
+				R_ROW(ty)[tx + i * MATRIX_WIDTH] =
+						C_ROW(ty)[res_mem.c_zero + i * MATRIX_WIDTH + tx];
+			}
+
+			inst->res_child_block = blockIdx.x;
+			inst->res_child_idx   = blockIdx.y;
+		}
+		#endif
+
 		cur_rule++;
 		__syncthreads();
 	} while(rules != end);

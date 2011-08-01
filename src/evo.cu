@@ -11,9 +11,9 @@
 
 /**
  * Works faster by copy 8 byte per copy and not only 1 like the provided version
- * by Nvidia. The bus width of 128 bit is completly used.
+ * by Nvidia. The bus width of 128 bit is completely used.
  */
-__device__ void double_memcpy(double* to, double* from, int size)
+__device__ void double_memcpy(double* to, const double* from, int size)
 {
 	while(size--) {
 		*to = *from;
@@ -27,7 +27,7 @@ __device__ void copy_child_to_parent(struct instance * const inst,
 				     const int child,
 				     const int parent)
 {
-	const int cstart = child * inst->width_per_inst;
+	const int cstart = child  * inst->width_per_inst;
 	const int pstart = parent * inst->width_per_inst;
 	const int rows = MATRIX_HEIGHT;
 
@@ -65,15 +65,17 @@ __global__ void evo_kernel(struct instance *inst, int flag)
 		evo_recombination(inst, &mem, &rnd_state, p_sel);
 		evo_mutation(inst, &mem, &rnd_state, &sparam[tx]);
 	} else {
-		evo_parent_selection_turnier(inst, &mem, &rnd_state, 3);
+		evo_parent_selection_best(inst, &mem);
+//		evo_parent_selection_turnier(inst, &mem, &rnd_state, 3);
 		__syncthreads();
 
 		/* Parallel copy of memory */
-		if(threadIdx.x < inst->dim.parents) {
+		if(tx < inst->dim.parents) {
 			copy_child_to_parent(inst, &mem,
 					     (int)mem.c_rat[2 * tx + 1], tx);
-			mem.p_rat[threadIdx.x] = mem.c_rat[2 * tx];
+			mem.p_rat[tx] = mem.c_rat[2 * tx];
 		}
+		__syncthreads();
 	}
 
 	/* backup rnd state to global mem */

@@ -64,13 +64,20 @@ void alloc_child_matrix(struct instance *inst)
  */
 void alloc_result_matrix(struct instance *inst)
 {
-	inst->dev_res_ext = make_cudaExtent(inst->dim.childs * inst->dim.parents *
-					    2 * inst->dim.matrix_width * sizeof(double),
+#ifdef DEBUG
+	const int width = inst->dim.childs * inst->dim.parents *
+			    inst->width_per_inst * sizeof(double);
+#else
+	const int width = sizeof(double);
+#endif
+
+	inst->dev_res_ext = make_cudaExtent(width,
 					    inst->dim.matrix_height,
 					    inst->dim.blocks);
 
 	cudaPitchedPtr pitched_ptr;
 	CUDA_CALL(cudaMalloc3D(&pitched_ptr, inst->dev_res_ext));
+	CUDA_CALL(cudaMemset3D(pitched_ptr, 1, inst->dev_res_ext));
 	inst->dev_res = pitched_ptr;
 }
 
