@@ -45,7 +45,7 @@ __device__ void copy_child_to_parent(struct instance * const inst,
 #include "evo_adaptive_gauss_mutation.cu"
 #include "evo_selection.cu"
 
-__global__ void evo_kernel(struct instance *inst, int flag)
+__global__ void evo_kernel_part_one(struct instance *inst)
 {
 	const int id = get_thread_id();
 
@@ -58,26 +58,33 @@ __global__ void evo_kernel(struct instance *inst, int flag)
 	int p_sel[2];
 	double* sparam = get_sparam_arr(inst);
 
-	const int tx = threadIdx.x;
-
-	if(flag == 0) {
-		evo_recomb_selection(inst, &rnd_state, p_sel);
-		evo_recombination(inst, &mem, &rnd_state, p_sel);
-		evo_mutation(inst, &mem, &rnd_state, &sparam[tx]);
-	} else {
-		evo_parent_selection_best(inst, &mem);
-//		evo_parent_selection_turnier(inst, &mem, &rnd_state, 3);
-		__syncthreads();
-
-		/* Parallel copy of memory */
-		if(tx < inst->dim.parents) {
-			copy_child_to_parent(inst, &mem,
-					     (int)mem.c_rat[2 * tx + 1], tx);
-			mem.p_rat[tx] = mem.c_rat[2 * tx];
-		}
-		__syncthreads();
-	}
+	evo_recomb_selection(inst, &rnd_state, p_sel);
+	evo_recombination(inst, &mem, &rnd_state, p_sel);
+	evo_mutation(inst, &mem, &rnd_state, &sparam[threadIdx.x]);
 
 	/* backup rnd state to global mem */
 	inst->rnd_states[id] = rnd_state;
 }
+
+__global__ void evo_kernel_part_two(struct instance *inst)
+{
+	/* copy global state to local mem for efficiency */
+//	const int id = get_thread_id();
+//	curandState rnd_state = inst->rnd_states[id];
+
+	struct memory mem;
+	evo_init_mem(inst, &mem);
+
+	const int tx = threadIdx.x;
+	evo_parent_selection_best(inst, &mem);
+//      evo_parent_selection_turnier(inst, &mem, &rnd_state, 3);
+	__syncthreads();
+
+	/* Parallel copy of memory */
+	copy_child_to_parent(inst, &mem, (int)mem.c_rat[2 * tx + 1], tx);
+	mem.p_rat[tx] = mem.c_rat[2 * tx];
+
+	/* backup rnd state to global mem */
+//	inst->rnd_states[id] = rnd_state;
+}
+

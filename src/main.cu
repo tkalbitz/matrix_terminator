@@ -255,7 +255,7 @@ int main(int argc, char** argv)
 		// Start record
 		cudaEventRecord(start, 0);
 
-		evo_kernel<<<BLOCKS, evo_threads>>>(dev_inst, 0);
+		evo_kernel_part_one<<<BLOCKS, evo_threads>>>(dev_inst);
 		CUDA_CALL(cudaGetLastError());
 		cudaThreadSynchronize();
 		CUDA_CALL(cudaGetLastError());
@@ -265,7 +265,7 @@ int main(int argc, char** argv)
 		cudaThreadSynchronize();
 		CUDA_CALL(cudaGetLastError());
 
-		evo_kernel<<<BLOCKS, evo_threads>>>(dev_inst, 1);
+		evo_kernel_part_two<<<BLOCKS, PARENTS>>>(dev_inst);
 		CUDA_CALL(cudaGetLastError());
 		cudaThreadSynchronize();
 		CUDA_CALL(cudaGetLastError());

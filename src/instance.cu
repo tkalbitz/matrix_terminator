@@ -117,11 +117,11 @@ void alloc_rating(struct instance *inst)
 
 	cudaPitchedPtr pitched_ptr;
 	CUDA_CALL(cudaMalloc3D(&pitched_ptr, inst->dev_crat_ext));
-	CUDA_CALL(cudaMemset3D(pitched_ptr, 0, inst->dev_crat_ext));
+	CUDA_CALL(cudaMemset3D(pitched_ptr, 33, inst->dev_crat_ext));
 	inst->dev_crat = pitched_ptr;
 
 	CUDA_CALL(cudaMalloc3D(&pitched_ptr, inst->dev_prat_ext));
-	CUDA_CALL(cudaMemset3D(pitched_ptr, 0, inst->dev_prat_ext));
+	CUDA_CALL(cudaMemset3D(pitched_ptr, 33, inst->dev_prat_ext));
 	inst->dev_prat = pitched_ptr;
 }
 

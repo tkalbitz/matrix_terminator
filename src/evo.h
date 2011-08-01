@@ -3,6 +3,7 @@
 
 #include "instance.h"
 
-__global__ void evo_kernel(struct instance *inst, int flag);
+__global__ void evo_kernel_part_one(struct instance *inst);
+__global__ void evo_kernel_part_two(struct instance *inst);
 
 #endif

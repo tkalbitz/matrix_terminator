@@ -127,20 +127,25 @@ __device__ void evo_result_rating(const struct instance * const inst,
 	const double penalty = 1e9;
 
 	if(ty == 0 && tx == 0) {
-		if(inst->cond_right == COND_UPPER_LEFT) {
+		switch(inst->cond_right) {
+		case COND_UPPER_LEFT:
 			if((res[0][0][0] - res[1][0][0]) < 1.f)
 				rating += penalty;
-		} else if(inst->cond_right == COND_UPPER_RIGHT) {
+			break;
+		case COND_UPPER_RIGHT:
 			if((res[0][0][cols] - res[1][0][cols]) < 1.f)
 				rating += penalty;
-		} else if(inst->cond_right == COND_UPPER_LEFT_LOWER_RIGHT) {
+			break;
+		case COND_UPPER_LEFT_LOWER_RIGHT:
 			if((res[0][0][0] - res[1][0][0]) < 1.f)
 				rating += penalty;
 
 			if((res[0][rows][cols] - res[1][rows][cols]) < 1.f)
 				rating += penalty;
-		} else {
+			break;
+		default:
 			rating += 2*penalty;
+			break;
 		}
 	}
 
@@ -182,10 +187,12 @@ __device__ void evo_init_mem2(const struct instance* const inst,
 	mem->c_zero = inst->width_per_inst * blockIdx.y;
 	mem->c_end  = inst->width_per_inst * (blockIdx.y + 1);
 
+#ifdef DEBUG
 	mem->r_zero1 = blockIdx.y * 2 * inst->dim.matrix_width;
 	mem->r_end1  = mem->r_zero1 + inst->dim.matrix_width;
 	mem->r_zero2 = mem->r_zero1 + inst->dim.matrix_width;
 	mem->r_end2  = mem->r_zero2 + inst->dim.matrix_width;
+#endif
 }
 
 __global__ void evo_calc_res(struct instance * const inst)
@@ -224,7 +231,6 @@ __global__ void evo_calc_res(struct instance * const inst)
 		}
 
 		eval_set_res_matrix_to_identity();
-		__syncthreads();
 
 		rules++;
 		rules = eval_interpret_rule(inst , &res_mem, rules, 0);
@@ -236,8 +242,7 @@ __global__ void evo_calc_res(struct instance * const inst)
 		evo_result_rating(inst, &res_mem);
 		__syncthreads();
 
-		if(!threadIdx.x && !threadIdx.y &&
-				inst->match == MATCH_ANY && old_rating == shrd_rating) {
+		if(inst->match == MATCH_ANY && old_rating == shrd_rating) {
 			active_rules[cur_rule] = 0;
 		}
 
