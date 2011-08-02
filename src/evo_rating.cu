@@ -12,18 +12,6 @@
 __shared__ double res[2][MATRIX_POW2][MATRIX_POW2];
 __shared__ double mtmp[MATRIX_HEIGHT][MATRIX_WIDTH];
 
-
-__device__ inline void eval_set_res_matrix_to_zero()
-{
-	res[0][threadIdx.y][threadIdx.x] = 0.;
-	res[1][threadIdx.y][threadIdx.x] = 0.;
-
-	if(2*tx < MATRIX_POW2 && 2*ty < MATRIX_POW2) {
-		res[0][2*ty][2*tx] = 0.;
-		res[1][2*ty][2*tx] = 0.;
-	}
-}
-
 __device__ inline void eval_set_res_matrix_to_identity()
 {
 	if(threadIdx.x != threadIdx.y) {
@@ -32,6 +20,23 @@ __device__ inline void eval_set_res_matrix_to_identity()
 	} else {
 		res[0][threadIdx.y][threadIdx.x] = 1.;
 		res[1][threadIdx.y][threadIdx.x] = 1.;
+	}
+
+	const uint32_t tty = ty + MATRIX_WIDTH;
+	const uint32_t ttx = tx + MATRIX_WIDTH;
+	if(tx + MATRIX_WIDTH < MATRIX_POW2) {
+		res[0][ty][ttx]  = 0.;
+		res[1][ty][ttx]  = 0.;
+	}
+
+	if(tty < MATRIX_POW2) {
+		res[0][tty][tx] = 0.;
+		res[1][tty][tx] = 0.;
+
+		if(ttx < MATRIX_POW2) {
+			res[0][tty][ttx] = 0.;
+			res[1][tty][ttx] = 0.;
+		}
 	}
 }
 
@@ -157,8 +162,10 @@ __device__ void evo_result_rating(const struct instance * const inst,
 //	res[0][ty][tx] /= max_value;
 	__syncthreads();
 
+	//only lines are processed
+
 	/* reduction step */
-	for(unsigned int s=MATRIX_POW2/2; s>0; s>>=1) {
+	for(uint32_t s = MATRIX_POW2 / 2; s > 0; s >>= 1) {
 		if (tx < s) {
 			res[0][ty][tx] += res[0][ty][tx + s];
 		}
@@ -168,14 +175,15 @@ __device__ void evo_result_rating(const struct instance * const inst,
 	if(tx != 0)
 		return;
 
-	for(unsigned int s=MATRIX_POW2/2; s>0; s>>=1) {
+	for(uint32_t s = MATRIX_POW2 / 2; s > 0; s >>= 1) {
 		if (ty < s) {
 			res[0][ty][0] += res[0][ty + s][0];
 		}
 		__syncthreads();
 	}
 
-	shrd_rating += res[0][0][0] + 1;
+	if(ty == 0)
+		shrd_rating += res[0][0][0];
 }
 
 __device__ void evo_init_mem2(const struct instance* const inst,
