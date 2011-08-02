@@ -10,12 +10,12 @@
 
 #include "instance.h"
 
-void print_parent_matrix(struct instance* inst);
-void print_parent_matrix(struct instance* inst, int block, int parent);
-void print_parent_matrix_pretty(struct instance* inst, int block, int parent);
+void print_parent_matrix_pretty(FILE* f, struct instance* inst,
+				int block, int parent);
 void print_result_matrix_pretty(struct instance* inst, int block, int child);
 
 void print_parent_ratings(struct instance *inst);
-void print_rules(struct instance *inst);
+void print_rules(FILE* f, struct instance *inst);
+void print_sparam(struct instance *inst);
 
 #endif /* MATRIX_PRINT_H_ */
