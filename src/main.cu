@@ -18,8 +18,10 @@
 
 #include "matrix_print.h"
 #include "matrix_copy.h"
+#include "ya_malloc.h"
 
-static void print_usage() {
+static void print_usage()
+{
 	printf("Usage: matrix_generator [options] rules\n\n");
 	printf("  -m|--match any|all -- default: any\n");
 	printf("	`- any -- termination contest rules\n");
@@ -48,10 +50,11 @@ static void print_usage() {
 	printf("           supplied at compile time and is %d\n\n", MATRIX_WIDTH);
 }
 
-static void parse_rules(struct instance * const inst, const char *rules) {
+static void parse_rules(struct instance * const inst, const char *rules)
+{
 	inst->rules_count = 0;
 	inst->rules_len  = strlen(rules);
-	inst->rules = (int*)malloc(sizeof(int) * inst->rules_len);
+	inst->rules = (int*)ya_malloc(sizeof(int) * inst->rules_len);
 
 	uint8_t tmp = 0;
 	for(int i = 0; i < inst->rules_len; i++) {
@@ -243,8 +246,8 @@ int main(int argc, char** argv)
 	float elapsedTime;
 	float elapsedTimeTotal = 0.f;
 
-	int width = inst.dim.parents * inst.dim.blocks;
-	double *rating = (double*)malloc(width * sizeof(double));
+	const int width = inst.dim.parents * inst.dim.blocks;
+	double * const rating = (double*)ya_malloc(width * sizeof(double));
 	int rounds = -1;
 
 	int block = 0; int thread = 0;

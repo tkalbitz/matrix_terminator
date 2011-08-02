@@ -2,6 +2,8 @@
 #include "matrix_copy.h"
 
 #include "config.h"
+#include "ya_malloc.h"
+
 
 void print_rules(FILE* f, struct instance *inst)
 {
@@ -46,7 +48,7 @@ void print_parent_matrix_pretty(FILE* f, struct instance* inst,
 		    sizeof(double) *
 		    inst->dim.matrix_height * inst->dim.blocks;
 
-	double* parent_cpy = (double*)malloc(width);
+	double* parent_cpy = (double*)ya_malloc(width);
 	memset(parent_cpy, 1, width);
 
 	copy_parents_dev_to_host(inst, parent_cpy);
@@ -95,7 +97,7 @@ void print_result_matrix_pretty(struct instance* inst, int block, int child)
 		    inst->width_per_inst * sizeof(double) *
 		    inst->dim.matrix_height * inst->dim.blocks;
 
-	double* const result_cpy = (double*)malloc(width);
+	double* const result_cpy = (double*)ya_malloc(width);
 	memset(result_cpy, 1, width);
 
 	copy_results_dev_to_host(inst, result_cpy);
@@ -124,7 +126,7 @@ void print_result_matrix_pretty(struct instance* inst, int block, int child)
 void print_parent_ratings(struct instance *inst)
 {
 	int width = inst->dim.parents * inst->dim.blocks;
-	double *rating = (double*)malloc(width * sizeof(double));
+	double *rating = (double*)ya_malloc(width * sizeof(double));
 	memset(rating, 1, width * sizeof(double));
 	copy_parent_rating_dev_to_host(inst, rating);
 	printf("-------------------RATINGS-------------------------------\n");
@@ -143,7 +145,7 @@ void print_parent_ratings(struct instance *inst)
 void print_sparam(struct instance *inst)
 {
 	int width = inst->dim.parents * inst->dim.childs * inst->dim.blocks;
-	double *sparam = (double*)malloc(width * sizeof(double));
+	double *sparam = (double*)ya_malloc(width * sizeof(double));
 	memset(sparam, 1, width * sizeof(double));
 	copy_sparam_dev_to_host(inst, sparam);
 	printf("-------------------s param-------------------------------\n");
