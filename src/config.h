@@ -11,7 +11,6 @@
 
 #define MATRIX_HEIGHT 5
 #define MATRIX_WIDTH  5
-#define MATRIX_POW2   8
 
 #define PARENT_MAX 1000.0f
 #define SPARAM     ((PARENT_MAX) * 0.01)
