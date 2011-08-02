@@ -22,23 +22,16 @@ __device__ void double_memcpy(double* to, const double* from, int size)
 	}
 }
 
-__device__ void copy_child_to_parent(struct instance * const inst,
-				     struct memory   * const mem,
-				     const int child,
-				     const int parent)
+__device__ inline void copy_child_to_parent(struct instance * const inst,
+					    struct memory   * const mem,
+					    const int child,
+					    const int parent)
 {
-	const int cstart = child  * inst->width_per_inst;
-	const int pstart = parent * inst->width_per_inst;
-	const int rows = MATRIX_HEIGHT;
+	const uint32_t cstart = child  * inst->width_per_inst;
+	const uint32_t pstart = parent * inst->width_per_inst;
 
-	for(int r = 0; r < rows; r++) {
-		double* const prow = P_ROW(r);
-		double* const crow = C_ROW(r);
-
-		double_memcpy(&(prow[pstart]),
-		              &(crow[cstart]),
-		              inst->width_per_inst);
-	}
+	for(uint32_t i = 0; i < inst->width_per_inst; i += MATRIX_WIDTH)
+		P_ROW(ty)[pstart + i + tx] = C_ROW(ty)[cstart + i + tx];
 }
 
 #include "evo_recombination.cu"
@@ -80,8 +73,10 @@ __global__ void evo_kernel_part_two(struct instance *inst)
 	__syncthreads();
 
 	/* Parallel copy of memory */
-	copy_child_to_parent(inst, &mem, (int)mem.c_rat[2 * tx + 1], tx);
-	mem.p_rat[tx] = mem.c_rat[2 * tx];
+	for(int i = 0; i < PARENTS; i++) {
+		copy_child_to_parent(inst, &mem, (int)mem.c_rat[2 * i + 1], i);
+		mem.p_rat[i] = mem.c_rat[2 * i];
+	}
 
 	/* backup rnd state to global mem */
 //	inst->rnd_states[id] = rnd_state;

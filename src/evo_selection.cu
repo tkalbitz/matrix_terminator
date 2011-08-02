@@ -8,27 +8,38 @@
 __device__ void evo_parent_selection_best(struct instance * const inst,
 					  struct memory   * const mem)
 {
-	if(threadIdx.x != 0)
+	if(ty != 0)
 		return;
 
-	const int elems = 2 * inst->dim.childs * inst->dim.parents;
-	double* const arr = mem->c_rat;
+	__shared__ struct double2 res[PARENTS * CHILDS];
+	double2* const arr   = (double2*)mem->c_rat;
 
-	double key, child;
+	for(int i = tx; i < PARENTS * CHILDS; i += MATRIX_WIDTH) {
+		res[i]   = arr[i];
+	}
 
-	/* insertion sort */
-	for(int i = 2; i < elems; i+=2) {
-		key   = arr[i];
-		child = arr[i+1];
+	__syncthreads();
 
-		int j = i - 2;
-		while(j >=0 && arr[j] > key) {
-			arr[j + 2] = arr[j];
-			arr[j + 3] = arr[j+1];
-			j = j - 2;
+	if(tx == 0) {
+		double2 key;
+
+		/* insertion sort */
+		for(int i = 1; i < PARENTS * CHILDS; i++) {
+			key = res[i];
+
+			int j = i - 1;
+			while(j >=0 && res[j].x > key.x) {
+				res[j + 1] = res[j];
+				j = j - 1;
+			}
+			res[j + 1] = key;
 		}
-		arr[j + 2] = key;
-		arr[j + 3] = child;
+	}
+
+	__syncthreads();
+
+	for(int i = tx; i < PARENTS * CHILDS; i += MATRIX_WIDTH) {
+		arr[i] = res[i];
 	}
 }
 
@@ -37,7 +48,7 @@ __device__ void evo_parent_selection_turnier(struct instance * const inst,
 					     curandState* rnd_state,
 					     const uint8_t q)
 {
-	if(threadIdx.x >= PARENTS)
+	if(threadIdx.y != 0 && threadIdx.x >= PARENTS)
 		return;
 
 	__shared__ double res[2 * PARENTS];

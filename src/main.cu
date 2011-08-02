@@ -265,7 +265,8 @@ int main(int argc, char** argv)
 		cudaThreadSynchronize();
 		CUDA_CALL(cudaGetLastError());
 
-		evo_kernel_part_two<<<BLOCKS, PARENTS>>>(dev_inst);
+		static dim3 copy_threads(MATRIX_WIDTH, MATRIX_HEIGHT);
+		evo_kernel_part_two<<<BLOCKS, copy_threads>>>(dev_inst);
 		CUDA_CALL(cudaGetLastError());
 		cudaThreadSynchronize();
 		CUDA_CALL(cudaGetLastError());
