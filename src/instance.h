@@ -14,6 +14,9 @@
 		fprintf(stderr, "Error '%s' at %s:%d\n", cudaGetErrorString(xxs),__FILE__,__LINE__); \
 		exit(EXIT_FAILURE);}} while(0)
 
+#define tx (threadIdx.x)
+#define ty (threadIdx.y)
+
 #define MATCH_ALL 0
 #define MATCH_ANY 1
 

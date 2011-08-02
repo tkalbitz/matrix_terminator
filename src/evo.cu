@@ -75,7 +75,6 @@ __global__ void evo_kernel_part_two(struct instance *inst)
 	struct memory mem;
 	evo_init_mem(inst, &mem);
 
-	const int tx = threadIdx.x;
 	evo_parent_selection_best(inst, &mem);
 //      evo_parent_selection_turnier(inst, &mem, &rnd_state, 3);
 	__syncthreads();

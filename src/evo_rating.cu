@@ -9,12 +9,19 @@
 #include "evo_rating.h"
 #include "evo_memory.cu"
 
-__shared__ double res[2][MATRIX_HEIGHT][MATRIX_WIDTH];
+__shared__ double res[2][MATRIX_POW2][MATRIX_POW2];
+__shared__ double mtmp[MATRIX_HEIGHT][MATRIX_WIDTH];
+
 
 __device__ inline void eval_set_res_matrix_to_zero()
 {
 	res[0][threadIdx.y][threadIdx.x] = 0.;
 	res[1][threadIdx.y][threadIdx.x] = 0.;
+
+	if(2*tx < MATRIX_POW2 && 2*ty < MATRIX_POW2) {
+		res[0][2*ty][2*tx] = 0.;
+		res[1][2*ty][2*tx] = 0.;
+	}
 }
 
 __device__ inline void eval_set_res_matrix_to_identity()
@@ -32,10 +39,7 @@ __device__ inline void eval_copy_matrix_to_res(struct memory * const mem,
 		    	    	    	       const int cmatrix,
 		    	    	    	       const int rmatrix)
 {
-	const int tx = threadIdx.x;
-	const int ty = threadIdx.y;
 	const int cstart = mem->c_zero + cmatrix * MATRIX_WIDTH;
-
 	res[rmatrix][ty][tx] = C_ROW(ty)[cstart + tx];
 }
 
@@ -46,16 +50,15 @@ __device__ void eval_mul_inplace(const struct instance * const inst,
 {
 	const int rows = MATRIX_HEIGHT;
 	const int cstart = mem->c_zero  + cmatrix * inst->dim.matrix_width;
-
-	const int tx = threadIdx.x;
-	const int ty = threadIdx.y;
-
 	double tmp = 0;
+
+	/* cache matrix */
+	mtmp[ty][tx] = C_ROW(ty)[cstart + tx];
 
 	/* result rows */
 	#pragma unroll
 	for(int i = 0; i < rows; i++) {
-		tmp += res[rmatrix][ty][i] * C_ROW(i)[cstart + tx];
+		tmp += res[rmatrix][ty][i] * mtmp[i][tx];
 	}
 
 	__syncthreads();
@@ -119,10 +122,6 @@ __device__ void evo_result_rating(const struct instance * const inst,
 {
 	const int rows = MATRIX_HEIGHT - 1;
 	const int cols = MATRIX_WIDTH  - 1;
-	double rating = 0.;
-
-	const int tx = threadIdx.x;
-	const int ty = threadIdx.y;
 
 	const double penalty = 1e9;
 
@@ -130,21 +129,21 @@ __device__ void evo_result_rating(const struct instance * const inst,
 		switch(inst->cond_right) {
 		case COND_UPPER_LEFT:
 			if((res[0][0][0] - res[1][0][0]) < 1.f)
-				rating += penalty;
+				shrd_rating += penalty;
 			break;
 		case COND_UPPER_RIGHT:
 			if((res[0][0][cols] - res[1][0][cols]) < 1.f)
-				rating += penalty;
+				shrd_rating += penalty;
 			break;
 		case COND_UPPER_LEFT_LOWER_RIGHT:
 			if((res[0][0][0] - res[1][0][0]) < 1.f)
-				rating += penalty;
+				shrd_rating += penalty;
 
 			if((res[0][rows][cols] - res[1][rows][cols]) < 1.f)
-				rating += penalty;
+				shrd_rating += penalty;
 			break;
 		default:
-			rating += 2*penalty;
+			shrd_rating += 2*penalty;
 			break;
 		}
 	}
@@ -158,22 +157,25 @@ __device__ void evo_result_rating(const struct instance * const inst,
 //	res[0][ty][tx] /= max_value;
 	__syncthreads();
 
-	//only lines are processed
+	/* reduction step */
+	for(unsigned int s=MATRIX_POW2/2; s>0; s>>=1) {
+		if (tx < s) {
+			res[0][ty][tx] += res[0][ty][tx + s];
+		}
+		__syncthreads();
+	}
+
 	if(tx != 0)
 		return;
 
-	for(int i = 1; i < MATRIX_WIDTH; i++) {
-		res[0][ty][0] += res[0][ty][i];
+	for(unsigned int s=MATRIX_POW2/2; s>0; s>>=1) {
+		if (ty < s) {
+			res[0][ty][0] += res[0][ty + s][0];
+		}
+		__syncthreads();
 	}
 
-	if(ty != 0)
-		return;
-
-	for(int i = 0; i < MATRIX_HEIGHT; i++) {
-		rating += res[0][i][0];
-	}
-
-	shrd_rating += rating;
+	shrd_rating += res[0][0][0] + 1;
 }
 
 __device__ void evo_init_mem2(const struct instance* const inst,
