@@ -60,15 +60,16 @@ __global__ void evo_kernel_part_one(struct instance *inst)
 
 __global__ void evo_kernel_part_two(struct instance *inst)
 {
-	/* copy global state to local mem for efficiency */
-//	const int id = get_thread_id();
-//	curandState rnd_state = inst->rnd_states[id];
-
 	struct memory mem;
 	evo_init_mem(inst, &mem);
 
 	evo_parent_selection_best(inst, &mem);
-//      evo_parent_selection_turnier(inst, &mem, &rnd_state, 3);
+//	if(ty == 0) {
+//		const int id = get_thread_id();
+//		curandState rnd_state = inst->rnd_states[id];
+//		evo_parent_selection_turnier(inst, &mem, &rnd_state, 3);
+//		inst->rnd_states[id] = rnd_state;
+//	}
 	__syncthreads();
 
 	/* Parallel copy of memory */
@@ -78,8 +79,5 @@ __global__ void evo_kernel_part_two(struct instance *inst)
 		mem.p_rat[i] = mem.c_rat[2 * i];
 		mem.psparam[i] = mem.sparam[child];
 	}
-
-	/* backup rnd state to global mem */
-//	inst->rnd_states[id] = rnd_state;
 }
 

@@ -53,7 +53,7 @@ __device__ void evo_mutation(struct instance * const inst,
                              double          * const s_param)
 {
 	*s_param = *s_param * exp(curand_normal(rnd_s) /
-				      sqrtf(inst->num_matrices * MATRIX_HEIGHT));
+				     sqrtf(inst->num_matrices * MATRIX_HEIGHT));
 	const int rows = MATRIX_HEIGHT;
 	const double delta = inst->delta;
 	double tmp;
