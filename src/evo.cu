@@ -49,11 +49,10 @@ __global__ void evo_kernel_part_one(struct instance *inst)
 	evo_init_mem(inst, &mem);
 
 	int p_sel[2];
-	double* sparam = get_sparam_arr(inst);
 
 	evo_recomb_selection(inst, &rnd_state, p_sel);
 	evo_recombination(inst, &mem, &rnd_state, p_sel);
-	evo_mutation(inst, &mem, &rnd_state, &sparam[threadIdx.x]);
+	evo_mutation(inst, &mem, &rnd_state, &(mem.sparam[threadIdx.x]));
 
 	/* backup rnd state to global mem */
 	inst->rnd_states[id] = rnd_state;
@@ -74,8 +73,10 @@ __global__ void evo_kernel_part_two(struct instance *inst)
 
 	/* Parallel copy of memory */
 	for(int i = 0; i < PARENTS; i++) {
-		copy_child_to_parent(inst, &mem, (int)mem.c_rat[2 * i + 1], i);
+		const int child = (int)mem.c_rat[2 * i + 1];
+		copy_child_to_parent(inst, &mem, child, i);
 		mem.p_rat[i] = mem.c_rat[2 * i];
+		mem.psparam[i] = mem.sparam[child];
 	}
 
 	/* backup rnd state to global mem */

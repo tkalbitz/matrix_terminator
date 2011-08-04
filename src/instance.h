@@ -46,8 +46,11 @@ struct instance {
 
 	curandState *rnd_states;   /* random number generator states */
 
-	cudaPitchedPtr dev_sparam; /* rating of the parents */
-	cudaExtent dev_sparam_ext; /* extend for parent rating */
+	cudaPitchedPtr dev_sparam; /* strategy param */
+	cudaExtent dev_sparam_ext; /* extend for parent strategy param */
+
+	cudaPitchedPtr dev_psparam; /* parent strategy param */
+	cudaExtent dev_psparam_ext; /* extend for parent strategy param */
 
 
 	int num_matrices;          /* number of matrices of the problem */

@@ -1,3 +1,6 @@
+#include <cuda.h>
+#include <math.h>
+
 __device__ static double evo_mut_new_value(struct instance * const inst,
 					   curandState     * const rnd_state)
 {
@@ -49,7 +52,8 @@ __device__ void evo_mutation(struct instance * const inst,
 			     curandState     * const rnd_s,
                              double          * const s_param)
 {
-	*s_param = *s_param * exp(curand_normal(rnd_s) / MATRIX_HEIGHT);
+	*s_param = *s_param * exp(curand_normal(rnd_s) /
+				      sqrtf(inst->num_matrices * MATRIX_HEIGHT));
 	const int rows = MATRIX_HEIGHT;
 	const double delta = inst->delta;
 	double tmp;

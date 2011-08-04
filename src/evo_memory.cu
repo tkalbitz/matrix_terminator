@@ -28,6 +28,8 @@ struct memory {
 
 	double* c_rat;
 	double* p_rat;
+	double* sparam;
+	double* psparam;
 };
 
 __device__ static void evo_init_mem(const struct instance* const inst,
@@ -69,26 +71,21 @@ __device__ static void evo_init_mem(const struct instance* const inst,
 	mem->r_end2  = mem->r_zero2 + inst->dim.matrix_width;
 #endif
 
-	char* t_dev_ptr = (char*)inst->dev_crat.ptr;
+	const char* const t_dev_ptr = (char*)inst->dev_crat.ptr;
 	mem->c_rat = (double*) (t_dev_ptr + blockIdx.x * inst->dev_crat.pitch);
 
-	t_dev_ptr = (char*)inst->dev_prat.ptr;
-	mem->p_rat = (double*) (t_dev_ptr + blockIdx.x * inst->dev_prat.pitch);
+	const char* const t_dev_ptr2 = (char*)inst->dev_prat.ptr;
+	mem->p_rat = (double*) (t_dev_ptr2 + blockIdx.x * inst->dev_prat.pitch);
+
+	const char* const s_dev_ptr = (char*)inst->dev_sparam.ptr;
+	mem->sparam  = (double*)(s_dev_ptr + blockIdx.x * inst->dev_sparam.pitch);
+	const char* const ps_dev_ptr = (char*)inst->dev_psparam.ptr;
+	mem->psparam = (double*)(ps_dev_ptr + blockIdx.x * inst->dev_psparam.pitch);
 }
 
 /* calculate the thread id for the current block topology */
 __device__ inline static int get_thread_id() {
 	return threadIdx.x + blockIdx.x * blockDim.x;
-}
-
-__device__ static double* get_sparam_arr(struct instance* const inst)
-{
-	char* const s_dev_ptr = (char*)inst->dev_sparam.ptr;
-	const size_t s_pitch = inst->dev_sparam.pitch;
-	const size_t s_slice_pitch = s_pitch * 1;
-	char* const s_slice = s_dev_ptr + blockIdx.x /* z */ * s_slice_pitch;
-	double* sparam = (double*) (s_slice + 0 * s_pitch);
-	return sparam;
 }
 
 #endif /* EVO_MEMORY_H_ */

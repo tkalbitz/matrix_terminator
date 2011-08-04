@@ -103,6 +103,13 @@ void alloc_sparam(struct instance *inst)
 	cudaPitchedPtr pitched_ptr;
 	CUDA_CALL(cudaMalloc3D(&pitched_ptr, inst->dev_sparam_ext));
 	inst->dev_sparam = pitched_ptr;
+
+	inst->dev_psparam_ext = make_cudaExtent(inst->dim.parents * sizeof(double),
+					        1,
+					        inst->dim.blocks);
+
+	CUDA_CALL(cudaMalloc3D(&pitched_ptr, inst->dev_psparam_ext));
+	inst->dev_psparam = pitched_ptr;
 }
 
 void alloc_rating(struct instance *inst)

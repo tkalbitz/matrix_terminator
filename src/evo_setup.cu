@@ -99,5 +99,10 @@ __global__ void setup_parent_kernel(struct instance * const inst)
 
 __global__ void setup_sparam(struct instance * const inst)
 {
-	get_sparam_arr(inst)[threadIdx.x] = inst->def_sparam;
+	struct memory mem;
+	evo_init_mem(inst, &mem);
+	mem.sparam[tx] = inst->def_sparam;
+
+	if(tx < PARENTS)
+		mem.psparam[tx] = inst->def_sparam;
 }

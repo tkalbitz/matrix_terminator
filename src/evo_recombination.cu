@@ -23,6 +23,9 @@ __device__ void evo_recombination(struct instance * const inst,
 	const int p2   = sel[1] * inst->width_per_inst;
 	const int cIdx = mem->c_zero;
 
+	mem->sparam[tx] = (1 - inst->recomb_rate) * mem->psparam[sel[0]] +
+			       inst->recomb_rate  * mem->psparam[sel[1]];
+
 	for(int r = 0; r < rows; r++) {
 		double* const c_row = C_ROW(r);
 		double* const p_row = P_ROW(r);
