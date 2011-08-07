@@ -24,10 +24,13 @@ CUDA_INCLUDE_DIRECTORIES(
 # Set CUDA_ATTACH_VS_BUILD_RULE_TO_CUDA_FILE when you want to add the same .cu
 # file to multiple targets.
 set(CUDA_ATTACH_VS_BUILD_RULE_TO_CUDA_FILE OFF)
+
+set(CMAKE_C_FLAGS "${CMAKE_C_CFLAGS} -std=gnu99 -Wall")
  
 # Use one executable only.
 CUDA_ADD_EXECUTABLE( matrix_generator
   instance.cu
+  plot_log.cu
   main.cu
   evo.cu
   evo_rating.cu

@@ -19,6 +19,7 @@
 #include "matrix_print.h"
 #include "matrix_copy.h"
 #include "ya_malloc.h"
+#include "plot_log.h"
 
 static void print_usage()
 {
@@ -40,6 +41,7 @@ static void print_usage()
 	printf("  -e|--recombination-rate <float number>  -- default: %3.2f\n",  RECOMB_RATE);
 	printf("  -p|--parent-max         <float number>  -- default: %.2f\n",   PARENT_MAX);
 	printf("  -s|--strategy-param     <float number>  -- default: %.2f\n", SPARAM);
+	printf("  -g|--plot-log\n");
 	printf("  -x|--enable-maxima\n\n");
 	printf("Rules should be supplied in the form:\n");
 	printf("  X10X01X110X0011X or XbaXabXbbaXaabbX\n");
@@ -48,6 +50,60 @@ static void print_usage()
 	printf("  Meaning: BA < AB and BBA < AABB in this case A and B\n");
 	printf("           are matrices of dimension (n,n). Parameter n is\n");
 	printf("           supplied at compile time and is %d\n\n", MATRIX_WIDTH);
+	printf("If the option --plot-log is given all ratings will be written in"
+		" a '.dat' file plus a '.plot' file for gnuplot.\n\n");
+	printf("If the option --enable-maxima is given the result will be written"
+		" in an 'mg_XXXXXX' file and maxima recalculate and prints the "
+		"result.\n\n");
+
+
+}
+
+void print_parents(struct instance* const inst,
+		   const int block,
+		   const int thread,
+		   const int rounds) {
+	FILE* f = stdout;
+	char* const fname = strdup("mg_XXXXXX");
+
+	printf("Parents:\n");
+
+	if(inst->maxima) {
+		int fd = mkstemp(fname);
+		if(fd == -1) {
+			perror("mkstemp: Failed fallback to stdout.");
+			f = stdout;
+			inst->maxima = 0;
+		}
+
+		f = fdopen(fd, "wb");
+		if(f == NULL) {
+			perror("fdopen: Failed fallback to stdout.");
+			close(fd);
+			f = stdout;
+			inst->maxima = 0;
+		}
+	}
+
+	print_parent_matrix_pretty(f, inst, block, thread);
+	print_rules(f, inst);
+
+	if(rounds != -1 && inst->maxima) {
+		fprintf(f, "quit();\n");
+		fflush(f);
+		fclose(f);
+
+		int r = fork();
+
+		if(r > 0)
+			execlp("maxima", "maxima", "--very-quiet", "-b", fname, NULL);
+
+		if(r == -1) {
+			perror("fork failed");
+		}
+	}
+
+	free(fname);
 }
 
 static void parse_rules(struct instance * const inst, const char *rules)
@@ -73,7 +129,7 @@ static void parse_rules(struct instance * const inst, const char *rules)
 }
 
 static int parse_configuration(struct instance* const inst,
-				int argc, char** argv)
+			       int argc, char** argv)
 {
 	int c;
 	int idx;
@@ -88,6 +144,7 @@ static int parse_configuration(struct instance* const inst,
 	inst->parent_max  = PARENT_MAX;
 	inst->def_sparam  = SPARAM;
 	inst->maxima      = 0;
+	inst->plot_log    = 0;
 	
 	struct option opt[] =
 	{
@@ -102,10 +159,11 @@ static int parse_configuration(struct instance* const inst,
 		{"parent-max"        , required_argument, 0, 'p'},
 		{"strategy-param"    , required_argument, 0, 's'},
 		{"enable-maxima"     , no_argument,       0, 'x'},
+		{"plot-log"          , no_argument,       0, 'g'},
 		{0, 0, 0, 0}
 	};
 
-	while((c = getopt_long(argc, argv, "m:l:r:c:d:hu:e:p:s:x",
+	while((c = getopt_long(argc, argv, "m:l:r:c:d:hu:e:p:s:xg",
 			      opt, &idx)) != EOF) {
 		switch(c) {
 		case 'm':
@@ -167,6 +225,9 @@ static int parse_configuration(struct instance* const inst,
 		case 'x':
 			inst->maxima = 1;
 			break;
+		case 'g':
+			inst->plot_log = 1;
+			break;
 		case '?':
 			switch (optopt) {
 			case 'm':
@@ -191,6 +252,7 @@ static int parse_configuration(struct instance* const inst,
 				exit(EXIT_FAILURE);
 				break;
 			}
+			break;
 
 		default:
 			printf("\n");
@@ -225,17 +287,11 @@ int main(int argc, char** argv)
 
 	inst_init(&inst);
 	dev_inst = inst_create_dev_inst(&inst);
-
-	printf("Rules: ");
-	print_rules(stdout, &inst);
+	int evo_threads = get_evo_threads(&inst);
 
 	setup_parent_kernel<<<BLOCKS, inst.dim.matrix_height>>>(dev_inst);
 	cudaThreadSynchronize();
 	CUDA_CALL(cudaGetLastError());
-
-	int evo_threads = get_evo_threads(&inst);
-	dim3 blocks(BLOCKS, PARENTS*CHILDS);
-	dim3 threads(MATRIX_WIDTH, MATRIX_HEIGHT);
 
 	setup_sparam<<<BLOCKS, evo_threads>>>(dev_inst);
 	cudaThreadSynchronize();
@@ -246,10 +302,15 @@ int main(int argc, char** argv)
 	float elapsedTime;
 	float elapsedTimeTotal = 0.f;
 
+	const dim3 blocks(BLOCKS, PARENTS*CHILDS);
+	const dim3 threads(MATRIX_WIDTH, MATRIX_HEIGHT);
+	const dim3 copy_threads(MATRIX_WIDTH, MATRIX_HEIGHT);
+
 	const int width = inst.dim.parents * inst.dim.blocks;
 	double * const rating = (double*)ya_malloc(width * sizeof(double));
-	int rounds = -1;
+	struct plot_log* pl = init_plot_log(&inst);
 
+	int rounds = -1;
 	int block = 0; int thread = 0;
 
 	for(unsigned long i = 0; i < max_rounds; i++) {
@@ -268,7 +329,6 @@ int main(int argc, char** argv)
 		cudaThreadSynchronize();
 		CUDA_CALL(cudaGetLastError());
 
-		static dim3 copy_threads(MATRIX_WIDTH, MATRIX_HEIGHT);
 		evo_kernel_part_two<<<BLOCKS, copy_threads>>>(dev_inst);
 		CUDA_CALL(cudaGetLastError());
 		cudaThreadSynchronize();
@@ -282,10 +342,9 @@ int main(int argc, char** argv)
 		cudaEventDestroy(start);
 		cudaEventDestroy(stop);
 
-//		if((i & 15) != 0 && i != (max_rounds - 1))
-//			continue;
-
 		copy_parent_rating_dev_to_host(&inst, rating);
+		plot_log(pl, i, rating);
+
 		for(int j = 0; j < width; j += PARENTS) {
 			if(rating[j] == 0.) {
 				block = j / PARENTS;
@@ -298,41 +357,19 @@ int main(int argc, char** argv)
 	}
 
 	free(rating);
+	clean_plot_log(pl);
 	inst_copy_dev_to_host(dev_inst, &inst);
 
 //	print_sparam(&inst);
 	print_parent_ratings(&inst);
-	printf("Parents:\n");
-
-	FILE* f;
-	char* fname = strdup("mg_XXXXXX");
-	if(inst.maxima) {
-		int fd = mkstemp(fname);
-		if(fd == -1) {
-			perror("mkstemp: Failed fallback to stdout.");
-			f = stdout;
-			inst.maxima = 0;
-		}
-
-		f = fdopen(fd, "wb");
-		if(f == NULL) {
-			perror("fdopen: Failed fallback to stdout.");
-			close(fd);
-			f = stdout;
-			inst.maxima = 0;
-		}
-	} else {
-		f = stdout;
-	}
-
-	print_parent_matrix_pretty(f, &inst, block, thread);
-	print_rules(f, &inst);
 
 	printf("Time needed: %f\n", elapsedTimeTotal);
 	printf("Needed rounds: %d\n", rounds);
 	printf("Result is block: %d, parent: %d\n", block, thread);
 	printf("Result was in block: %d, child: %d, selection: %d\n",
 		inst.res_child_block, inst.res_child_idx, inst.res_parent);
+
+	print_parents(&inst, block, thread, rounds);
 
 	#ifdef DEBUG
 	if(rounds != -1) {
@@ -344,23 +381,7 @@ int main(int argc, char** argv)
 	}
 	#endif
 
-	if(rounds != -1 && inst.maxima) {
-		fprintf(f, "quit();\n");
-		fflush(f);
-		fclose(f);
-
-		int r = fork();
-
-		if(r > 0)
-			execlp("maxima", "maxima", "--very-quiet", "-b", fname, NULL);
-
-		if(r == -1) {
-			perror("fork failed");
-		}
-	}
-
 	printf("Clean up and exit.\n");
-	free(fname);
 	inst_cleanup(&inst, dev_inst);
 
 	if(rounds == -1)
