@@ -163,6 +163,7 @@ __device__ void evo_result_rating(const struct instance * const inst,
 
 	for(int i = 0; i < MATRIX_HEIGHT; i++) {
 		rating += res[0][i][0];
+
 	}
 
 	shrd_rating += rating;

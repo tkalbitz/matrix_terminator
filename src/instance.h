@@ -74,17 +74,12 @@ struct instance {
 	unsigned int res_child_block; /* in which block is the result */
 	unsigned int res_child_idx;   /* which parent is the result */
 
-	double mut_rate;
-	double recomb_rate;
 	double parent_max;
-	double def_sparam;
 
-	uint16_t match:1,	/* match all rules or any of them */
-		 cond_left:3,	/* left condition */
-	         cond_right:3,	/* right condition */
-		 maxima:1,	/* is the maxima test enabled */
-		 plot_log:1,    /* gnuplot activated */
-		 reserved:7;
+	uint8_t match:1,	/* match all rules or any of them */
+		cond_left:3,	/* left condition */
+	        cond_right:3,	/* right condition */
+		reserved:1;
 };
 
 void inst_init(struct instance* const inst);

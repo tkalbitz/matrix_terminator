@@ -6,6 +6,14 @@
 #define R_ROW(y) ((double*) (mem->r_slice + (y) * mem->r_pitch))
 #define CR_ROW(y) ((double*) (res_mem.r_slice + (y) * res_mem.r_pitch))
 
+#define SP(x) (mem->sparam[3*(x)])
+#define MR(x) (mem->sparam[3*(x)+1])
+#define RR(x) (mem->sparam[3*(x)+2])
+
+#define PSP(x) (mem->psparam[3*(x)])
+#define PMR(x) (mem->psparam[3*(x)+1])
+#define PRR(x) (mem->psparam[3*(x)+2])
+
 struct memory {
 	size_t p_pitch;
 	char  *p_slice;

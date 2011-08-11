@@ -96,7 +96,9 @@ void alloc_results(struct instance *inst)
 
 void alloc_sparam(struct instance *inst)
 {
-	inst->dev_sparam_ext = make_cudaExtent(inst->dim.childs * inst->dim.parents * sizeof(double),
+	inst->dev_sparam_ext = make_cudaExtent(inst->dim.childs *
+					       inst->dim.parents * 3 *
+					       sizeof(double),
 					       1,
 					       inst->dim.blocks);
 
@@ -104,7 +106,8 @@ void alloc_sparam(struct instance *inst)
 	CUDA_CALL(cudaMalloc3D(&pitched_ptr, inst->dev_sparam_ext));
 	inst->dev_sparam = pitched_ptr;
 
-	inst->dev_psparam_ext = make_cudaExtent(inst->dim.parents * sizeof(double),
+	inst->dev_psparam_ext = make_cudaExtent(inst->dim.parents * 3 *
+						sizeof(double),
 					        1,
 					        inst->dim.blocks);
 

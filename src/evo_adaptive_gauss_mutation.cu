@@ -9,6 +9,9 @@ __device__ static double evo_mut_new_value(struct instance * const inst,
 	if((factor * inst->delta) < 1.0)
 		factor++;
 
+	if(factor * inst->delta < 1.)
+		return 1;
+
 	return factor * inst->delta;
 }
 
@@ -49,14 +52,21 @@ __device__ void evo_ensure_constraints(struct instance * const inst,
 
 __device__ void evo_mutation(struct instance * const inst,
 			     struct memory   * const mem,
-			     curandState     * const rnd_s,
-                             double          * const s_param)
+			     curandState     * const rnd_s)
 {
-	*s_param = *s_param * exp(curand_normal(rnd_s) /
-				     sqrtf(inst->num_matrices * MATRIX_HEIGHT));
 	const int rows = MATRIX_HEIGHT;
 	const double delta = inst->delta;
 	double tmp;
+
+	SP(tx) = SP(tx) * exp(curand_normal(rnd_s) /
+				     sqrtf(inst->num_matrices * MATRIX_HEIGHT));
+	SP(tx) = min(max(SP(tx), 0.0001), PARENT_MAX);
+
+	MR(tx) = MR(tx) + (curand_normal(rnd_s) / 20);
+	MR(tx) = min(max(MR(tx), 0.0001), 1.);
+
+	const double mr = MR(tx);
+	const double sp = SP(tx);
 
 	#pragma unroll
 	for(int r = 0; r < rows; r++) {
@@ -64,11 +74,14 @@ __device__ void evo_mutation(struct instance * const inst,
 
 		for(int c = mem->c_zero; c < mem->c_end; c++) {
 
-			if(curand_uniform(rnd_s) > inst->mut_rate)
+			if(curand_uniform(rnd_s) > mr) {
+				if(curand_uniform(rnd_s) < 0.005)
+					row[c] = 0.;
 				continue;
+			}
 
-			tmp = row[c];
-			tmp = tmp + (double)(curand_normal(rnd_s) * (*s_param));
+			tmp = (double)(curand_normal(rnd_s) * sp);
+			tmp = row[c] + tmp;
 			/* we want x * delta, where x is an int */
 			tmp = ((unsigned long)(tmp / delta)) * delta;
 			tmp = max(tmp, 0.0);

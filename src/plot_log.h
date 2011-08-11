@@ -16,9 +16,10 @@ struct plot_log
 	char* plot_name;
 	FILE* plot;
 	FILE* dat;
+	char best;
 };
 
-struct plot_log* init_plot_log(struct instance* inst);
+struct plot_log* init_plot_log(char activate, char best_only);
 void clean_plot_log(struct plot_log* const pl);
 void plot_log(struct plot_log* const pl,
 	      const int round,

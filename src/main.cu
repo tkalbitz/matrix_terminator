@@ -21,6 +21,17 @@
 #include "ya_malloc.h"
 #include "plot_log.h"
 
+struct matrix_option {
+	double mut_rate;
+	double recomb_rate;
+	double sparam;
+	uint32_t rounds;
+	char enable_maxima;
+	char plot_log_enable;
+	char plot_log_best;
+
+};
+
 static void print_usage()
 {
 	printf("Usage: matrix_generator [options] rules\n\n");
@@ -42,6 +53,8 @@ static void print_usage()
 	printf("  -p|--parent-max         <float number>  -- default: %.2f\n",   PARENT_MAX);
 	printf("  -s|--strategy-param     <float number>  -- default: %.2f\n", SPARAM);
 	printf("  -g|--plot-log\n");
+	printf("	`- best         -- log only the best rating\n");
+	printf("	   all          -- log all ratings 1\n");
 	printf("  -x|--enable-maxima\n\n");
 	printf("Rules should be supplied in the form:\n");
 	printf("  X10X01X110X0011X or XbaXabXbbaXaabbX\n");
@@ -60,20 +73,22 @@ static void print_usage()
 }
 
 void print_parents(struct instance* const inst,
+		   struct matrix_option* const mopt,
 		   const int block,
 		   const int thread,
-		   const int rounds) {
+		   const int rounds)
+{
 	FILE* f = stdout;
 	char* const fname = strdup("mg_XXXXXX");
 
 	printf("Parents:\n");
 
-	if(inst->maxima) {
+	if(mopt->enable_maxima) {
 		int fd = mkstemp(fname);
 		if(fd == -1) {
 			perror("mkstemp: Failed fallback to stdout.");
 			f = stdout;
-			inst->maxima = 0;
+			mopt->enable_maxima = 0;
 		}
 
 		f = fdopen(fd, "wb");
@@ -81,14 +96,14 @@ void print_parents(struct instance* const inst,
 			perror("fdopen: Failed fallback to stdout.");
 			close(fd);
 			f = stdout;
-			inst->maxima = 0;
+			mopt->enable_maxima = 0;
 		}
 	}
 
 	print_parent_matrix_pretty(f, inst, block, thread);
 	print_rules(f, inst);
 
-	if(rounds != -1 && inst->maxima) {
+	if(rounds != -1 && mopt->enable_maxima) {
 		fprintf(f, "quit();\n");
 		fflush(f);
 		fclose(f);
@@ -128,24 +143,26 @@ static void parse_rules(struct instance * const inst, const char *rules)
 	}
 }
 
-static int parse_configuration(struct instance* const inst,
-			       int argc, char** argv)
+static void parse_configuration(struct instance* const inst,
+				struct matrix_option* const mopt,
+				int argc, char** argv)
 {
 	int c;
 	int idx;
-	unsigned long int rounds = 500;
 
 	inst->match       = MATCH_ANY;
 	inst->cond_left   = COND_UPPER_LEFT_LOWER_RIGHT;
 	inst->cond_right  = COND_UPPER_RIGHT;
 	inst->delta       = 0.1;
-	inst->mut_rate    = MUT_RATE;
-	inst->recomb_rate = RECOMB_RATE;
 	inst->parent_max  = PARENT_MAX;
-	inst->def_sparam  = SPARAM;
-	inst->maxima      = 0;
-	inst->plot_log    = 0;
-	
+
+	mopt->mut_rate        = MUT_RATE;
+	mopt->recomb_rate     = RECOMB_RATE;
+	mopt->sparam          = SPARAM;
+	mopt->rounds          = 500;
+	mopt->enable_maxima   = 0;
+	mopt->plot_log_enable = 0;
+
 	struct option opt[] =
 	{
 		{"match"             , required_argument, 0, 'm'},
@@ -159,11 +176,11 @@ static int parse_configuration(struct instance* const inst,
 		{"parent-max"        , required_argument, 0, 'p'},
 		{"strategy-param"    , required_argument, 0, 's'},
 		{"enable-maxima"     , no_argument,       0, 'x'},
-		{"plot-log"          , no_argument,       0, 'g'},
+		{"plot-log"          , required_argument, 0, 'g'},
 		{0, 0, 0, 0}
 	};
 
-	while((c = getopt_long(argc, argv, "m:l:r:c:d:hu:e:p:s:xg",
+	while((c = getopt_long(argc, argv, "m:l:r:c:d:hu:e:p:s:xg:",
 			      opt, &idx)) != EOF) {
 		switch(c) {
 		case 'm':
@@ -171,9 +188,10 @@ static int parse_configuration(struct instance* const inst,
 				inst->match = MATCH_ALL;
 			else if(!strcmp(optarg, "any"))
 				inst->match = MATCH_ANY;
-			else
-				return -1;
-
+			else {
+				print_usage();
+				exit(EXIT_FAILURE);
+			}
 			break;
 		case 'l':
 			if(!strcmp(optarg, "uleft"))
@@ -202,32 +220,42 @@ static int parse_configuration(struct instance* const inst,
 
 			break;
 		case 'c':
-			rounds = strtoul(optarg, NULL, 10);
+			mopt->rounds = strtoul(optarg, NULL, 10);
 			break;
 		case 'd':
 			inst->delta = strtod(optarg, NULL);
 			break;
 		case 'h':
 			print_usage();
-			return 0;
+			exit(EXIT_FAILURE);
 		case 'u':
-			inst->mut_rate = strtod(optarg, NULL);
+			mopt->mut_rate = strtod(optarg, NULL);
 			break;
 		case 'e':
-			inst->recomb_rate = strtod(optarg, NULL);
+			mopt->recomb_rate = strtod(optarg, NULL);
 			break;
 		case 'p':
 			inst->parent_max = strtod(optarg, NULL);
 			break;
 		case 's':
-			inst->def_sparam = strtod(optarg, NULL);
+			mopt->sparam     = strtod(optarg, NULL);
 			break;
 		case 'x':
-			inst->maxima = 1;
+			mopt->enable_maxima = 1;
 			break;
-		case 'g':
-			inst->plot_log = 1;
+		case 'g': {
+			mopt->plot_log_enable = 1;
+
+			if(!strcmp(optarg, "all"))
+				mopt->plot_log_best = 0;
+			else if(!strcmp(optarg, "best"))
+				mopt->plot_log_best = 1;
+			else {
+				print_usage();
+				exit(EXIT_FAILURE);
+			}
 			break;
+		}
 		case '?':
 			switch (optopt) {
 			case 'm':
@@ -239,6 +267,7 @@ static int parse_configuration(struct instance* const inst,
 			case 'e':
 			case 'p':
 			case 's':
+			case 'g':
 				fprintf(stderr, "Option -%c requires an "
 						"argument!\n", optopt);
 				exit(EXIT_FAILURE);
@@ -268,7 +297,6 @@ static int parse_configuration(struct instance* const inst,
 	}
 
 	parse_rules(inst, argv[optind]);
-	return rounds;
 }
 
 int main(int argc, char** argv)
@@ -277,13 +305,10 @@ int main(int argc, char** argv)
 	CUDA_CALL(cudaSetDevice(0));
 
 	struct instance inst;
+	struct matrix_option mopt;
 	struct instance *dev_inst;
 
-	unsigned long max_rounds = 500;
-
-	max_rounds = parse_configuration(&inst, argc, argv);
-	if(max_rounds == 0)
-		return 1;
+	parse_configuration(&inst, &mopt, argc, argv);
 
 	inst_init(&inst);
 	dev_inst = inst_create_dev_inst(&inst);
@@ -293,7 +318,8 @@ int main(int argc, char** argv)
 	cudaThreadSynchronize();
 	CUDA_CALL(cudaGetLastError());
 
-	setup_sparam<<<BLOCKS, evo_threads>>>(dev_inst);
+	setup_sparam<<<BLOCKS, evo_threads>>>(dev_inst,
+			mopt.sparam, mopt.mut_rate, mopt.recomb_rate);
 	cudaThreadSynchronize();
 	CUDA_CALL(cudaGetLastError());
 
@@ -308,12 +334,13 @@ int main(int argc, char** argv)
 
 	const int width = inst.dim.parents * inst.dim.blocks;
 	double * const rating = (double*)ya_malloc(width * sizeof(double));
-	struct plot_log* pl = init_plot_log(&inst);
+	struct plot_log* pl = init_plot_log(mopt.plot_log_enable,
+					    mopt.plot_log_best);
 
 	int rounds = -1;
 	int block = 0; int thread = 0;
 
-	for(unsigned long i = 0; i < max_rounds; i++) {
+	for(unsigned long i = 0; i < mopt.rounds; i++) {
 		cudaEventCreate(&start);
 		cudaEventCreate(&stop);
 		// Start record
@@ -350,7 +377,7 @@ int main(int argc, char** argv)
 				block = j / PARENTS;
 				thread = j % PARENTS;
 				rounds = i;
-				i = max_rounds;
+				i = mopt.rounds;
 				break;
 			}
 		}
@@ -360,7 +387,7 @@ int main(int argc, char** argv)
 	clean_plot_log(pl);
 	inst_copy_dev_to_host(dev_inst, &inst);
 
-//	print_sparam(&inst);
+	print_sparam(&inst);
 	print_parent_ratings(&inst);
 
 	printf("Time needed: %f\n", elapsedTimeTotal);
@@ -369,7 +396,7 @@ int main(int argc, char** argv)
 	printf("Result was in block: %d, child: %d, selection: %d\n",
 		inst.res_child_block, inst.res_child_idx, inst.res_parent);
 
-	print_parents(&inst, block, thread, rounds);
+	print_parents(&inst, &mopt, block, thread, rounds);
 
 	#ifdef DEBUG
 	if(rounds != -1) {

@@ -144,7 +144,7 @@ void print_parent_ratings(struct instance *inst)
 
 void print_sparam(struct instance *inst)
 {
-	int width = inst->dim.parents * inst->dim.childs * inst->dim.blocks;
+	int width = inst->dim.parents * inst->dim.childs * 3 * inst->dim.blocks;
 	double *sparam = (double*)ya_malloc(width * sizeof(double));
 	memset(sparam, 1, width * sizeof(double));
 	copy_sparam_dev_to_host(inst, sparam);

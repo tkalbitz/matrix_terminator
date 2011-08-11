@@ -97,12 +97,20 @@ __global__ void setup_parent_kernel(struct instance * const inst)
 	inst->rnd_states[id] = rnd;
 }
 
-__global__ void setup_sparam(struct instance * const inst)
+__global__ void setup_sparam(struct instance * const inst,
+			     const double sparam,
+			     const double mut_rate,
+			     const double recomb_rate)
 {
 	struct memory mem;
 	evo_init_mem(inst, &mem);
-	mem.sparam[tx] = inst->def_sparam;
+	mem.sparam[3 * tx]     = sparam;
+	mem.sparam[3 * tx + 1] = mut_rate;
+	mem.sparam[3 * tx + 2] = recomb_rate;
 
-	if(tx < PARENTS)
-		mem.psparam[tx] = inst->def_sparam;
+	if(tx < PARENTS) {
+		mem.psparam[3 * tx]     = sparam;
+		mem.psparam[3 * tx + 1] = mut_rate;
+		mem.psparam[3 * tx + 2] = recomb_rate;
+	}
 }

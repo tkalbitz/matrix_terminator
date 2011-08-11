@@ -52,7 +52,7 @@ __global__ void evo_kernel_part_one(struct instance *inst)
 
 	evo_recomb_selection(inst, &rnd_state, p_sel);
 	evo_recombination(inst, &mem, &rnd_state, p_sel);
-	evo_mutation(inst, &mem, &rnd_state, &(mem.sparam[threadIdx.x]));
+	evo_mutation(inst, &mem, &rnd_state);
 
 	/* backup rnd state to global mem */
 	inst->rnd_states[id] = rnd_state;
@@ -60,10 +60,11 @@ __global__ void evo_kernel_part_one(struct instance *inst)
 
 __global__ void evo_kernel_part_two(struct instance *inst)
 {
-	struct memory mem;
-	evo_init_mem(inst, &mem);
+	struct memory m;
+	struct memory* const mem = &m;
 
-	evo_parent_selection_best(inst, &mem);
+	evo_init_mem(inst, &m);
+	evo_parent_selection_best(inst, mem);
 //	if(ty == 0) {
 //		const int id = get_thread_id();
 //		curandState rnd_state = inst->rnd_states[id];
@@ -74,10 +75,12 @@ __global__ void evo_kernel_part_two(struct instance *inst)
 
 	/* Parallel copy of memory */
 	for(int i = 0; i < PARENTS; i++) {
-		const int child = (int)mem.c_rat[2 * i + 1];
-		copy_child_to_parent(inst, &mem, child, i);
-		mem.p_rat[i] = mem.c_rat[2 * i];
-		mem.psparam[i] = mem.sparam[child];
+		const int child = (int)mem->c_rat[2 * i + 1];
+		copy_child_to_parent(inst, mem, child, i);
+		mem->p_rat[i] = mem->c_rat[2 * i];
+		PSP(i) = SP(child);
+		PMR(i) = MR(child);
+		PRR(i) = RR(child);
 	}
 }
 

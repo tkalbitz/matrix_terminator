@@ -36,8 +36,8 @@ void copy_sparam_dev_to_host(struct instance* inst, void* sparam_cpy)
 	p.srcPtr = inst->dev_sparam;
 	p.dstPtr = make_cudaPitchedPtr(
 			sparam_cpy,
-			inst->dim.parents * inst->dim.childs * sizeof(double),
-			inst->dim.parents * inst->dim.childs,
+			inst->dim.parents * inst->dim.childs * 3 * sizeof(double),
+			inst->dim.parents * inst->dim.childs * 3,
 			1);
 
 	p.extent = inst->dev_sparam_ext;

@@ -23,15 +23,21 @@ __device__ void evo_recombination(struct instance * const inst,
 	const int p2   = sel[1] * inst->width_per_inst;
 	const int cIdx = mem->c_zero;
 
-	mem->sparam[tx] = (1 - inst->recomb_rate) * mem->psparam[sel[0]] +
-			       inst->recomb_rate  * mem->psparam[sel[1]];
+	RR(tx) = ((PRR(sel[0]) + PRR(sel[1])) / 2.) + (curand_normal(rnd_state) / 100);
+	RR(tx) = min(max(RR(tx), 0.5), 1.);
+//	RR(tx) = PRR(sel[0]);
+
+	MR(tx) = (1 - RR(tx)) * PMR(sel[0]) + RR(tx) * PMR(sel[1]);
+	SP(tx) = (1 - RR(tx)) * PSP(sel[0]) + RR(tx) * PSP(sel[1]);
+
+	const double mr = RR(tx);
 
 	for(int r = 0; r < rows; r++) {
 		double* const c_row = C_ROW(r);
 		double* const p_row = P_ROW(r);
 
 		for(int c = 0; c < cols; c++) {
-			if(curand_uniform(rnd_state) > inst->recomb_rate) {
+			if(curand_uniform(rnd_state) > mr) {
 				c_row[cIdx + c] = p_row[p1 + c];
 			} else {
 				c_row[cIdx + c] = p_row[p2 + c];

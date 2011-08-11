@@ -7,6 +7,7 @@
 
 #include <time.h>
 #include <stdlib.h>
+#include <float.h>
 
 #include "config.h"
 #include "ya_malloc.h"
@@ -35,18 +36,21 @@ static char* plot_txt = "\"%s\" using 1:($%d) title \"Block %d\" with linespoint
 static void write_plot_tmpl(struct plot_log* const pl)
 {
 	fprintf(pl->plot, plot_preamble_txt, pl->dat_name);
-	for(int i = 0; i < BLOCKS; i++) {
+
+	const int end = pl->best ? 1 : BLOCKS;
+
+	for(int i = 0; i < end; i++) {
 		fprintf(pl->plot, plot_txt, pl->dat_name, i + 2, i + 1);
 
-		if(i < BLOCKS - 1) {
+		if(i < end - 1) {
 			fprintf(pl->plot, ",\\\n");
 		}
 	}
 }
 
-struct plot_log* init_plot_log(struct instance* inst)
+struct plot_log* init_plot_log(char activate, char best_only)
 {
-	if(!inst->plot_log)
+	if(!activate)
 		return NULL;
 
 	const int dat_len  = 26;
@@ -55,6 +59,7 @@ struct plot_log* init_plot_log(struct instance* inst)
 	struct plot_log *pl = (struct plot_log*)ya_malloc(sizeof(*pl));
 	pl->dat_name  = (char*)ya_malloc(dat_len);
 	pl->plot_name = (char*)ya_malloc(plot_len);
+	pl->best = (best_only > 0) ? 1 : 0;
 
 	time_t tmp_time = time(NULL);
 	struct tm* tm = localtime(&tmp_time);
@@ -70,6 +75,7 @@ struct plot_log* init_plot_log(struct instance* inst)
 	}
 
 	write_plot_tmpl(pl);
+
 	fflush(pl->plot);
 	fclose(pl->plot);
 
@@ -91,8 +97,8 @@ void clean_plot_log(struct plot_log* const pl)
 }
 
 void plot_log(struct plot_log* const pl,
-	      const int round,
-	      const double* const rating)
+		  const int round,
+		  const double* const rating)
 {
 	if(pl == NULL)
 		return;
@@ -101,8 +107,17 @@ void plot_log(struct plot_log* const pl,
 
 	fprintf(pl->dat, "%10d\t", round);
 
-	for(int i = 0; i < width; i += PARENTS) {
-		fprintf(pl->dat, "%10.9e\t", rating[i]);
+	if(pl->best) {
+		double tmp = FLT_MAX;
+		for(int i = 0; i < width; i += PARENTS) {
+			tmp = min(tmp, rating[i]);
+		}
+
+		fprintf(pl->dat, "%10.9e\t", tmp);
+	} else {
+		for(int i = 0; i < width; i += PARENTS) {
+			fprintf(pl->dat, "%10.9e\t", rating[i]);
+		}
 	}
 
 	fprintf(pl->dat, "\n");
