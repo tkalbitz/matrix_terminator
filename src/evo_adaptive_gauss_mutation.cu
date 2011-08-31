@@ -56,14 +56,15 @@ __device__ void evo_mutation(struct instance * const inst,
 {
 	const int rows = MATRIX_HEIGHT;
 	const double delta = inst->delta;
+	const uint32_t elems = MATRIX_WIDTH*MATRIX_HEIGHT*inst->num_matrices;
 	double tmp;
 
 	SP(tx) = SP(tx) * exp(curand_normal(rnd_s) /
 				     sqrtf(inst->num_matrices * MATRIX_HEIGHT));
-	SP(tx) = min(max(SP(tx), 0.0001), PARENT_MAX);
+	SP(tx) = min(max(SP(tx), 2*delta), inst->parent_max);
 
 	MR(tx) = MR(tx) + (curand_normal(rnd_s) / 20);
-	MR(tx) = min(max(MR(tx), 0.0001), 1.);
+	MR(tx) = min(max(MR(tx), 1./elems), 1.);
 
 	const double mr = MR(tx);
 	const double sp = SP(tx);
@@ -75,7 +76,7 @@ __device__ void evo_mutation(struct instance * const inst,
 		for(int c = mem->c_zero; c < mem->c_end; c++) {
 
 			if(curand_uniform(rnd_s) > mr) {
-				if(curand_uniform(rnd_s) < 0.005)
+				if(curand_uniform(rnd_s) < mr)
 					row[c] = 0.;
 				continue;
 			}
