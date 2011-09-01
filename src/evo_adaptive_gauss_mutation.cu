@@ -76,13 +76,13 @@ __device__ void evo_mutation(struct instance * const inst,
 		for(int c = mem->c_zero; c < mem->c_end; c++) {
 
 			if(curand_uniform(rnd_s) > mr) {
-				if(curand_uniform(rnd_s) < mr)
+				if(curand_uniform(rnd_s) < mr/10)
 					row[c] = 0.;
 				continue;
 			}
 
 			tmp = (double)(curand_normal(rnd_s) * sp);
-			tmp = max(delta, tmp);
+			tmp = (tmp < 0 ? -1 : 1) * max(delta, fabs(tmp));
 			tmp = row[c] + tmp;
 			/* we want x * delta, where x is an int */
 			tmp = ((unsigned long)(tmp / delta)) * delta;
