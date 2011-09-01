@@ -242,8 +242,8 @@ __global__ void evo_calc_res(struct instance * const inst)
 	__syncthreads();
 
 	if(tx == 0 && ty == 0) {
-//		if(inst->match == MATCH_ANY)
-//			shrd_rating += matrix_form;
+		if(inst->match == MATCH_ANY)
+			shrd_rating += matrix_form;
 
 		res_mem.c_rat[2 * blockIdx.y]     = shrd_rating;
 		res_mem.c_rat[2 * blockIdx.y + 1] = blockIdx.y;

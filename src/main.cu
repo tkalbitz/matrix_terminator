@@ -387,7 +387,7 @@ int main(int argc, char** argv)
 	clean_plot_log(pl);
 	inst_copy_dev_to_host(dev_inst, &inst);
 
-	print_sparam(&inst);
+//	print_sparam(&inst);
 	print_parent_ratings(&inst);
 
 	printf("Time needed: %f\n", elapsedTimeTotal);
