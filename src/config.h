@@ -4,7 +4,7 @@
 #define PARENTS  32
 #define CHILDS   6
 
-#define RECOMB_RATE 0.7
+#define RECOMB_RATE 1
 #define MUT_RATE    0.05
 
 #define PARENT_MAX 1000.0f

@@ -82,6 +82,7 @@ __device__ void evo_mutation(struct instance * const inst,
 			}
 
 			tmp = (double)(curand_normal(rnd_s) * sp);
+			tmp = max(delta, tmp);
 			tmp = row[c] + tmp;
 			/* we want x * delta, where x is an int */
 			tmp = ((unsigned long)(tmp / delta)) * delta;

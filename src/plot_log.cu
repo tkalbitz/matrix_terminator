@@ -31,7 +31,7 @@ set output '%s.pdf'\n\
 \n\
 plot ";
 
-static char* plot_txt = "\"%s\" using 1:($%d) title \"Block %d\" with linespoints";
+static char* plot_txt = "\"%s\" using 1:($%d) title \"Block %d\" with lines";
 
 static void write_plot_tmpl(struct plot_log* const pl)
 {

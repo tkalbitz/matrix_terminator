@@ -64,13 +64,13 @@ __global__ void evo_kernel_part_two(struct instance *inst)
 	struct memory* const mem = &m;
 
 	evo_init_mem(inst, &m);
-	evo_parent_selection_best(inst, mem);
-//	if(ty == 0) {
-//		const int id = get_thread_id();
-//		curandState rnd_state = inst->rnd_states[id];
-//		evo_parent_selection_turnier(inst, &mem, &rnd_state, 3);
-//		inst->rnd_states[id] = rnd_state;
-//	}
+//	evo_parent_selection_best(inst, mem);
+	if(ty == 0) {
+		const int id = get_thread_id();
+		curandState rnd_state = inst->rnd_states[id];
+		evo_parent_selection_turnier(inst, mem, &rnd_state, 5);
+		inst->rnd_states[id] = rnd_state;
+	}
 	__syncthreads();
 
 	/* Parallel copy of memory */

@@ -84,6 +84,7 @@ __device__ const int* eval_interpret_rule(const struct instance * const inst,
 
 __shared__ struct memory res_mem;
 __shared__ double shrd_rating;
+__shared__ double matrix_form;
 
 __device__ double get_max_value()
 {
@@ -139,12 +140,19 @@ __device__ void evo_result_rating(const struct instance * const inst,
 			rating += 2*penalty;
 			break;
 		}
+
+		if(inst->match == MATCH_ANY) {
+			if(rating == 0.)
+				matrix_form = 0.;
+
+			rating = 0.;
+		}
 	}
 
 	__syncthreads();
 	// keep only negative numbers
 	res[0][ty][tx] = fabs(min(res[0][ty][tx] - res[1][ty][tx], 0.));
-
+	res[0][ty][tx] *= res[0][ty][tx];
 //	double max_value = get_max_value();
 //	max_value = (max_value == 0 ? 1 : max_value); // div. by zero is evil...
 //	res[0][ty][tx] /= max_value;
@@ -166,7 +174,7 @@ __device__ void evo_result_rating(const struct instance * const inst,
 
 	}
 
-	shrd_rating += rating;
+	shrd_rating += sqrtf(rating);
 }
 
 __device__ void evo_init_mem2(const struct instance* const inst,
@@ -193,36 +201,16 @@ __global__ void evo_calc_res(struct instance * const inst)
 	const int* end = inst->rules + inst->rules_len - 1;
 	const int* rules = inst->rules;
 
-	char* const r_dev_ptr = (char*)inst->dev_rules.ptr;
-        const size_t r_pitch = inst->dev_rules.pitch;
-        const size_t r_slice_pitch = r_pitch * inst->dim.childs * inst->dim.parents;
-        char* const r_slice = r_dev_ptr + blockIdx.x /* z */ * r_slice_pitch;
-        uint8_t* const active_rules = (uint8_t*) (r_slice + blockIdx.y * r_pitch);
-
-	if(threadIdx.x == 0 && threadIdx.y == 0) {
+	if(tx == 0 && ty == 0) {
 		evo_init_mem2(inst, &res_mem);
 		shrd_rating = 0.;
+		matrix_form = 1e9;
 	}
 
 	__syncthreads();
 	uint8_t cur_rule = 0;
 
 	do {
-		/* ignore matched rules */	
-		if(inst->match == MATCH_ANY && !active_rules[cur_rule]) {
-			rules++;
-			while(*rules != MUL_SEP) {
-				rules++;
-			}
-			rules++;
-			while(*rules != MUL_SEP) {
-				rules++;
-			}
-			cur_rule++;
-			__syncthreads();
-			continue;
-		}
-
 		eval_set_res_matrix_to_identity();
 
 		rules++;
@@ -231,13 +219,8 @@ __global__ void evo_calc_res(struct instance * const inst)
 		rules++;
 		rules = eval_interpret_rule(inst , &res_mem, rules, 1);
 
-		const double old_rating = shrd_rating;
 		evo_result_rating(inst, &res_mem);
 		__syncthreads();
-
-		if(inst->match == MATCH_ANY && old_rating == shrd_rating) {
-			active_rules[cur_rule] = 0;
-		}
 
 		#ifdef DEBUG
 		if(shrd_rating == 0.) {
@@ -258,7 +241,10 @@ __global__ void evo_calc_res(struct instance * const inst)
 
 	__syncthreads();
 
-	if(threadIdx.x == 0 && threadIdx.y == 0) {
+	if(tx == 0 && ty == 0) {
+//		if(inst->match == MATCH_ANY)
+//			shrd_rating += matrix_form;
+
 		res_mem.c_rat[2 * blockIdx.y]     = shrd_rating;
 		res_mem.c_rat[2 * blockIdx.y + 1] = blockIdx.y;
 	}
