@@ -23,7 +23,7 @@ set ytics border in scale 0,0 mirror norotate offset character 0, 0, 0\n\
 set border 3\n\
 set grid y linestyle 4\n\
 set key below\n\
-set log y\n\
+set yrange [0:20]\n\
 \n\
 #set terminal png size 1024,768\n\
 set terminal pdf monochrome dashed\n\

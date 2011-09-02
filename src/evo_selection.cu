@@ -90,21 +90,6 @@ __device__ void evo_parent_selection_turnier(struct instance * const inst,
 			dest[j + 1] = key;
 		}
 
-//		#ifdef DEBUG
-//		if(res[0] == 0.0) {
-//			inst->res_parent = res[1];
-//
-//			const int off  = inst->width_per_inst;
-//			const int off2 = res[1] * inst->width_per_inst;
-//			for(uint8_t row = 0; row < MATRIX_HEIGHT; row++) {
-//				for(int i = 0; i < inst->width_per_inst; i++) {
-//					R_ROW(row)[off + i] =
-//							C_ROW(row)[mem->c_zero + off2 + i];
-//				}
-//			}
-//
-//		}
-//		#endif
 	}
 	__syncthreads();
 
@@ -112,7 +97,6 @@ __device__ void evo_parent_selection_turnier(struct instance * const inst,
 		arr[i] = dest[i];
 	}
 }
-
 
 __device__ void evo_parent_selection_convergence_prevention(
 					     struct instance * const inst,

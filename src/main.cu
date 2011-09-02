@@ -302,7 +302,7 @@ static void parse_configuration(struct instance* const inst,
 int main(int argc, char** argv)
 {
 	/* there is no runtime limit for kernels */
-	CUDA_CALL(cudaSetDevice(0));
+//	CUDA_CALL(cudaSetDevice(0));
 
 	struct instance inst;
 	struct matrix_option mopt;
@@ -314,7 +314,7 @@ int main(int argc, char** argv)
 	dev_inst = inst_create_dev_inst(&inst);
 	int evo_threads = get_evo_threads(&inst);
 
-	setup_parent_kernel<<<BLOCKS, inst.dim.matrix_height>>>(dev_inst);
+	setup_childs_kernel<<<BLOCKS, inst.dim.matrix_height>>>(dev_inst);
 	cudaThreadSynchronize();
 	CUDA_CALL(cudaGetLastError());
 
@@ -339,6 +339,16 @@ int main(int argc, char** argv)
 
 	int rounds = -1;
 	int block = 0; int thread = 0;
+
+	evo_calc_res<<<blocks, threads>>>(dev_inst);
+	CUDA_CALL(cudaGetLastError());
+	cudaThreadSynchronize();
+	CUDA_CALL(cudaGetLastError());
+
+	evo_kernel_part_two<<<BLOCKS, copy_threads>>>(dev_inst);
+	CUDA_CALL(cudaGetLastError());
+	cudaThreadSynchronize();
+	CUDA_CALL(cudaGetLastError());
 
 	for(unsigned long i = 0; i < mopt.rounds; i++) {
 		cudaEventCreate(&start);

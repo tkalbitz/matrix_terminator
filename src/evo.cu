@@ -68,7 +68,9 @@ __global__ void evo_kernel_part_two(struct instance *inst)
 	if(ty == 0) {
 		const int id = get_thread_id();
 		curandState rnd_state = inst->rnd_states[id];
-		evo_parent_selection_turnier(inst, mem, &rnd_state, 5);
+//		evo_parent_selection_convergence_prevention(inst, mem, &rnd_state, 1);
+//		evo_parent_selection_turnier2(inst, mem, &rnd_state, 6, 0.5);
+		evo_parent_selection_turnier(inst, mem, &rnd_state, 2);
 		inst->rnd_states[id] = rnd_state;
 	}
 	__syncthreads();
