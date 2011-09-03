@@ -2,7 +2,7 @@
 #define __M_CONFIG_H__
 
 #define PARENTS  32
-#define CHILDS   6
+#define CHILDS   7
 #define NEXT_2POW 256
 
 #define RECOMB_RATE 1.

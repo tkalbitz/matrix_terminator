@@ -4,7 +4,11 @@
 __device__ static double evo_mut_new_value(struct instance * const inst,
 					   curandState     * const rnd_state)
 {
-	const int rnd_val = (curand(rnd_state) % ((int)inst->parent_max - 1)) + 1;
+	/* we want to begin with small numbers */
+//	const int tmp = (int)inst->parent_max;
+	const int tmp = (inst->parent_max > 10) ? 10 : (int)inst->parent_max;
+
+	const int rnd_val = (curand(rnd_state) % (tmp - 1)) + 1;
 	int factor = (int)(rnd_val / inst->delta);
 	if((factor * inst->delta) < 1.0)
 		factor++;
@@ -59,8 +63,9 @@ __device__ void evo_mutation(struct instance * const inst,
 	const uint32_t elems = MATRIX_WIDTH*MATRIX_HEIGHT*inst->num_matrices;
 	double tmp;
 
-	SP(tx) = SP(tx) * exp(curand_normal(rnd_s) /
-				     sqrtf(inst->num_matrices * MATRIX_HEIGHT));
+//	SP(tx) = SP(tx) * exp(curand_normal(rnd_s) /
+//			sqrtf(inst->num_matrices * MATRIX_HEIGHT));
+	SP(tx) *= exp( (1 / sqrtf(inst->num_matrices * MATRIX_HEIGHT * MATRIX_HEIGHT)) * curand_normal(rnd_s));
 	SP(tx) = min(max(SP(tx), 2*delta), inst->parent_max);
 
 	MR(tx) = MR(tx) + (curand_normal(rnd_s) / 20);
@@ -76,8 +81,11 @@ __device__ void evo_mutation(struct instance * const inst,
 		for(int c = mem->c_zero; c < mem->c_end; c++) {
 
 			if(curand_uniform(rnd_s) > mr) {
-				if(curand_uniform(rnd_s) < mr/10)
+				if(curand_uniform(rnd_s) < mr/10) {
 					row[c] = 0.;
+				} if(curand_uniform(rnd_s) < mr/10) {
+					row[c] = evo_mut_new_value(inst, rnd_s);
+				}
 				continue;
 			}
 

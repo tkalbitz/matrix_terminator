@@ -23,7 +23,11 @@ __global__ void setup_rnd_kernel(curandState* const rnd_states,
 __device__ static double evo_mut_new_value(struct instance * const inst,
 					   curandState     * const rnd_state)
 {
-	const int rnd_val = (curand(rnd_state) % ((int)inst->parent_max - 1)) + 1;
+	/* we want to begin with small numbers */
+	const int tmp = (inst->parent_max > 10) ? 10 : (int)inst->parent_max;
+//	const int tmp = (int)inst->parent_max;
+
+	const int rnd_val = (curand(rnd_state) % (tmp - 1)) + 1;
 	int factor = (int)(rnd_val / inst->delta);
 	if((factor * inst->delta) < 1.0)
 		factor++;
@@ -52,9 +56,11 @@ __global__ void setup_parent_kernel(struct instance * const inst)
 	char* const slice = devPtr + blockIdx.x * slicePitch;
 	double* row = (double*) (slice + threadIdx.x * pitch);
 
+	const int tmp = (int)inst->parent_max;
+
 	for(int x = 0; x < inst->dim.parents * inst->width_per_inst; x++) {
 		if(curand_uniform(&rnd) < MATRIX_TAKEN_POS) {
-			row[x] = curand(&rnd) % (int)inst->parent_max;
+			row[x] = curand(&rnd) % tmp;
 		} else {
 			row[x] = 0;
 		}
@@ -118,9 +124,24 @@ __global__ void setup_childs_kernel(struct instance * const inst)
 	char* const slice = devPtr + blockIdx.x * slicePitch;
 	double* row = (double*) (slice + threadIdx.x * pitch);
 
-	for(int x = 0; x < CHILDS * PARENTS * inst->width_per_inst; x++) {
+//	const int tmp = (inst->parent_max > 10) ? 10 : (int)inst->parent_max;
+	const int max1 = (int)inst->parent_max;
+	const int max2 = (int)inst->parent_max / 2;
+	const int width = inst->width_per_inst;
+	int flag = 1;
+
+	for(int x = 0; x < CHILDS * PARENTS * width; x++) {
+
+		if(x % width == 0) {
+			flag = (flag + 1) & 1;
+		}
+
 		if(curand_uniform(&rnd) < MATRIX_TAKEN_POS) {
-			row[x] = curand(&rnd) % (int)inst->parent_max;
+			if(flag)
+				row[x] = curand(&rnd) % max1;
+			else
+				row[x] = min(max(0., curand_normal(&rnd)*(curand(&rnd) % max2) + max2), inst->parent_max);
+
 		} else {
 			row[x] = 0;
 		}

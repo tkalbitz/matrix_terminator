@@ -153,10 +153,25 @@ void print_sparam(struct instance *inst)
 	for (int b = 0; b < inst->dim.blocks; b++) {
 		printf("block %3d: ", b);
 
-		for (; i < (b + 1) * (inst->dim.parents * inst->dim.childs); i++) {
+		for (; i < 3 * (b + 1) * (inst->dim.parents * inst->dim.childs); i++) {
 			printf("%3.2e ", sparam[i]);
 		}
 		printf("\n");
 	}
+	free(sparam);
+}
+
+void print_sparam_best(struct instance *inst)
+{
+	int width = inst->dim.parents * inst->dim.childs * 3 * inst->dim.blocks;
+	double *sparam = (double*)ya_malloc(width * sizeof(double));
+	memset(sparam, 1, width * sizeof(double));
+	copy_sparam_dev_to_host(inst, sparam);
+	int i = 0;
+	for (int b = 0; b < inst->dim.blocks; b++) {
+		printf("%3.2e %3.2e | ", sparam[i], sparam[i + 1]);
+		i += 3 * (inst->dim.parents * inst->dim.childs);
+	}
+	printf("\n");
 	free(sparam);
 }
