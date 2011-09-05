@@ -142,7 +142,7 @@ void set_num_matrices(struct instance* inst)
 		m = max(m, inst->rules[i]);
 
 	inst->num_matrices = m + 1; /* matrices are zero based */
-	printf("num_matrices set to %d\n", inst->num_matrices);
+//	printf("num_matrices set to %d\n", inst->num_matrices);
 }
 
 void inst_init(struct instance* const inst)

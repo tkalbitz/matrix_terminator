@@ -314,12 +314,12 @@ int main(int argc, char** argv)
 	dev_inst = inst_create_dev_inst(&inst);
 	int evo_threads = get_evo_threads(&inst);
 
-	setup_childs_kernel<<<BLOCKS, inst.dim.matrix_height>>>(dev_inst);
+	setup_childs_kernel<<<BLOCKS, inst.dim.matrix_height>>>(dev_inst, false);
 	cudaThreadSynchronize();
 	CUDA_CALL(cudaGetLastError());
 
 	setup_sparam<<<BLOCKS, evo_threads>>>(dev_inst,
-			mopt.sparam, mopt.mut_rate, mopt.recomb_rate);
+			mopt.sparam, mopt.mut_rate, mopt.recomb_rate, false);
 	cudaThreadSynchronize();
 	CUDA_CALL(cudaGetLastError());
 
@@ -351,6 +351,14 @@ int main(int argc, char** argv)
 	CUDA_CALL(cudaGetLastError());
 
 	for(unsigned long i = 0; i < mopt.rounds; i++) {
+		if(i % 300 == 0) {
+			setup_childs_kernel<<<BLOCKS, inst.dim.matrix_height>>>(dev_inst, true);
+			evo_calc_res<<<blocks, threads>>>(dev_inst);
+			evo_kernel_part_two<<<BLOCKS, copy_threads>>>(dev_inst);
+			setup_sparam<<<BLOCKS, evo_threads>>>(dev_inst,
+					mopt.sparam, mopt.mut_rate, mopt.recomb_rate, true);
+		}
+
 		cudaEventCreate(&start);
 		cudaEventCreate(&stop);
 		// Start record

@@ -110,9 +110,12 @@ __global__ void setup_parent_kernel(struct instance * const inst)
 /*
  * Initialize the child memory with random values.
  */
-__global__ void setup_childs_kernel(struct instance * const inst)
+__global__ void setup_childs_kernel(struct instance * const inst, bool half)
 {
 	if(threadIdx.x >= MATRIX_HEIGHT)
+		return;
+
+	if(half && blockIdx.x >= 16)
 		return;
 
 	const int id = get_thread_id();
@@ -128,9 +131,10 @@ __global__ void setup_childs_kernel(struct instance * const inst)
 	const int max1 = (int)inst->parent_max;
 	const int max2 = (int)inst->parent_max / 2;
 	const int width = inst->width_per_inst;
+	const int end = CHILDS * PARENTS * width;
 	int flag = 1;
 
-	for(int x = 0; x < CHILDS * PARENTS * width; x++) {
+	for(int x = 0; x < end; x++) {
 
 		if(x % width == 0) {
 			flag = (flag + 1) & 1;
@@ -191,8 +195,11 @@ __global__ void setup_childs_kernel(struct instance * const inst)
 __global__ void setup_sparam(struct instance * const inst,
 			     const double sparam,
 			     const double mut_rate,
-			     const double recomb_rate)
+			     const double recomb_rate, bool half)
 {
+	if(half && blockIdx.x >= 16)
+		return;
+
 	struct memory mem;
 	evo_init_mem(inst, &mem);
 	mem.sparam[3 * tx]     = sparam;
