@@ -162,15 +162,27 @@ __device__ void evo_result_rating(const struct instance * const inst,
 	if(tx != 0)
 		return;
 
+	double c = 0.0;
+	double y, t;
+	double sum = res[0][ty][0];
+
 	for(int i = 1; i < MATRIX_WIDTH; i++) {
-		res[0][ty][0] += res[0][ty][i];
+		y = res[0][ty][i] - c;
+		t = sum + y;
+		c = (t - sum) - y;
+		sum = t;
 	}
+
+	res[0][ty][0] = sum;
 
 	if(ty != 0)
 		return;
 
 	for(int i = 0; i < MATRIX_HEIGHT; i++) {
-		rating += res[0][i][0];
+		y = res[0][i][0] - c;
+		t = rating + y;
+		c = (t - rating) - y;
+		rating = t;
 
 	}
 
