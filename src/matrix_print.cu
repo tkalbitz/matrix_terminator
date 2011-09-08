@@ -8,18 +8,27 @@
 void print_rules(FILE* f, struct instance *inst)
 {
 	bool mul_sep_count = false;
+	bool old_mul_sep_count = true;
 
-	for(int i = 1; i < inst->rules_len; i++)
+	for(int i = 1; i < inst->rules_len; i++) {
+
+		if(old_mul_sep_count != mul_sep_count) {
+			if(mul_sep_count == false)
+				fprintf(f, "ratsimp(factor(");
+			old_mul_sep_count = mul_sep_count;
+		}
+
 		if(inst->rules[i] == MUL_SEP) {
-			if(mul_sep_count == 0)
+			if(mul_sep_count == false)
 				fprintf(f, "ident(%d)-", MATRIX_HEIGHT);
 			else
-				fprintf(f, "ident(%d);\n\n", MATRIX_HEIGHT);
+				fprintf(f, "ident(%d)));\n\n", MATRIX_HEIGHT);
 
 			mul_sep_count = !mul_sep_count;
 		} else {
 				fprintf(f, "%c.", 'A' + inst->rules[i]);
 		}
+	}
 
 	fprintf(f, "\n");
 }
@@ -58,7 +67,8 @@ void print_parent_matrix_pretty(FILE* f, struct instance* inst,
 	double* block_ptr = parent_cpy + block_offset * block;
 
 	for(int m = 0; m < inst->num_matrices; m++) {
-		fprintf(f, "%c: matrix(\n", 'A'+m);
+		char matrix = 'A' + m;
+		fprintf(f, "%c: matrix(\n", matrix);
 		for (int h = 0; h < inst->dim.matrix_height; h++) {
 			print_parent_matrix_line_pretty(f, inst,
 							block_ptr + h*line,
@@ -68,7 +78,7 @@ void print_parent_matrix_pretty(FILE* f, struct instance* inst,
 				fprintf(f, ",");
 			fprintf(f, "\n");
 		}
-		fprintf(f, ");\n\n");
+		fprintf(f, ");\n%c: factor(%c);\n\n", matrix, matrix);
 	}
 
 	fprintf(f, "\n");
