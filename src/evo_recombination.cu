@@ -16,7 +16,7 @@ __device__ void evo_recombination(struct instance * const inst,
 				  curandState     * const rnd_state,
 				  const int       * const sel)
 {
-	const int rows = MATRIX_HEIGHT;
+	const int rows = inst->dim.matrix_height;
 	const int cols = inst->width_per_inst;
 
 	const int p1   = sel[0] * inst->width_per_inst;

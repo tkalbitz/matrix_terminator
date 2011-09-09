@@ -25,6 +25,7 @@ struct matrix_option {
 	double mut_rate;
 	double recomb_rate;
 	double sparam;
+	int    matrix_width;
 	uint32_t rounds;
 	char enable_maxima;
 	char plot_log_enable;
@@ -52,6 +53,7 @@ static void print_usage()
 	printf("  -e|--recombination-rate <float number>  -- default: %3.2f\n",  RECOMB_RATE);
 	printf("  -p|--parent-max         <float number>  -- default: %.2f\n",   PARENT_MAX);
 	printf("  -s|--strategy-param     <float number>  -- default: %.2f\n", SPARAM);
+	printf("  -w|--matrix-width       <2 - 18>        -- default: 5\n");
 	printf("  -g|--plot-log\n");
 	printf("	`- best         -- log only the best rating\n");
 	printf("	   all          -- log all ratings 1\n");
@@ -162,6 +164,7 @@ static void parse_configuration(struct instance* const inst,
 	mopt->rounds          = 500;
 	mopt->enable_maxima   = 0;
 	mopt->plot_log_enable = 0;
+	mopt->matrix_width    = 5;
 
 	struct option opt[] =
 	{
@@ -177,10 +180,11 @@ static void parse_configuration(struct instance* const inst,
 		{"strategy-param"    , required_argument, 0, 's'},
 		{"enable-maxima"     , no_argument,       0, 'x'},
 		{"plot-log"          , required_argument, 0, 'g'},
+		{"matrix-width"      , required_argument, 0, 'w'},
 		{0, 0, 0, 0}
 	};
 
-	while((c = getopt_long(argc, argv, "m:l:r:c:d:hu:e:p:s:xg:",
+	while((c = getopt_long(argc, argv, "m:l:r:c:d:hu:e:p:s:xg:w:",
 			      opt, &idx)) != EOF) {
 		switch(c) {
 		case 'm':
@@ -225,6 +229,14 @@ static void parse_configuration(struct instance* const inst,
 		case 'd':
 			inst->delta = strtod(optarg, NULL);
 			break;
+		case 'w':
+			mopt->matrix_width = (int)strtod(optarg, NULL);
+			if(mopt->matrix_width < 2 || mopt->matrix_width > 18) {
+				printf("matrix width was to small or to big!\n");
+				print_usage();
+				exit(EXIT_FAILURE);
+			}
+			break;
 		case 'h':
 			print_usage();
 			exit(EXIT_FAILURE);
@@ -268,6 +280,7 @@ static void parse_configuration(struct instance* const inst,
 			case 'p':
 			case 's':
 			case 'g':
+			case 'w':
 				fprintf(stderr, "Option -%c requires an "
 						"argument!\n", optopt);
 				exit(EXIT_FAILURE);
@@ -310,7 +323,7 @@ int main(int argc, char** argv)
 
 	parse_configuration(&inst, &mopt, argc, argv);
 
-	inst_init(&inst);
+	inst_init(&inst, mopt.matrix_width);
 	dev_inst = inst_create_dev_inst(&inst);
 	int evo_threads = get_evo_threads(&inst);
 
@@ -329,8 +342,8 @@ int main(int argc, char** argv)
 	float elapsedTimeTotal = 0.f;
 
 	const dim3 blocks(BLOCKS, PARENTS*CHILDS);
-	const dim3 threads(MATRIX_WIDTH, MATRIX_HEIGHT);
-	const dim3 copy_threads(MATRIX_WIDTH, MATRIX_HEIGHT);
+	const dim3 threads(inst.dim.matrix_width, inst.dim.matrix_height);
+	const dim3 copy_threads(inst.dim.matrix_width, inst.dim.matrix_height);
 
 	const int width = inst.dim.parents * inst.dim.blocks;
 	double * const rating = (double*)ya_malloc(width * sizeof(double));
@@ -353,10 +366,14 @@ int main(int argc, char** argv)
 	for(unsigned long i = 0; i < mopt.rounds; i++) {
 		if(i % 300 == 0) {
 			setup_childs_kernel<<<BLOCKS, inst.dim.matrix_height>>>(dev_inst, true);
+			CUDA_CALL(cudaGetLastError());
 			evo_calc_res<<<blocks, threads>>>(dev_inst);
+			CUDA_CALL(cudaGetLastError());
 			evo_kernel_part_two<<<BLOCKS, copy_threads>>>(dev_inst);
+			CUDA_CALL(cudaGetLastError());
 			setup_sparam<<<BLOCKS, evo_threads>>>(dev_inst,
 					mopt.sparam, mopt.mut_rate, mopt.recomb_rate, true);
+			CUDA_CALL(cudaGetLastError());
 		}
 
 		cudaEventCreate(&start);

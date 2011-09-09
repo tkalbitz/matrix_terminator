@@ -20,9 +20,9 @@ void print_rules(FILE* f, struct instance *inst)
 
 		if(inst->rules[i] == MUL_SEP) {
 			if(mul_sep_count == false)
-				fprintf(f, "ident(%d)-", MATRIX_HEIGHT);
+				fprintf(f, "ident(%d)-", inst->dim.matrix_height);
 			else
-				fprintf(f, "ident(%d)));\n\n", MATRIX_HEIGHT);
+				fprintf(f, "ident(%d)));\n\n", inst->dim.matrix_height);
 
 			mul_sep_count = !mul_sep_count;
 		} else {
@@ -37,7 +37,7 @@ static void print_parent_matrix_line_pretty(FILE* f, struct instance *inst,
 					    double* parent_cpy,
 					    int parent, int m)
 {
-	int count = parent * inst->width_per_inst + (m + 1) * MATRIX_WIDTH - 1;
+	int count = parent * inst->width_per_inst + (m + 1) * inst->dim.matrix_width - 1;
 	int w = parent * inst->width_per_inst + m * inst->dim.matrix_width;
 
 	fprintf(f, "[ ");
@@ -89,8 +89,8 @@ static void print_result_matrix_line_pretty(struct instance *inst,
 					    double* result_cpy,
 					    int child, int m)
 {
-	int w =     child * inst->width_per_inst + m * MATRIX_WIDTH;
-	int count = child * inst->width_per_inst + (m + 1) * MATRIX_WIDTH - 1;
+	int w =     child * inst->width_per_inst + m * inst->dim.matrix_width;
+	int count = child * inst->width_per_inst + (m + 1) * inst->dim.matrix_width - 1;
 
 	printf("[ ");
 

@@ -10,6 +10,9 @@
 #include "evo_memory.cu"
 
 __shared__ double res[2][MATRIX_HEIGHT][MATRIX_WIDTH];
+__shared__ int MHEIGHT;
+__shared__ int MWIDTH;
+
 
 __device__ inline void eval_set_res_matrix_to_zero()
 {
@@ -28,11 +31,12 @@ __device__ inline void eval_set_res_matrix_to_identity()
 	}
 }
 
-__device__ inline void eval_copy_matrix_to_res(struct memory * const mem,
+__device__ inline void eval_copy_matrix_to_res(const struct instance * const inst,
+					       struct memory * const mem,
 		    	    	    	       const int cmatrix,
 		    	    	    	       const int rmatrix)
 {
-	const int cstart = mem->c_zero + cmatrix * MATRIX_WIDTH;
+	const int cstart = mem->c_zero + cmatrix * MWIDTH;
 
 	res[rmatrix][ty][tx] = C_ROW(ty)[cstart + tx];
 }
@@ -42,8 +46,8 @@ __device__ void eval_mul_inplace(const struct instance * const inst,
 				 const int cmatrix,
 				 const int rmatrix)
 {
-	const int rows = MATRIX_HEIGHT;
-	const int cstart = mem->c_zero  + cmatrix * inst->dim.matrix_width;
+	const int rows = MHEIGHT;
+	const int cstart = mem->c_zero  + cmatrix * MWIDTH;
 
 	double tmp = 0;
 
@@ -70,7 +74,7 @@ __device__ const int* eval_interpret_rule(const struct instance * const inst,
 	 * all multiplications are inplace,
 	 * so we copy the first matrix to our result
 	 */
-	eval_copy_matrix_to_res(mem, *rule, rmatrix);
+	eval_copy_matrix_to_res(inst, mem, *rule, rmatrix);
 	rule++;
 
 	__syncthreads();
@@ -86,35 +90,35 @@ __shared__ struct memory res_mem;
 __shared__ double shrd_rating;
 __shared__ double matrix_form;
 
-__device__ double get_max_value()
-{
-	double my_max;
-	__shared__ double max_value[MATRIX_HEIGHT];
-
-	if(threadIdx.x == 0) {
-		my_max = res[0][threadIdx.y][0];
-		for(int i = 1; i < MATRIX_WIDTH; i++) {
-			my_max = max(my_max, res[0][threadIdx.y][i]);
-		}
-		max_value[threadIdx.y] = my_max;
-
-		__syncthreads();
-		if(threadIdx.y == 0) {
-			for(int k = 1; k < MATRIX_HEIGHT; k++) {
-				max_value[0] = max(max_value[0], max_value[k]);
-			}
-		}
-		__syncthreads();
-	}
-
-	return max_value[0];
-}
+//__device__ double get_max_value(const struct instance * const inst)
+//{
+//	double my_max;
+//	__shared__ double max_value[MATRIX_HEIGHT];
+//
+//	if(threadIdx.x == 0) {
+//		my_max = res[0][threadIdx.y][0];
+//		for(int i = 1; i < MWIDTH; i++) {
+//			my_max = max(my_max, res[0][threadIdx.y][i]);
+//		}
+//		max_value[threadIdx.y] = my_max;
+//
+//		__syncthreads();
+//		if(threadIdx.y == 0) {
+//			for(int k = 1; k < MHEIGHT; k++) {
+//				max_value[0] = max(max_value[0], max_value[k]);
+//			}
+//		}
+//		__syncthreads();
+//	}
+//
+//	return max_value[0];
+//}
 
 __device__ void evo_result_rating(const struct instance * const inst,
 				  struct memory         * const mem)
 {
-	const int rows = MATRIX_HEIGHT - 1;
-	const int cols = MATRIX_WIDTH  - 1;
+	const int rows = MHEIGHT - 1;
+	const int cols = MWIDTH  - 1;
 	double rating = 0.;
 
 	const double penalty = 1e9;
@@ -166,7 +170,7 @@ __device__ void evo_result_rating(const struct instance * const inst,
 	double y, t;
 	double sum = res[0][ty][0];
 
-	for(int i = 1; i < MATRIX_WIDTH; i++) {
+	for(int i = 1; i < MWIDTH; i++) {
 		y = res[0][ty][i] - c;
 		t = sum + y;
 		c = (t - sum) - y;
@@ -178,7 +182,7 @@ __device__ void evo_result_rating(const struct instance * const inst,
 	if(ty != 0)
 		return;
 
-	for(int i = 0; i < MATRIX_HEIGHT; i++) {
+	for(int i = 0; i < MHEIGHT; i++) {
 		y = res[0][i][0] - c;
 		t = rating + y;
 		c = (t - rating) - y;
@@ -201,10 +205,10 @@ __device__ void evo_init_mem2(const struct instance* const inst,
 	mem->c_end  = inst->width_per_inst * (blockIdx.y + 1);
 
 #ifdef DEBUG
-	mem->r_zero1 = blockIdx.y * 2 * inst->dim.matrix_width;
-	mem->r_end1  = mem->r_zero1 + inst->dim.matrix_width;
-	mem->r_zero2 = mem->r_zero1 + inst->dim.matrix_width;
-	mem->r_end2  = mem->r_zero2 + inst->dim.matrix_width;
+	mem->r_zero1 = blockIdx.y * 2 * MWIDTH;
+	mem->r_end1  = mem->r_zero1 + MWIDTH;
+	mem->r_zero2 = mem->r_zero1 + MWIDTH;
+	mem->r_end2  = mem->r_zero2 + MWIDTH;
 #endif
 }
 
@@ -217,6 +221,8 @@ __global__ void evo_calc_res(struct instance * const inst)
 		evo_init_mem2(inst, &res_mem);
 		shrd_rating = 0.;
 		matrix_form = 1e9;
+		MHEIGHT = inst->dim.matrix_height;
+		MWIDTH  = inst->dim.matrix_width;
 	}
 
 	__syncthreads();
@@ -238,8 +244,8 @@ __global__ void evo_calc_res(struct instance * const inst)
 		if(shrd_rating == 0.) {
 			struct memory *mem = &res_mem;
 			for(int i = 0; i < inst->num_matrices; i++) {
-				R_ROW(ty)[tx + i * MATRIX_WIDTH] =
-						C_ROW(ty)[res_mem.c_zero + i * MATRIX_WIDTH + tx];
+				R_ROW(ty)[tx + i * MWIDTH] =
+						C_ROW(ty)[res_mem.c_zero + i * MWIDTH + tx];
 			}
 
 			inst->res_child_block = blockIdx.x;

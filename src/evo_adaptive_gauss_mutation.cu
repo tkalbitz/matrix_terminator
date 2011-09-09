@@ -24,11 +24,11 @@ __device__ void evo_ensure_constraints(struct instance * const inst,
 				       curandState     * const rnd_state)
 {
 	double* const row   = C_ROW(0);
-	double* const lrow  = C_ROW(MATRIX_HEIGHT-1);
+	double* const lrow  = C_ROW(inst->dim.matrix_height-1);
 
 	const int end = mem->c_end;
 
-	for(int start = mem->c_zero; start < end; start += MATRIX_WIDTH) {
+	for(int start = mem->c_zero; start < end; start += inst->dim.matrix_width) {
 		const int lidx = start + inst->dim.matrix_width - 1;
 
 		if(inst->cond_left == COND_UPPER_LEFT && row[start] < 1.0) {
@@ -46,7 +46,7 @@ __device__ void evo_ensure_constraints(struct instance * const inst,
 			 * This should be recognized ;) It's only a 1.3 card
 			 *  so there is no printf :/
 			 */
-			for(int i = 0; i < MATRIX_WIDTH; i++) {
+			for(int i = 0; i < inst->dim.matrix_width; i++) {
 				row[start + i] = 1337;
 				lrow[start + i] = 1337;
 			}
@@ -58,14 +58,14 @@ __device__ void evo_mutation(struct instance * const inst,
 			     struct memory   * const mem,
 			     curandState     * const rnd_s)
 {
-	const int rows = MATRIX_HEIGHT;
+	const int rows = inst->dim.matrix_height;
 	const double delta = inst->delta;
-	const uint32_t elems = MATRIX_WIDTH*MATRIX_HEIGHT*inst->num_matrices;
+	const uint32_t elems = inst->dim.matrix_width*inst->dim.matrix_height*inst->num_matrices;
 	double tmp;
 
 //	SP(tx) = SP(tx) * exp(curand_normal(rnd_s) /
-//			sqrtf(inst->num_matrices * MATRIX_HEIGHT));
-	SP(tx) *= exp( (1 / sqrtf(inst->num_matrices * MATRIX_HEIGHT * MATRIX_HEIGHT)) * curand_normal(rnd_s));
+//			sqrtf(inst->num_matrices * inst->dim.matrix_height));
+	SP(tx) *= exp( (1 / sqrtf(inst->num_matrices * inst->dim.matrix_height * inst->dim.matrix_height)) * curand_normal(rnd_s));
 	SP(tx) = min(max(SP(tx), 2*delta), inst->parent_max);
 
 	MR(tx) = MR(tx) + (curand_normal(rnd_s) / 20);

@@ -14,7 +14,7 @@ __device__ void evo_parent_selection_best(struct instance * const inst,
 	__shared__ struct double2 res[PARENTS * CHILDS];
 	double2* const arr   = (double2*)mem->c_rat;
 
-	for(int i = tx; i < PARENTS * CHILDS; i += MATRIX_WIDTH) {
+	for(int i = tx; i < PARENTS * CHILDS; i += inst->dim.matrix_width) {
 		res[i]   = arr[i];
 	}
 
@@ -38,7 +38,7 @@ __device__ void evo_parent_selection_best(struct instance * const inst,
 
 	__syncthreads();
 
-	for(int i = tx; i < PARENTS * CHILDS; i += MATRIX_WIDTH) {
+	for(int i = tx; i < PARENTS * CHILDS; i += inst->dim.matrix_width) {
 		arr[i] = res[i];
 	}
 }
@@ -55,13 +55,13 @@ __device__ void evo_parent_selection_turnier(struct instance * const inst,
 	__shared__ struct double2 dest[PARENTS * CHILDS];
 	double2* const arr = (double2*)mem->c_rat;
 
-	for(int i = tx; i < PARENTS * CHILDS; i += MATRIX_WIDTH) {
+	for(int i = tx; i < PARENTS * CHILDS; i += inst->dim.matrix_width) {
 		src[i]   = arr[i];
 	}
 
 	__syncthreads();
 
-	for(int pos = tx; pos < PARENTS; pos += MATRIX_WIDTH) {
+	for(int pos = tx; pos < PARENTS; pos += inst->dim.matrix_width) {
 		uint32_t idx = curand(rnd_state) % (PARENTS * CHILDS);
 		for(uint8_t t = 0; t < q; t++) {
 			uint32_t opponent = curand(rnd_state) % (PARENTS * CHILDS);
@@ -93,7 +93,7 @@ __device__ void evo_parent_selection_turnier(struct instance * const inst,
 	}
 	__syncthreads();
 
-	for(int i = tx; i < PARENTS; i += MATRIX_WIDTH) {
+	for(int i = tx; i < PARENTS; i += inst->dim.matrix_width) {
 		arr[i] = dest[i];
 	}
 }
@@ -111,7 +111,7 @@ __device__ void evo_parent_selection_convergence_prevention(
 
 	double2* const arr   = (double2*)mem->c_rat;
 
-	for(int i = tx; i < PARENTS * CHILDS; i += MATRIX_WIDTH) {
+	for(int i = tx; i < PARENTS * CHILDS; i += inst->dim.matrix_width) {
 		res[i]   = arr[i];
 	}
 
@@ -120,7 +120,7 @@ __device__ void evo_parent_selection_convergence_prevention(
 	double2 key;
 
 	for(int k = 64; k < NEXT_2POW; k *= 2) {
-		for(int p = k * tx; p < PARENTS * CHILDS; p += k * MATRIX_WIDTH) {
+		for(int p = k * tx; p < PARENTS * CHILDS; p += k * inst->dim.matrix_width) {
 			const int end =  min(k * (tx + 1), PARENTS * CHILDS);
 
 			/* insertion sort */
@@ -185,7 +185,7 @@ __device__ void evo_parent_selection_convergence_prevention(
 	}
 	__syncthreads();
 
-	for(int i = tx; i < PARENTS * CHILDS; i += MATRIX_WIDTH) {
+	for(int i = tx; i < PARENTS * CHILDS; i += inst->dim.matrix_width) {
 		arr[i] = res[i];
 	}
 }

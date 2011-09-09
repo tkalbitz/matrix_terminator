@@ -30,7 +30,7 @@ __device__ inline void copy_child_to_parent(struct instance * const inst,
 	const uint32_t cstart = child  * inst->width_per_inst;
 	const uint32_t pstart = parent * inst->width_per_inst;
 
-	for(uint32_t i = 0; i < inst->width_per_inst; i += MATRIX_WIDTH)
+	for(uint32_t i = 0; i < inst->width_per_inst; i += inst->dim.matrix_width)
 		P_ROW(ty)[pstart + i + tx] = C_ROW(ty)[cstart + i + tx];
 }
 

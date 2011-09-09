@@ -79,27 +79,27 @@ __global__ void setup_parent_kernel(struct instance * const inst)
 		row = (double*) (slice + y * pitch);
 
 		for(int i = 0; i < matrices; i++) {
-			row[i * MATRIX_WIDTH] = evo_mut_new_value(inst, &rnd);
+			row[i * inst->dim.matrix_width] = evo_mut_new_value(inst, &rnd);
 		}
 	} else if(inst->cond_left == COND_UPPER_RIGHT) {
 		y = 0;
 		row = (double*) (slice + y * pitch);
 
 		for(int i = 0; i < matrices; i++) {
-			int idx = i * MATRIX_WIDTH + (MATRIX_WIDTH - 1);
+			int idx = i * inst->dim.matrix_width + (inst->dim.matrix_width - 1);
 			row[idx] = evo_mut_new_value(inst, &rnd);
 		}
 	} else if(inst->cond_left == COND_UPPER_LEFT_LOWER_RIGHT) {
 		y = 0;
 		row = (double*) (slice + y * pitch);
 		for(int i = 0; i < matrices; i++) {
-			row[i * MATRIX_WIDTH] = evo_mut_new_value(inst, &rnd);
+			row[i * inst->dim.matrix_width] = evo_mut_new_value(inst, &rnd);
 		}
 
 		y = (inst->dim.matrix_height - 1);
 		row = (double*) (slice + y * pitch);
 		for(int i = 0; i < matrices; i++) {
-			int idx = i * MATRIX_WIDTH + (MATRIX_WIDTH - 1);
+			int idx = i * inst->dim.matrix_width + (inst->dim.matrix_width - 1);
 			row[idx] = evo_mut_new_value(inst, &rnd);
 		}
 	}
@@ -112,7 +112,7 @@ __global__ void setup_parent_kernel(struct instance * const inst)
  */
 __global__ void setup_childs_kernel(struct instance * const inst, bool half)
 {
-	if(threadIdx.x >= MATRIX_HEIGHT)
+	if(threadIdx.x >= inst->dim.matrix_height)
 		return;
 
 	if(half && blockIdx.x >= 16)
@@ -164,27 +164,27 @@ __global__ void setup_childs_kernel(struct instance * const inst, bool half)
 		row = (double*) (slice + y * pitch);
 
 		for(int i = 0; i < matrices; i++) {
-			row[i * MATRIX_WIDTH] = evo_mut_new_value(inst, &rnd);
+			row[i * inst->dim.matrix_width] = evo_mut_new_value(inst, &rnd);
 		}
 	} else if(inst->cond_left == COND_UPPER_RIGHT) {
 		y = 0;
 		row = (double*) (slice + y * pitch);
 
 		for(int i = 0; i < matrices; i++) {
-			int idx = i * MATRIX_WIDTH + (MATRIX_WIDTH - 1);
+			int idx = i * inst->dim.matrix_width + (inst->dim.matrix_width - 1);
 			row[idx] = evo_mut_new_value(inst, &rnd);
 		}
 	} else if(inst->cond_left == COND_UPPER_LEFT_LOWER_RIGHT) {
 		y = 0;
 		row = (double*) (slice + y * pitch);
 		for(int i = 0; i < matrices; i++) {
-			row[i * MATRIX_WIDTH] = evo_mut_new_value(inst, &rnd);
+			row[i * inst->dim.matrix_width] = evo_mut_new_value(inst, &rnd);
 		}
 
 		y = (inst->dim.matrix_height - 1);
 		row = (double*) (slice + y * pitch);
 		for(int i = 0; i < matrices; i++) {
-			int idx = i * MATRIX_WIDTH + (MATRIX_WIDTH - 1);
+			int idx = i * inst->dim.matrix_width + (inst->dim.matrix_width - 1);
 			row[idx] = evo_mut_new_value(inst, &rnd);
 		}
 	}

@@ -125,7 +125,7 @@ void alloc_rating(struct instance *inst)
 void init_rnd_generator(struct instance *inst, int seed)
 {
 	curandState *rnd_states;
-	const int count = max(get_evo_threads(inst), MATRIX_HEIGHT);
+	const int count = max(get_evo_threads(inst), inst->dim.matrix_height);
 
 	CUDA_CALL(cudaMalloc((void **)&rnd_states,
 			     count * BLOCKS * sizeof(curandState)));
@@ -145,13 +145,13 @@ void set_num_matrices(struct instance* inst)
 //	printf("num_matrices set to %d\n", inst->num_matrices);
 }
 
-void inst_init(struct instance* const inst)
+void inst_init(struct instance* const inst, int matrix_width)
 {
 	inst->dim.blocks  = BLOCKS;
 	inst->dim.childs  = CHILDS;
 	inst->dim.parents = PARENTS;
-	inst->dim.matrix_width  = MATRIX_WIDTH;
-	inst->dim.matrix_height = MATRIX_HEIGHT;
+	inst->dim.matrix_width  = matrix_width;
+	inst->dim.matrix_height = matrix_width;
 
 	inst->res_block = 0;
 	inst->res_parent = 0;

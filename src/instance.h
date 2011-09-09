@@ -80,7 +80,7 @@ struct instance {
 		reserved:1;
 };
 
-void inst_init(struct instance* const inst);
+void inst_init(struct instance* const inst, int matrix_width);
 void inst_cleanup(struct instance * const inst,
 		      struct instance * const dev_inst);
 
