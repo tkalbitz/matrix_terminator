@@ -178,6 +178,7 @@ __device__ void evo_result_rating(const struct instance * const inst,
 	}
 
 	res[0][ty][0] = sum;
+	__syncthreads();
 
 	if(ty != 0)
 		return;
@@ -187,7 +188,6 @@ __device__ void evo_result_rating(const struct instance * const inst,
 		t = rating + y;
 		c = (t - rating) - y;
 		rating = t;
-
 	}
 
 	shrd_rating += sqrtf(rating);
