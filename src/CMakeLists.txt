@@ -40,7 +40,7 @@ CUDA_ADD_EXECUTABLE( matrix_generator
   matrix_copy.cu
   matrix_print.cu
   OPTIONS -arch=sm_13 -use_fast_math --ptxas-options=-v -O2 --compiler-options -Wall
-#  OPTIONS -arch=sm_13 -use_fast_math --ptxas-options=-v -G3 -g -DDEBUG
+#  OPTIONS -arch=sm_13 -use_fast_math --ptxas-options=-v -G3 -g -DDEBUG --maxrregcount=60
 ) 
 
 # Or compile the cuda code into a shared library.

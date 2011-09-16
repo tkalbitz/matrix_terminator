@@ -24,14 +24,11 @@ struct memory {
 	int c_zero;
 	int c_end;
 
-#ifdef DEBUG
 	size_t r_pitch;
 	char  *r_slice;
 
-	int r_zero1;
-	int r_zero2;
-	int r_end1;
-	int r_end2;
+	int r_zero;
+	int r_end;
 #endif
 
 	double* c_rat;
@@ -64,20 +61,15 @@ __device__ static void evo_init_mem(const struct instance* const inst,
 	mem->c_zero = inst->width_per_inst * threadIdx.x;
 	mem->c_end  = inst->width_per_inst * (threadIdx.x + 1);
 
-#ifdef DEBUG
 	char* const r_dev_ptr = (char*)inst->dev_res.ptr;
 	const size_t r_pitch = inst->dev_res.pitch;
 	const size_t r_slice_pitch = r_pitch * inst->dim.matrix_height;
 	char* const r_slice = r_dev_ptr + blockIdx.x /* z */ * r_slice_pitch;
-
 	mem->r_pitch = r_pitch;
 	mem->r_slice = r_slice;
 
-	mem->r_zero1 = threadIdx.x * 2 * inst->dim.matrix_width;
-	mem->r_end1  = mem->r_zero1 + inst->dim.matrix_width;
-	mem->r_zero2 = mem->r_zero1 + inst->dim.matrix_width;
-	mem->r_end2  = mem->r_zero2 + inst->dim.matrix_width;
-#endif
+	mem->r_zero = threadIdx.x * inst->dim.matrix_width;
+	mem->r_end  = mem->r_zero1 + inst->dim.matrix_width;
 
 	const char* const t_dev_ptr = (char*)inst->dev_crat.ptr;
 	mem->c_rat = (double*) (t_dev_ptr + blockIdx.x * inst->dev_crat.pitch);

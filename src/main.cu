@@ -7,6 +7,8 @@
 #include <ctype.h>
 #include <errno.h>
 
+#include <sys/wait.h>
+
 #include <cuda.h> 
 #include <curand_kernel.h>
 
@@ -112,8 +114,12 @@ void print_parents(struct instance* const inst,
 
 		int r = fork();
 
-		if(r > 0)
+		if(r > 0) {
+			int status;
+			wait(&status);
+		} else if(r == 0){
 			execlp("maxima", "maxima", "--very-quiet", "-b", fname, NULL);
+		}
 
 		if(r == -1) {
 			perror("fork failed");

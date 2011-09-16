@@ -64,12 +64,8 @@ void alloc_child_matrix(struct instance *inst)
  */
 void alloc_result_matrix(struct instance *inst)
 {
-#ifdef DEBUG
 	const int width = inst->dim.childs * inst->dim.parents *
-			    inst->width_per_inst * sizeof(double);
-#else
-	const int width = sizeof(double);
-#endif
+			    inst->dim.matrix_width * sizeof(double);
 
 	inst->dev_res_ext = make_cudaExtent(width,
 					    inst->dim.matrix_height,
