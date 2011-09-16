@@ -45,16 +45,21 @@ __device__ void eval_mul_inplace(const struct instance * const inst,
 	const int rows = MHEIGHT;
 	const int cstart = mem->c_zero  + cmatrix * MWIDTH;
 
-	double tmp = 0;
+	double y, t;
+	double c = 0;
+	double sum = 0;
 
 	/* result rows */
 	#pragma unroll
 	for(int i = 0; i < rows; i++) {
-		tmp += res[ty][i] * C_ROW(i)[cstart + tx];
+		y = res[ty][i] * C_ROW(i)[cstart + tx] - c;
+		t = sum + y;
+		c = (t - sum) - y;
+		sum = t;
 	}
 
 	__syncthreads();
-	res[ty][tx] = tmp;
+	res[ty][tx] = sum;
 	__syncthreads();
 }
 
