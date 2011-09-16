@@ -52,7 +52,7 @@ __device__ void evo_parent_selection_turnier(struct instance * const inst,
 		return;
 
 	__shared__ struct double2 src[PARENTS * CHILDS];
-	__shared__ struct double2 dest[PARENTS * CHILDS];
+	__shared__ struct double2 dest[PARENTS];
 	double2* const arr = (double2*)mem->c_rat;
 
 	for(int i = tx; i < PARENTS * CHILDS; i += inst->dim.matrix_width) {
