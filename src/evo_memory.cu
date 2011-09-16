@@ -29,7 +29,6 @@ struct memory {
 
 	int r_zero;
 	int r_end;
-#endif
 
 	double* c_rat;
 	double* p_rat;
@@ -69,7 +68,7 @@ __device__ static void evo_init_mem(const struct instance* const inst,
 	mem->r_slice = r_slice;
 
 	mem->r_zero = threadIdx.x * inst->dim.matrix_width;
-	mem->r_end  = mem->r_zero1 + inst->dim.matrix_width;
+	mem->r_end  = mem->r_zero + inst->dim.matrix_width;
 
 	const char* const t_dev_ptr = (char*)inst->dev_crat.ptr;
 	mem->c_rat = (double*) (t_dev_ptr + blockIdx.x * inst->dev_crat.pitch);
