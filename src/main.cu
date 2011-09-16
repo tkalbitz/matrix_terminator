@@ -54,8 +54,8 @@ static void print_usage()
 	printf("  -m|--mutation-rate      <float number>  -- default: %3.2f\n",  MUT_RATE);
 	printf("  -e|--recombination-rate <float number>  -- default: %3.2f\n",  RECOMB_RATE);
 	printf("  -p|--parent-max         <float number>  -- default: %.2f\n",   PARENT_MAX);
-	printf("  -s|--strategy-param     <float number>  -- default: %.2f\n", SPARAM);
-	printf("  -w|--matrix-width       <2 - 18>        -- default: 5\n");
+	printf("  -s|--strategy-param     <float number>  -- default: %.2f\n",   SPARAM);
+	printf("  -w|--matrix-width       <2 - %d>        -- default: 5\n",      MATRIX_WIDTH);
 	printf("  -g|--plot-log\n");
 	printf("	`- best         -- log only the best rating\n");
 	printf("	   all          -- log all ratings 1\n");
@@ -237,7 +237,8 @@ static void parse_configuration(struct instance* const inst,
 			break;
 		case 'w':
 			mopt->matrix_width = (int)strtod(optarg, NULL);
-			if(mopt->matrix_width < 2 || mopt->matrix_width > 18) {
+			if(mopt->matrix_width < 2 ||
+			   mopt->matrix_width > MATRIX_WIDTH) {
 				printf("matrix width was to small or to big!\n");
 				print_usage();
 				exit(EXIT_FAILURE);

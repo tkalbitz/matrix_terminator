@@ -60,12 +60,18 @@ __device__ void evo_mutation(struct instance * const inst,
 {
 	const int rows = inst->dim.matrix_height;
 	const double delta = inst->delta;
-	const uint32_t elems = inst->dim.matrix_width*inst->dim.matrix_height*inst->num_matrices;
 	double tmp;
+	const uint32_t elems = inst->dim.matrix_width  *
+			       inst->dim.matrix_height *
+			       inst->num_matrices;
 
 //	SP(tx) = SP(tx) * exp(curand_normal(rnd_s) /
 //			sqrtf(inst->num_matrices * inst->dim.matrix_height));
-	SP(tx) *= exp( (1 / sqrtf(inst->num_matrices * inst->dim.matrix_height * inst->dim.matrix_height)) * curand_normal(rnd_s));
+	SP(tx) *= exp(
+			(1 / sqrtf(inst->num_matrices *
+				   inst->dim.matrix_height *
+				   inst->dim.matrix_height)) *
+		        curand_normal(rnd_s));
 	SP(tx) = min(max(SP(tx), 2*delta), inst->parent_max);
 
 	MR(tx) = MR(tx) + (curand_normal(rnd_s) / 20);
