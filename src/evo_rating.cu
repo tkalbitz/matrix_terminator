@@ -205,6 +205,8 @@ __global__ void evo_calc_res(struct instance * const inst)
                 __syncthreads();
                 CR_ROW(ty)[mem->r_zero + tx] = res[ty][tx];
                 __syncthreads();
+		eval_set_res_matrix_to_identity();
+                __syncthreads();
 
 		rules++;
 		rules = eval_interpret_rule(inst , mem, rules);

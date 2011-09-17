@@ -334,7 +334,12 @@ int main(int argc, char** argv)
 	dev_inst = inst_create_dev_inst(&inst);
 	int evo_threads = get_evo_threads(&inst);
 
-	setup_childs_kernel<<<BLOCKS, inst.dim.matrix_height>>>(dev_inst, false);
+	const dim3 blocks(BLOCKS, PARENTS*CHILDS);
+	const dim3 threads(inst.dim.matrix_width, inst.dim.matrix_height);
+	const dim3 copy_threads(inst.dim.matrix_width, inst.dim.matrix_height);
+	const dim3 setup_threads(inst.dim.matrix_width * inst.dim.matrix_height);
+
+	setup_childs_kernel<<<BLOCKS, setup_threads>>>(dev_inst, false);
 	cudaThreadSynchronize();
 	CUDA_CALL(cudaGetLastError());
 
@@ -347,10 +352,6 @@ int main(int argc, char** argv)
 	cudaEvent_t start, stop;
 	float elapsedTime;
 	float elapsedTimeTotal = 0.f;
-
-	const dim3 blocks(BLOCKS, PARENTS*CHILDS);
-	const dim3 threads(inst.dim.matrix_width, inst.dim.matrix_height);
-	const dim3 copy_threads(inst.dim.matrix_width, inst.dim.matrix_height);
 
 	const int width = inst.dim.parents * inst.dim.blocks;
 	double * const rating = (double*)ya_malloc(width * sizeof(double));
@@ -372,7 +373,7 @@ int main(int argc, char** argv)
 
 	for(unsigned long i = 0; i < mopt.rounds; i++) {
 		if(i % 300 == 0) {
-			setup_childs_kernel<<<BLOCKS, inst.dim.matrix_height>>>(dev_inst, true);
+			setup_childs_kernel<<<BLOCKS, setup_threads>>>(dev_inst, true);
 			CUDA_CALL(cudaGetLastError());
 			evo_calc_res<<<blocks, threads>>>(dev_inst);
 			CUDA_CALL(cudaGetLastError());
