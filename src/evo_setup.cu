@@ -127,11 +127,12 @@ __global__ void setup_childs_kernel(struct instance * const inst, bool half)
 	char* const slice = devPtr + blockIdx.x * slicePitch;
 	double* row = (double*) (slice + threadIdx.x * pitch);
 
-//	const int tmp = (inst->parent_max > 10) ? 10 : (int)inst->parent_max;
 	const int max1 = (int)inst->parent_max;
 	const int max2 = (int)inst->parent_max / 2;
 	const int width = inst->width_per_inst;
 	const int end = CHILDS * PARENTS * width;
+	double tmp;
+	const double delta = inst->delta;
 	int flag = 1;
 
 	for(int x = 0; x < end; x++) {
@@ -141,11 +142,13 @@ __global__ void setup_childs_kernel(struct instance * const inst, bool half)
 		}
 
 		if(curand_uniform(&rnd) < MATRIX_TAKEN_POS) {
-			if(flag)
-				row[x] = curand(&rnd) % max1;
-			else
+			if(flag) {
+				tmp = curand(&rnd) % max1;
+			} else {
 				row[x] = min(max(0., curand_normal(&rnd)*(curand(&rnd) % max2) + max2), inst->parent_max);
-
+			}
+			tmp = ((unsigned long)(tmp / delta)) * delta;
+			row[x] = tmp;
 		} else {
 			row[x] = 0;
 		}
