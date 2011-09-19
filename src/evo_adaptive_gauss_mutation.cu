@@ -5,7 +5,6 @@ __device__ static double evo_mut_new_value(struct instance * const inst,
 					   curandState     * const rnd_state)
 {
 	/* we want to begin with small numbers */
-//	const int tmp = (int)inst->parent_max;
 	const int tmp = (inst->parent_max > 10) ? 10 : (int)inst->parent_max;
 
 	const int rnd_val = (curand(rnd_state) % (tmp - 1)) + 1;
@@ -13,7 +12,7 @@ __device__ static double evo_mut_new_value(struct instance * const inst,
 	if((factor * inst->delta) < 1.0)
 		factor++;
 
-	if(factor * inst->delta < 1.)
+	if(factor * inst->delta < 1.0)
 		return 1;
 
 	return factor * inst->delta;
@@ -60,18 +59,16 @@ __device__ void evo_mutation(struct instance * const inst,
 {
 	const int rows = inst->dim.matrix_height;
 	const double delta = inst->delta;
-	double tmp;
 	const uint32_t elems = inst->dim.matrix_width  *
 			       inst->dim.matrix_height *
 			       inst->num_matrices;
 
-//	SP(tx) = SP(tx) * exp(curand_normal(rnd_s) /
-//			sqrtf(inst->num_matrices * inst->dim.matrix_height));
-	SP(tx) *= exp(
-			(1 / sqrtf(inst->num_matrices *
-				   inst->dim.matrix_height *
-				   inst->dim.matrix_height)) *
-		        curand_normal(rnd_s));
+	const int parent = curand(rnd_s) % inst->dim.parents;
+
+	MR(tx) = PMR(parent);
+	SP(tx) = PSP(parent);
+
+	SP(tx) *= exp((1 / sqrtf(elems)) * curand_normal(rnd_s));
 	SP(tx) = min(max(SP(tx), 2*delta), inst->parent_max);
 
 	MR(tx) = MR(tx) + (curand_normal(rnd_s) / 20);
@@ -79,31 +76,35 @@ __device__ void evo_mutation(struct instance * const inst,
 
 	const double mr = MR(tx);
 	const double sp = SP(tx);
+	double tmp;
 
 	#pragma unroll
 	for(int r = 0; r < rows; r++) {
-		double* const row = C_ROW(r);
+		double* const c_row = C_ROW(r);
+		double* const p_row = P_ROW(r);
 
-		for(int c = mem->c_zero; c < mem->c_end; c++) {
+		for(int c = mem->c_zero, p = parent * inst->width_per_inst; c < mem->c_end; c++, p++) {
 
 			if(curand_uniform(rnd_s) > mr) {
 				if(curand_uniform(rnd_s) < mr/10) {
-					row[c] = 0.;
+					c_row[c] = 0.;
 				} if(curand_uniform(rnd_s) < mr/10) {
-					row[c] = evo_mut_new_value(inst, rnd_s);
+					c_row[c] = evo_mut_new_value(inst, rnd_s);
+				} else {
+					c_row[c] = p_row[p];
 				}
 				continue;
 			}
 
 			tmp = (double)(curand_normal(rnd_s) * sp);
-			tmp = (tmp < 0 ? -1 : 1) * max(delta, fabs(tmp));
-			tmp = row[c] + tmp;
+			tmp = __dmul_rn((tmp < 0 ? -1 : 1), max(delta, fabs(tmp)));
+			tmp = __dadd_rn(p_row[p], tmp);
 			/* we want x * delta, where x is an int */
-			tmp = ((unsigned long)(tmp / delta)) * delta;
+			tmp = __dmul_rn(((unsigned long)(tmp / delta)), delta);
 			tmp = max(tmp, 0.0);
 			tmp = min(inst->parent_max, tmp);
 
-			row[c] = tmp;
+			c_row[c] = tmp;
 		}
 	}
 

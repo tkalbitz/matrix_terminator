@@ -47,11 +47,6 @@ __global__ void evo_kernel_part_one(struct instance *inst)
 
 	struct memory mem;
 	evo_init_mem(inst, &mem);
-
-	int p_sel[2];
-
-	evo_recomb_selection(inst, &rnd_state, p_sel);
-	evo_recombination(inst, &mem, &rnd_state, p_sel);
 	evo_mutation(inst, &mem, &rnd_state);
 
 	/* backup rnd state to global mem */

@@ -52,8 +52,8 @@ __device__ void eval_mul_inplace(const struct instance * const inst,
 	/* result rows */
 	#pragma unroll
 	for(int i = 0; i < rows; i++) {
-		y = res[ty][i] * C_ROW(i)[cstart + tx] - c;
-		t = sum + y;
+		y = __dmul_rn(res[ty][i], C_ROW(i)[cstart + tx]) - c;
+		t = __dadd_rn(sum, y);
 		c = (t - sum) - y;
 		sum = t;
 	}
@@ -127,7 +127,7 @@ __device__ void evo_result_rating(const struct instance * const inst,
 	__syncthreads();
 	// keep only negative numbers
 	res[ty][tx] = fabs(min(R_ROW(ty)[mem->r_zero + tx] - res[ty][tx], 0.));
-	res[ty][tx] *= res[ty][tx];
+	res[ty][tx] = __dmul_rn(res[ty][tx], res[ty][tx]);
 	__syncthreads();
 
 	//only lines are processed
@@ -206,7 +206,6 @@ __global__ void evo_calc_res(struct instance * const inst)
                 CR_ROW(ty)[mem->r_zero + tx] = res[ty][tx];
                 __syncthreads();
 		eval_set_res_matrix_to_identity();
-                __syncthreads();
 
 		rules++;
 		rules = eval_interpret_rule(inst , mem, rules);

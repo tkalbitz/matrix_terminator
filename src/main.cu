@@ -453,6 +453,7 @@ int main(int argc, char** argv)
 
 	printf("Clean up and exit.\n");
 	inst_cleanup(&inst, dev_inst);
+	cudaThreadExit();
 
 	if(rounds == -1)
 		return 0;
