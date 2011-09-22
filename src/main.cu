@@ -327,11 +327,12 @@ int main(int argc, char** argv)
 	struct instance inst;
 	struct matrix_option mopt;
 	struct instance *dev_inst;
+	int* dev_rules;
 
 	parse_configuration(&inst, &mopt, argc, argv);
 
 	inst_init(&inst, mopt.matrix_width);
-	dev_inst = inst_create_dev_inst(&inst);
+	dev_inst = inst_create_dev_inst(&inst, &dev_rules);
 	int evo_threads = get_evo_threads(&inst);
 
 	const dim3 blocks(BLOCKS, PARENTS*CHILDS);
@@ -453,6 +454,7 @@ int main(int argc, char** argv)
 
 	printf("Clean up and exit.\n");
 	inst_cleanup(&inst, dev_inst);
+	cudaFree(dev_rules);
 	cudaThreadExit();
 
 	if(rounds == -1)

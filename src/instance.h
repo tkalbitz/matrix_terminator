@@ -84,7 +84,7 @@ void inst_init(struct instance* const inst, int matrix_width);
 void inst_cleanup(struct instance * const inst,
 		      struct instance * const dev_inst);
 
-struct instance* inst_create_dev_inst(struct instance * const inst);
+struct instance* inst_create_dev_inst(struct instance *inst, int** dev_rules);
 void inst_copy_dev_to_host(struct instance * const dev,
 		           struct instance * const host);
 int get_evo_threads(const struct instance * const inst);

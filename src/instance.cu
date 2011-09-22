@@ -170,10 +170,8 @@ void inst_init(struct instance* const inst, int matrix_width)
 void inst_cleanup(struct instance * const inst,
 		  struct instance * const dev_inst)
 {
-	free(inst->rules);
-
-	cudaFree(dev_inst);
-	/* dev_inst-> rules? */
+	if(dev_inst != NULL)
+		cudaFree(dev_inst);
 
 	cudaFree(inst->rnd_states);
 	cudaFree(inst->dev_child.ptr);
@@ -184,20 +182,23 @@ void inst_cleanup(struct instance * const inst,
 	cudaFree(inst->dev_sparam.ptr);
 }
 
-struct instance* inst_create_dev_inst(struct instance *inst)
+struct instance* inst_create_dev_inst(struct instance *inst, int** dev_rules)
 {
 	struct instance *dev_inst;
 	int *rules = inst->rules;
-	int *dev_rules;
-	CUDA_CALL(cudaMalloc(&dev_rules, inst->rules_len * sizeof(int)));
-	CUDA_CALL(cudaMemcpy(dev_rules, rules, inst->rules_len * sizeof(int),
+	int *tmp_dev_rules;
+	CUDA_CALL(cudaMalloc(&tmp_dev_rules, inst->rules_len * sizeof(int)));
+	CUDA_CALL(cudaMemcpy(tmp_dev_rules,  rules, inst->rules_len * sizeof(int),
 					cudaMemcpyHostToDevice));
-	inst->rules = dev_rules;
+	inst->rules = tmp_dev_rules;
 	CUDA_CALL(cudaMalloc(&dev_inst, sizeof(*dev_inst)));
 	CUDA_CALL(cudaMemcpy(dev_inst, inst, sizeof(*dev_inst),
 					cudaMemcpyHostToDevice));
-
 	inst->rules = rules;
+
+	if(dev_rules != NULL)
+		*dev_rules = tmp_dev_rules;
+
 	return dev_inst;
 }
 

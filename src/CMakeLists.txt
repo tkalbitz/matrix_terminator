@@ -39,8 +39,9 @@ CUDA_ADD_EXECUTABLE( matrix_generator
   evo_setup.cu
   matrix_copy.cu
   matrix_print.cu
-  OPTIONS -arch=sm_13 -use_fast_math --ptxas-options=-v -O2 --compiler-options -Wall
-#  OPTIONS -arch=sm_13 -use_fast_math --ptxas-options=-v -G3 -g -DDEBUG --maxrregcount=60
+  OPTIONS -arch=sm_13 -use_fast_math --ptxas-options=-v 
+  RELEASE -O2 --compiler-options -Wall
+  DEBUG   -G3 -g -DDEBUG --maxrregcount=60
 ) 
 
 # Or compile the cuda code into a shared library.
@@ -63,6 +64,28 @@ add_definitions()
 #  RELEASE --use_fast_math -DNDEBUG
 #  DEBUG -g -DDEBUG
 #  )
+
+CUDA_ADD_LIBRARY( evo_matrix_generator
+  matrix_generator.cu
+  instance.cu
+  evo.cu
+  evo_rating.cu
+  evo_setup.cu
+  matrix_copy.cu
+
+  SHARED
+  OPTIONS -arch=sm_13 -use_fast_math --ptxas-options=-v 
+  RELEASE -O2 --compiler-options -Wall
+  DEBUG -G3 -g -DDEBUG --maxrregcount=60
+  )
+
+ADD_EXECUTABLE( evo_lib_test
+  evo_lib_test.c
+  matrix_generator.h
+)  
+
+add_dependencies(evo_lib_test evo_matrix_generator)
+target_link_libraries(evo_lib_test evo_matrix_generator) 
 
 # Then link the shared library to another executable.
 #ADD_EXECUTABLE( matrix_terminator
