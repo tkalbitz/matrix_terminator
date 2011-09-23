@@ -65,28 +65,6 @@ add_definitions()
 #  DEBUG -g -DDEBUG
 #  )
 
-CUDA_ADD_LIBRARY( evo_matrix_generator
-  matrix_generator.cu
-  instance.cu
-  evo.cu
-  evo_rating.cu
-  evo_setup.cu
-  matrix_copy.cu
-
-  SHARED
-  OPTIONS -arch=sm_13 -use_fast_math --ptxas-options=-v 
-  RELEASE -O2 --compiler-options -Wall
-  DEBUG -G3 -g -DDEBUG --maxrregcount=60
-  )
-
-ADD_EXECUTABLE( evo_lib_test
-  evo_lib_test.c
-  matrix_generator.h
-)  
-
-add_dependencies(evo_lib_test evo_matrix_generator)
-target_link_libraries(evo_lib_test evo_matrix_generator) 
-
 # Then link the shared library to another executable.
 #ADD_EXECUTABLE( matrix_terminator
 #  main.c
@@ -95,4 +73,9 @@ target_link_libraries(evo_lib_test evo_matrix_generator)
 
 # Add a special target to clean nvcc generated files.
 CUDA_BUILD_CLEAN_TARGET()
+
+subdirs(
+  lib
+)
+
 
