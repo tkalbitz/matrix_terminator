@@ -50,7 +50,7 @@ int evo_create_instance(const int         matrix_width,
  *
  * @return != a error occurs
  */
-int evo_destroy_instance(uint32_t instance);
+int evo_destroy_instance(const int instance);
 
 /**
  * Runs the evo and try to match the given rules.
@@ -66,7 +66,7 @@ int evo_destroy_instance(uint32_t instance);
  *         < INT_MAX solution found in this cycle
  *         = INT_MAX no solution found
  */
-int evo_run(const uint32_t instance,
+int evo_run(const int instance,
 	    const int      cycles,
 	    double* const  result);
 
@@ -78,7 +78,7 @@ int evo_run(const uint32_t instance,
  *
  * @return != 0 a error occured
  */
-int evo_set_matrix_max_value(const uint32_t instance, const double max);
+int evo_set_matrix_max_value(const int instance, const double max);
 
 /**
  * Set the delta a matrix element must a multiple of.
@@ -88,6 +88,6 @@ int evo_set_matrix_max_value(const uint32_t instance, const double max);
  *
  * @return != 0 a error occured
  */
-int evo_set_delta_value(const uint32_t instance, const double delta);
+int evo_set_delta_value(const int instance, const double delta);
 
 #endif /* MATRIX_GENERATOR_H_ */

@@ -36,7 +36,7 @@ void evo_lib_destroy()
 	cudaThreadExit();
 }
 
-struct evo_info_t* evo_get_empty(uint32_t* instance)
+struct evo_info_t* evo_get_empty(int* const instance)
 {
 	int free_inst = -1;
 	for(int i = 0; i < INFO_LEN; i++) {
@@ -54,9 +54,10 @@ struct evo_info_t* evo_get_empty(uint32_t* instance)
 	return &evo_info[free_inst];
 }
 
-struct evo_info_t* evo_get(uint32_t instance)
+struct evo_info_t* evo_get(const int instance)
 {
-	if(instance >= INFO_LEN || evo_info[instance].is_initialized == 0)
+	if(instance < 0 || instance >= INFO_LEN ||
+			evo_info[instance].is_initialized == 0)
 		return NULL;
 
 	return &evo_info[instance];

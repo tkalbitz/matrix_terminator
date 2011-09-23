@@ -20,12 +20,13 @@ struct evo_info_t
 	double sparam;
 };
 
-extern "C" {
+extern "C"
+{
 	void evo_lib_init();
 	void evo_lib_destroy();
 };
 
-struct evo_info_t* evo_get_empty(uint32_t* instance);
-struct evo_info_t* evo_get(uint32_t instance);
+struct evo_info_t* evo_get_empty(int* const instance);
+struct evo_info_t* evo_get(const int instance);
 
 #endif /* EVO_INFO_H_ */

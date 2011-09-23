@@ -42,7 +42,7 @@ int evo_create_instance(const int         matrix_width,
 		return E_INVALID_MAT_WIDTH;
 	}
 
-	uint32_t free_inst;
+	int free_inst;
 	struct evo_info_t* const evo_info = evo_get_empty(&free_inst);
 	if(evo_info == NULL)
 		return E_NO_FREE_INST;
@@ -71,7 +71,7 @@ int evo_create_instance(const int         matrix_width,
 }
 
 
-int evo_destroy_instance(uint32_t instance)
+int evo_destroy_instance(const int instance)
 {
 	struct evo_info_t* evo_info = evo_get(instance);
 	if(evo_info == NULL)
@@ -84,7 +84,7 @@ int evo_destroy_instance(uint32_t instance)
 	return 0;
 }
 
-int evo_set_matrix_max_value(const uint32_t instance, const double max)
+int evo_set_matrix_max_value(const int instance, const double max)
 {
 	struct evo_info_t* info = evo_get(instance);
 	if(info == NULL)
@@ -97,7 +97,7 @@ int evo_set_matrix_max_value(const uint32_t instance, const double max)
 	return 0;
 }
 
-int evo_set_delta_value(const uint32_t instance, const double delta)
+int evo_set_delta_value(const int instance, const double delta)
 {
 	struct evo_info_t* info = evo_get(instance);
 	if(info == NULL)

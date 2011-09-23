@@ -63,9 +63,9 @@ static void copy_result_to_buffer(struct instance* inst,
 	free(parent_cpy);
 }
 
-int evo_run(const uint32_t instance,
-	    const int      cycles,
-	    double* const  result)
+int evo_run(const int     instance,
+	    const int     cycles,
+	    double* const result)
 {
 	struct evo_info_t* const evo_info = evo_get(instance);
 	if(evo_info == NULL)
