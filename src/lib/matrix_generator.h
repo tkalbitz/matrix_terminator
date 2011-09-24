@@ -70,24 +70,69 @@ int evo_run(const int instance,
 	    const int      cycles,
 	    double* const  result);
 
-/**
- * Set the maximum value a element in the matrix can have.
- *
- * @param instance (in) The instance for which the value should be set.
- * @param max      (in) The maximum value of the matrix element.
- *
- * @return != 0 a error occured
- */
-int evo_set_matrix_max_value(const int instance, const double max);
+#define MATCH_ALL 0
+#define MATCH_ANY 1
+
+#define COND_UPPER_LEFT  0
+#define COND_UPPER_RIGHT 1
+#define COND_UPPER_LEFT_LOWER_RIGHT 2
 
 /**
- * Set the delta a matrix element must a multiple of.
+ * Set all evo parameter which will be used when evo_run is called for the
+ * given instance. Please note that the defualt parameters will be set at every
+ * evo_create_instance. If a parameter is < 0 it will be ignored. If 0 is
+ * forbidden or the parameter is out of range E_INVALID_VALUE is returned. It is
+ * garanteed that no parameter was changed when a error is returned.
  *
- * @param instance (in) The instance for which the delta should be set.
- * @param delta    (in) The delta value.
+ * @param instance   (in) The instance for which the value should be set.
+ * @param max        (in) The maximum value of the matrix element (must be > 0).
+ * @param match      (in) The match value (must MATCH_ALL OR MATCH_ANY).
+ * @param cond_left  (in) The constraint which all factor matrices have to
+ *                        match. This has to be one of the values
+ *                        COND_UPPER_LEFT, COND_UPPER_RIGHT or
+ *                        COND_UPPER_LEFT_LOWER_RIGHT
+ * @param cond_right (in) The constraint which all result matrices have to
+ *                        match. This has to be one of the values
+ *                        COND_UPPER_LEFT, COND_UPPER_RIGHT or
+ *                        COND_UPPER_LEFT_LOWER_RIGHT
+ * @param mut_rate   (in) The mutation rate which should be used at the start
+ * 			  of the algorithm (must be > 0 and <= 1).
+ * @param strgy_parm (in) Strategy parameter which is used in the algorithm. A
+ *                        good start value is 2*delta (must be != 0).
  *
- * @return != 0 a error occured
+ * @return = 0 at success, at error < 0
  */
-int evo_set_delta_value(const int instance, const double delta);
+int evo_set_params(int instance,
+		   double max, double delta, int match,
+		   int cond_left, int cond_right,
+		   double mut_rate, double strgy_parm);
+
+/**
+ * Set all default evo parameter which will be used when ever a new instance is
+ * created. If a parameter is < 0 it will be ignored. If 0 is forbidden or the
+ * parameter is out of range E_INVALID_VALUE is returned. It is garanteed that
+ * no parameter was changed when a error is returned.
+ *
+ * @param instance   (in) The instance for which the value should be set.
+ * @param max        (in) The maximum value of the matrix element (must be > 0).
+ * @param match      (in) The match value (must MATCH_ALL OR MATCH_ANY).
+ * @param cond_left  (in) The constraint which all factor matrices have to
+ *                        match. This has to be one of the values
+ *                        COND_UPPER_LEFT, COND_UPPER_RIGHT or
+ *                        COND_UPPER_LEFT_LOWER_RIGHT
+ * @param cond_right (in) The constraint which all result matrices have to
+ *                        match. This has to be one of the values
+ *                        COND_UPPER_LEFT, COND_UPPER_RIGHT or
+ *                        COND_UPPER_LEFT_LOWER_RIGHT
+ * @param mut_rate   (in) The mutation rate which should be used at the start
+ * 			  of the algorithm (must be > 0 and <= 1).
+ * @param strgy_parm (in) Strategy parameter which is used in the algorithm. A
+ *                        good start value is 2*delta.
+ *
+ * @return = 0 at success, at error < 0
+ */
+int evo_set_def_params(double max, double delta, int match,
+		       int cond_left, int cond_right,
+		       double mut_rate, double strgy_parm);
 
 #endif /* MATRIX_GENERATOR_H_ */

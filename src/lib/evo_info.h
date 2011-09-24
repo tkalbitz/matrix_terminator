@@ -26,7 +26,11 @@ extern "C"
 	void evo_lib_destroy();
 };
 
+#define DEF_INST -1
+
 struct evo_info_t* evo_get_empty(int* const instance);
 struct evo_info_t* evo_get(const int instance);
+struct evo_info_t* evo_get_default();
+
 
 #endif /* EVO_INFO_H_ */
