@@ -2,6 +2,7 @@
 CUDA_INCLUDE_DIRECTORIES(
   ${CMAKE_CURRENT_SOURCE_DIR}
   ${CMAKE_CURRENT_SOURCE_DIR}/..
+  ${CMAKE_CURRENT_SOURCE_DIR}/../evo
   )
 
 CUDA_ADD_LIBRARY( evo_matrix_generator
@@ -10,14 +11,14 @@ CUDA_ADD_LIBRARY( evo_matrix_generator
   evo_info.cu
   evo_info.h
   evo_instance.cu
-  ../instance.cu
-  ../instance.h
-  ../evo.cu
-  ../evo.h
-  ../evo_rating.cu
-  ../evo_setup.cu
-  ../matrix_copy.cu
-  ../matrix_copy.h
+  ../evo/instance.cu
+  ../evo/instance.h
+  ../evo/evo.cu
+  ../evo/evo.h
+  ../evo/evo_rating.cu
+  ../evo/evo_setup.cu
+  ../evo/matrix_copy.cu
+  ../evo/matrix_copy.h
   ../ya_malloc.h
 
   SHARED

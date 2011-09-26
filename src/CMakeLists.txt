@@ -8,6 +8,7 @@
 # The cuda_include_directories adds paths to only cuda compilation.
 CUDA_INCLUDE_DIRECTORIES(
   ${CMAKE_CURRENT_SOURCE_DIR}
+  ${CMAKE_CURRENT_SOURCE_DIR}/evo
   )
 
 # The include_directories adds paths to both C/C++ compilation in the native
@@ -31,14 +32,14 @@ add_definitions(-DBLOCKS=${BLOCKS} -DMATRIX_WIDTH=${MATRIX_WIDTH} -DMATRIX_HEIGH
  
 # Use one executable only.
 CUDA_ADD_EXECUTABLE( matrix_generator
-  instance.cu
-  plot_log.cu
-  main.cu
-  evo.cu
-  evo_rating.cu
-  evo_setup.cu
-  matrix_copy.cu
-  matrix_print.cu
+  matrix_generator.cu
+  evo/instance.cu
+  evo/plot_log.cu
+  evo/evo.cu
+  evo/evo_rating.cu
+  evo/evo_setup.cu
+  evo/matrix_copy.cu
+  evo/matrix_print.cu
   OPTIONS -arch=sm_13 -use_fast_math --ptxas-options=-v 
   RELEASE -O2 --compiler-options -Wall
   DEBUG   -G3 -g -DDEBUG --maxrregcount=60
