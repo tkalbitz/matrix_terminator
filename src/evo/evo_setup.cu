@@ -17,7 +17,7 @@ __global__ void setup_rnd_kernel(curandState* const rnd_states,
          * Each thread get the same seed,
          * a different sequence number and no offset.
          */
-	curand_init(seed, id, 0, &rnd_states[id]);
+	curand_init(seed + id, id, 0, &rnd_states[id]);
 }
 
 __device__ static double evo_mut_new_value(struct instance * const inst,

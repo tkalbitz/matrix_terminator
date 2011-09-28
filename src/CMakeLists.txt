@@ -32,7 +32,7 @@ add_definitions(-DBLOCKS=${BLOCKS} -DMATRIX_WIDTH=${MATRIX_WIDTH} -DMATRIX_HEIGH
  
 # Use one executable only.
 CUDA_ADD_EXECUTABLE( matrix_generator
-  matrix_generator.cu
+  evo_matrix_generator.cu
   evo/instance.cu
   evo/plot_log.cu
   evo/evo.cu
@@ -40,6 +40,15 @@ CUDA_ADD_EXECUTABLE( matrix_generator
   evo/evo_setup.cu
   evo/matrix_copy.cu
   evo/matrix_print.cu
+  OPTIONS -arch=sm_13 -use_fast_math --ptxas-options=-v 
+  RELEASE -O2 --compiler-options -Wall
+  DEBUG   -G3 -g -DDEBUG --maxrregcount=60
+) 
+
+CUDA_ADD_EXECUTABLE( pso_matrix_generator
+  pso_matrix_generator.cu
+  pso/pso_instance.cu
+  pso/pso_setup.cu
   OPTIONS -arch=sm_13 -use_fast_math --ptxas-options=-v 
   RELEASE -O2 --compiler-options -Wall
   DEBUG   -G3 -g -DDEBUG --maxrregcount=60
