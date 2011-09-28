@@ -7,7 +7,7 @@
 
 #include "assert.h"
 
-#include "config.h"
+#include "pso_config.h"
 #include "pso_instance.h"
 #include "pso_setup.h"
 
@@ -110,7 +110,7 @@ void alloc_rating(struct pso_instance *inst)
 	inst->dev_prat = pitched_ptr;
 }
 
-void inst_init(struct pso_instance* const inst, int matrix_width)
+void pso_inst_init(struct pso_instance* const inst, int matrix_width)
 {
 	inst->dim.blocks    = BLOCKS;
 	inst->dim.particles = PARTICLE_COUNT;
@@ -134,7 +134,7 @@ void inst_init(struct pso_instance* const inst, int matrix_width)
 	init_rnd_generator(inst, time(0));
 }
 
-void inst_cleanup(struct pso_instance * const inst,
+void pso_inst_cleanup(struct pso_instance * const inst,
 		  struct pso_instance * const dev_inst)
 {
 	if(dev_inst != NULL)
@@ -149,8 +149,8 @@ void inst_cleanup(struct pso_instance * const inst,
 	cudaFree(inst->dev_prat.ptr);
 }
 
-struct pso_instance* inst_create_dev_inst(struct pso_instance *inst,
-					  int** dev_rules)
+struct pso_instance* pso_inst_create_dev_inst(struct pso_instance *inst,
+					      int** dev_rules)
 {
 	struct pso_instance *dev_inst;
 	int *rules = inst->rules;
@@ -170,7 +170,7 @@ struct pso_instance* inst_create_dev_inst(struct pso_instance *inst,
 	return dev_inst;
 }
 
-void inst_copy_dev_to_host(struct pso_instance * const dev,
+void pso_inst_copy_dev_to_host(struct pso_instance * const dev,
 			   struct pso_instance * const host)
 {
 	int *rules = host->rules;

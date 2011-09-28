@@ -32,7 +32,6 @@ struct matrix_option {
 	char enable_maxima;
 	char plot_log_enable;
 	char plot_log_best;
-
 };
 
 static void print_usage()
@@ -72,8 +71,6 @@ static void print_usage()
 	printf("If the option --enable-maxima is given the result will be written"
 		" in an 'mg_XXXXXX' file and maxima recalculate and prints the "
 		"result.\n\n");
-
-
 }
 
 void print_parents(struct instance* const inst,
