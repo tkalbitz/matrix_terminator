@@ -100,14 +100,22 @@ void alloc_result_matrix(struct pso_instance *inst)
 
 void alloc_rating(struct pso_instance *inst)
 {
+	cudaPitchedPtr pitched_ptr;
+
 	inst->dev_prat_ext = make_cudaExtent(inst->dim.particles * sizeof(double),
 					     1,
 					     inst->dim.blocks);
-
-	cudaPitchedPtr pitched_ptr;
 	CUDA_CALL(cudaMalloc3D(&pitched_ptr, inst->dev_prat_ext));
 	CUDA_CALL(cudaMemset3D(pitched_ptr, 33, inst->dev_prat_ext));
 	inst->dev_prat = pitched_ptr;
+
+	inst->dev_lbrat_ext = make_cudaExtent(inst->dim.particles * sizeof(double),
+					      1,
+					      inst->dim.blocks);
+	CUDA_CALL(cudaMalloc3D(&pitched_ptr, inst->dev_lbrat_ext));
+	CUDA_CALL(cudaMemset3D(pitched_ptr, 33, inst->dev_lbrat_ext));
+	inst->dev_lbrat = pitched_ptr;
+
 }
 
 void pso_inst_init(struct pso_instance* const inst, int matrix_width)

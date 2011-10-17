@@ -299,7 +299,7 @@ int main(int argc, char** argv)
 	cudaThreadSynchronize();
 	CUDA_CALL(cudaGetLastError());
 
-	pso_evaluation_lbest<<<BLOCKS, threads>>>(dev_inst);
+	pso_evaluation_lbest<<<blocks, threads>>>(dev_inst);
 	CUDA_CALL(cudaGetLastError());
 	cudaThreadSynchronize();
 	CUDA_CALL(cudaGetLastError());
