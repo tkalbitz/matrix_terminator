@@ -5,6 +5,8 @@
  *      Author: tkalbitz
  */
 
+#include <float.h>
+
 #include "pso_config.h"
 #include "pso_setup.h"
 #include "pso_memory.h"
@@ -53,10 +55,15 @@ setup_particle_kernel(struct pso_instance * const inst, bool half)
 
 	const uint32_t tp = threadIdx.x % inst->dim.matrix_width;
 
-	const size_t pitch = inst->dev_particle.pitch;
-	char* const slice = ((char*)inst->dev_particle.ptr) + blockIdx.x *
-			                        pitch * inst->dim.matrix_height;
-	double* row = (double*) (slice + (threadIdx.x / inst->dim.matrix_height) * pitch);
+	const size_t p_pitch = inst->dev_particle.pitch;
+	char* const p_slice = ((char*)inst->dev_particle.ptr) + blockIdx.x *
+			              p_pitch * inst->dim.matrix_height;
+	double* p_row = (double*) (p_slice + (threadIdx.x / inst->dim.matrix_height) * p_pitch);
+
+	const size_t v_pitch = inst->dev_velocity.pitch;
+	char* const v_slice = ((char*)inst->dev_velocity.ptr) + blockIdx.x *
+			              v_pitch * inst->dim.matrix_height;
+	double* v_row = (double*) (v_slice + (threadIdx.x / inst->dim.matrix_height) * v_pitch);
 
 	const int max1 = (int)inst->parent_max;
 	const int max2 = (int)inst->parent_max / 2;
@@ -66,18 +73,21 @@ setup_particle_kernel(struct pso_instance * const inst, bool half)
 
 	for(uint32_t x = tp; x < end; x += inst->dim.matrix_width) {
 
+		//init velocity of particle
+		v_row[x] = curand_uniform(&rnd) * 2;
+
 		if(x % width == 0) {
 			flag = (flag + 1) & 1;
 		}
 
 		if(curand_uniform(&rnd) < MATRIX_TAKEN_POS) {
-	                if(flag) {
-	                	row[x] = curand(&rnd) % max1 ;
-	                } else {
-	                        row[x] = min(max(0., curand_normal(&rnd)*(curand(&rnd) % max2) + max2), inst->parent_max);
-	                }
+//	                if(flag) {
+	                	p_row[x] = curand(&rnd) % max1 ;
+//	                } else {
+//	                        p_row[x] = min(max(0., curand_normal(&rnd)*(curand(&rnd) % max2) + max2), inst->parent_max);
+//	                }
 		} else {
-			row[x] = 0;
+			p_row[x] = 0;
 		}
 	}
 
@@ -92,31 +102,31 @@ setup_particle_kernel(struct pso_instance * const inst, bool half)
 
 	if(inst->cond_left == COND_UPPER_LEFT) {
 		y = 0;
-		row = (double*) (slice + y * pitch);
+		p_row = (double*) (p_slice + y * p_pitch);
 
 		for(i = 0; i < matrices; i++) {
-			row[i * inst->dim.matrix_width] = evo_mut_new_value(inst, &rnd);
+			p_row[i * inst->dim.matrix_width] = evo_mut_new_value(inst, &rnd);
 		}
 	} else if(inst->cond_left == COND_UPPER_RIGHT) {
 		y = 0;
-		row = (double*) (slice + y * pitch);
+		p_row = (double*) (p_slice + y * p_pitch);
 
 		for(i = 0; i < matrices; i++) {
 			int idx = i * inst->dim.matrix_width + (inst->dim.matrix_width - 1);
-			row[idx] = evo_mut_new_value(inst, &rnd);
+			p_row[idx] = evo_mut_new_value(inst, &rnd);
 		}
 	} else if(inst->cond_left == COND_UPPER_LEFT_LOWER_RIGHT) {
 		y = 0;
-		row = (double*) (slice + y * pitch);
+		p_row = (double*) (p_slice + y * p_pitch);
 		for(i = 0; i < matrices; i++) {
-			row[i * inst->dim.matrix_width] = evo_mut_new_value(inst, &rnd);
+			p_row[i * inst->dim.matrix_width] = evo_mut_new_value(inst, &rnd);
 		}
 
 		y = (inst->dim.matrix_height - 1);
-		row = (double*) (slice + y * pitch);
+		p_row = (double*) (p_slice + y * p_pitch);
 		for(i = 0; i < matrices; i++) {
 			int idx = i * inst->dim.matrix_width + (inst->dim.matrix_width - 1);
-			row[idx] = evo_mut_new_value(inst, &rnd);
+			p_row[idx] = evo_mut_new_value(inst, &rnd);
 		}
 	}
 
@@ -138,3 +148,13 @@ __global__ void setup_param(struct pso_instance * const inst,
 	mem.param[3 * tx + 2] = c2;
 }
 
+__global__ void setup_rating(struct pso_instance * const inst)
+{
+	struct memory mem;
+	pso_init_mem(inst, &mem);
+	mem.lb_rat[tx] = FLT_MAX;
+	mem.p_rat[tx]  = FLT_MAX;
+
+	if(tx == 0)
+		inst->gb_rat[blockIdx.x] = FLT_MAX;
+}

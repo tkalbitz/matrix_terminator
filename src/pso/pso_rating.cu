@@ -159,21 +159,6 @@ __device__ void pso_result_rating(const struct pso_instance * const inst,
 	shrd_rating += sqrtf(rating);
 }
 
-__device__ void pso_init_mem2(const struct pso_instance* const inst,
-			      struct memory * const mem)
-{
-	pso_init_mem(inst, mem);
-	/*
-	 * each block represent one child which has a
-	 * defined pos in the matrix
-	 */
-	mem->p_zero = inst->width_per_inst * blockIdx.y;
-	mem->p_end  = inst->width_per_inst * (blockIdx.y + 1);
-
-	mem->r_zero = blockIdx.y * MWIDTH;
-	mem->r_end  = mem->r_zero + MWIDTH;
-}
-
 __global__ void pso_calc_res(struct pso_instance * const inst)
 {
 	__shared__ struct memory res_mem;
@@ -187,7 +172,7 @@ __global__ void pso_calc_res(struct pso_instance * const inst)
 		MWIDTH  = inst->dim.matrix_width;
 		shrd_rating = 0.;
 		matrix_form = 1e9;
-		pso_init_mem2(inst, &res_mem);
+		pso_init_mem(inst, &res_mem);
 	}
 
 
@@ -201,7 +186,7 @@ __global__ void pso_calc_res(struct pso_instance * const inst)
 		rules = eval_interpret_rule(inst , mem, rules);
 
                 __syncthreads();
-                P_ROW(ty)[mem->r_zero + tx] = res[ty][tx];
+                R_ROW(ty)[mem->r_zero + tx] = res[ty][tx];
                 __syncthreads();
 		eval_set_res_matrix_to_identity();
 
@@ -221,6 +206,6 @@ __global__ void pso_calc_res(struct pso_instance * const inst)
 		if(inst->match == MATCH_ANY)
 			shrd_rating += matrix_form;
 
-		res_mem.p_rat[blockIdx.y]     = shrd_rating;
+		res_mem.p_rat[blockIdx.y] = shrd_rating;
 	}
 }

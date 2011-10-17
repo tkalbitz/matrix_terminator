@@ -26,8 +26,8 @@
 #include "pso_rating.h"
 #include "pso_setup.h"
 
-//#include "matrix_print.h"
-//#include "matrix_copy.h"
+#include "pso_print.h"
+#include "pso_copy.h"
 #include "ya_malloc.h"
 //#include "plot_log.h"
 
@@ -281,13 +281,15 @@ int main(int argc, char** argv)
 	cudaThreadSynchronize();
 	CUDA_CALL(cudaGetLastError());
 
+	setup_rating<<<BLOCKS, PARTICLE_COUNT>>>(dev_inst);
+	CUDA_CALL(cudaGetLastError());
+
 	// Prepare
 	cudaEvent_t start, stop;
 	float elapsedTime;
 	float elapsedTimeTotal = 0.f;
 
-	const int width = inst.dim.particles * inst.dim.blocks;
-	double * const rating = (double*)ya_malloc(width * sizeof(double));
+	double * const rating = (double*)ya_malloc(BLOCKS * sizeof(double));
 //	struct plot_log* pl = init_plot_log(mopt.plot_log_enable,
 //					    mopt.plot_log_best);
 
@@ -310,53 +312,47 @@ int main(int argc, char** argv)
 	CUDA_CALL(cudaGetLastError());
 
 	for(unsigned long i = 0; i < mopt.rounds; i++) {
-//		if(i % 300 == 0) {
-//			setup_childs_kernel<<<BLOCKS, setup_threads>>>(dev_inst, true);
-//			CUDA_CALL(cudaGetLastError());
-//			evo_calc_res<<<blocks, threads>>>(dev_inst);
-//			CUDA_CALL(cudaGetLastError());
-//			evo_kernel_part_two<<<BLOCKS, copy_threads>>>(dev_inst);
-//			CUDA_CALL(cudaGetLastError());
-//			setup_sparam<<<BLOCKS, evo_threads>>>(dev_inst,
-//					mopt.sparam, mopt.mut_rate, mopt.recomb_rate, true);
-//			CUDA_CALL(cudaGetLastError());
-//		}
-
 		cudaEventCreate(&start);
 		cudaEventCreate(&stop);
 		// Start record
 		cudaEventRecord(start, 0);
 
-//		evo_kernel_part_one<<<BLOCKS, evo_threads>>>(dev_inst);
-//		CUDA_CALL(cudaGetLastError());
-//		cudaThreadSynchronize();
-//		CUDA_CALL(cudaGetLastError());
-//
-//		evo_calc_res<<<blocks, threads>>>(dev_inst);
-//		CUDA_CALL(cudaGetLastError());
-//		cudaThreadSynchronize();
-//		CUDA_CALL(cudaGetLastError());
-//
-//		evo_kernel_part_two<<<BLOCKS, copy_threads>>>(dev_inst);
-//		CUDA_CALL(cudaGetLastError());
-//		cudaThreadSynchronize();
-//		CUDA_CALL(cudaGetLastError());
-//
-//		cudaEventRecord(stop, 0);
-//		cudaEventSynchronize(stop);
-//		cudaEventElapsedTime(&elapsedTime, start, stop); // that's our time!
-//		elapsedTimeTotal += elapsedTime;
-//		// Clean up:
-//		cudaEventDestroy(start);
-//		cudaEventDestroy(stop);
-//
-//		copy_parent_rating_dev_to_host(&inst, rating);
+		pso_swarm_step<<<blocks, threads>>>(dev_inst);
+		CUDA_CALL(cudaGetLastError());
+		cudaThreadSynchronize();
+		CUDA_CALL(cudaGetLastError());
+
+		pso_calc_res<<<blocks, threads>>>(dev_inst);
+		CUDA_CALL(cudaGetLastError());
+		cudaThreadSynchronize();
+		CUDA_CALL(cudaGetLastError());
+
+		pso_evaluation_lbest<<<blocks, threads>>>(dev_inst);
+		CUDA_CALL(cudaGetLastError());
+		cudaThreadSynchronize();
+		CUDA_CALL(cudaGetLastError());
+
+		pso_evaluation_gbest<<<BLOCKS, threads>>>(dev_inst);
+		CUDA_CALL(cudaGetLastError());
+		cudaThreadSynchronize();
+		CUDA_CALL(cudaGetLastError());
+
+		cudaEventRecord(stop, 0);
+		cudaEventSynchronize(stop);
+		cudaEventElapsedTime(&elapsedTime, start, stop); // that's our time!
+		elapsedTimeTotal += elapsedTime;
+
+		// Clean up:
+		cudaEventDestroy(start);
+		cudaEventDestroy(stop);
+
+		print_gbest_particle_ratings(&inst);
+		copy_gb_rating_dev_to_host(&inst, rating);
 //		plot_log(pl, i, rating);
 
-		for(int j = 0; j < width; j += PARTICLE_COUNT) {
+		for(int j = 0; j < BLOCKS; j++) {
 			if(rating[j] == 0.) {
-				block = j / PARTICLE_COUNT;
-				thread = j % PARAM_COUNT;
+				block = j;
 				rounds = i;
 				i = mopt.rounds;
 				break;
@@ -376,6 +372,8 @@ int main(int argc, char** argv)
 	printf("Result is block: %d, parent: %d\n", block, thread);
 	printf("Result was in block: %d, child: %d, selection: %d\n",
 		inst.res_child_block, inst.res_child_idx, inst.res_parent);
+
+	print_global_matrix_pretty(stdout, &inst, block);
 
 //	print_parents(&inst, &mopt, block, thread, rounds);
 

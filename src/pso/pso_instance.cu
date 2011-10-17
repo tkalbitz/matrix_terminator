@@ -48,6 +48,12 @@ void alloc_particle_matrix(struct pso_instance *inst)
 
 	cudaPitchedPtr pitched_ptr;
 
+	inst->dev_velocity_ext = make_cudaExtent(width,
+					         inst->dim.matrix_height,
+					         inst->dim.blocks);
+	CUDA_CALL(cudaMalloc3D(&pitched_ptr, inst->dev_velocity_ext));
+	inst->dev_velocity = pitched_ptr;
+
 	inst->dev_particle_ext = make_cudaExtent(width,
 					         inst->dim.matrix_height,
 					         inst->dim.blocks);
@@ -60,7 +66,7 @@ void alloc_particle_matrix(struct pso_instance *inst)
 	CUDA_CALL(cudaMalloc3D(&pitched_ptr, inst->dev_particle_lbest_ext));
 	inst->dev_particle_lbest = pitched_ptr;
 
-	inst->dev_particle_gbest_ext = make_cudaExtent(inst->width_per_inst,
+	inst->dev_particle_gbest_ext = make_cudaExtent(inst->width_per_inst * sizeof(double),
 					               inst->dim.matrix_height,
 					               inst->dim.blocks);
 	CUDA_CALL(cudaMalloc3D(&pitched_ptr, inst->dev_particle_gbest_ext));
@@ -116,6 +122,8 @@ void alloc_rating(struct pso_instance *inst)
 	CUDA_CALL(cudaMemset3D(pitched_ptr, 33, inst->dev_lbrat_ext));
 	inst->dev_lbrat = pitched_ptr;
 
+	cudaMalloc(&inst->gb_rat, BLOCKS * sizeof(double));
+
 }
 
 void pso_inst_init(struct pso_instance* const inst, int matrix_width)
@@ -150,11 +158,15 @@ void pso_inst_cleanup(struct pso_instance * const inst,
 
 	cudaFree(inst->rnd_states);
 	cudaFree(inst->dev_params.ptr);
+	cudaFree(inst->dev_velocity.ptr);
 	cudaFree(inst->dev_particle.ptr);
 	cudaFree(inst->dev_particle_gbest.ptr);
 	cudaFree(inst->dev_particle_lbest.ptr);
 	cudaFree(inst->dev_res.ptr);
 	cudaFree(inst->dev_prat.ptr);
+	cudaFree(inst->dev_lbrat.ptr);
+	cudaFree(inst->gb_rat);
+
 }
 
 struct pso_instance* pso_inst_create_dev_inst(struct pso_instance *inst,

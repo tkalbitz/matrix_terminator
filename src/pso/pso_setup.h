@@ -13,6 +13,8 @@
 
 #include "pso_instance.h"
 
+__global__ void setup_rating(struct pso_instance * const inst);
+
 __global__ void setup_rnd_kernel(curandState* const rnd_states, const int seed);
 __global__ void setup_particle_kernel(struct pso_instance *inst, bool half);
 __global__ void setup_param(struct pso_instance * const inst,

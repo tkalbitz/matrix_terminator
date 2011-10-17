@@ -44,6 +44,7 @@ struct pso_dimension
 struct pso_instance
 {
 	struct pso_dimension dim;     /* dimension of the matrix */
+	cudaPitchedPtr dev_velocity;  /* device memory for velocity */
 	cudaPitchedPtr dev_particle;  /* device memory for all particles */
 	cudaPitchedPtr dev_particle_lbest;  /* device memory for all particles */
 	cudaPitchedPtr dev_particle_gbest;  /* device memory for all particles */
@@ -57,9 +58,10 @@ struct pso_instance
 	int num_matrices;             /* number of matrices of the problem */
 	size_t width_per_inst;        /* how many elements are stored for each thread */
 
-	cudaExtent dev_particle_ext;       /* extent for parents */
-	cudaExtent dev_particle_lbest_ext; /* extent for parents */
-	cudaExtent dev_particle_gbest_ext; /* extent for parents */
+	cudaExtent dev_velocity_ext;       /* extent for velocity */
+	cudaExtent dev_particle_ext;       /* extent for particles */
+	cudaExtent dev_particle_lbest_ext; /* extent for best local particle */
+	cudaExtent dev_particle_gbest_ext; /* extent for best global particle */
 	cudaExtent dev_params_ext;          /* extent for parameter */
 	cudaExtent dev_res_ext;             /* extend for result */
 	cudaExtent dev_prat_ext;            /* extend for particle rating */
@@ -69,6 +71,7 @@ struct pso_instance
 	int*   rules;                 /* rules that must be matched */
 	size_t rules_len;             /* number of elements in rules */
 	size_t rules_count;           /* number of rules */
+	double* gb_rat;               /* rating of the global best particles */
 
 	unsigned int res_block;       /* in which block is the result */
 	unsigned int res_parent;      /* which parent is the result */
