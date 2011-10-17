@@ -22,8 +22,8 @@
 #include "pso_config.h"
 #include "pso_instance.h"
 
-//#include "evo.h"
-//#include "evo_rating.h"
+#include "pso.h"
+#include "pso_rating.h"
 #include "pso_setup.h"
 
 //#include "matrix_print.h"
@@ -269,15 +269,14 @@ int main(int argc, char** argv)
 //	int evo_threads = get_evo_threads(&inst);
 //
 	const dim3 blocks(BLOCKS, inst.dim.particles);
-//	const dim3 threads(inst.dim.matrix_width, inst.dim.matrix_height);
-//	const dim3 copy_threads(inst.dim.matrix_width, inst.dim.matrix_height);
+	const dim3 threads(inst.dim.matrix_width, inst.dim.matrix_height);
 	const dim3 setup_threads(inst.dim.matrix_width * inst.dim.matrix_height);
 //
 	setup_particle_kernel<<<BLOCKS, setup_threads>>>(dev_inst, false);
 	cudaThreadSynchronize();
 	CUDA_CALL(cudaGetLastError());
 
-	setup_param<<<BLOCKS, blocks>>>(dev_inst,
+	setup_param<<<BLOCKS, inst.dim.particles>>>(dev_inst,
 			mopt.w, mopt.c1, mopt.c2, false);
 	cudaThreadSynchronize();
 	CUDA_CALL(cudaGetLastError());
@@ -295,15 +294,20 @@ int main(int argc, char** argv)
 	int rounds = -1;
 	int block = 0; int thread = 0;
 
-//	evo_calc_res<<<blocks, threads>>>(dev_inst);
-//	CUDA_CALL(cudaGetLastError());
-//	cudaThreadSynchronize();
-//	CUDA_CALL(cudaGetLastError());
-//
-//	evo_kernel_part_two<<<BLOCKS, copy_threads>>>(dev_inst);
-//	CUDA_CALL(cudaGetLastError());
-//	cudaThreadSynchronize();
-//	CUDA_CALL(cudaGetLastError());
+	pso_calc_res<<<blocks, threads>>>(dev_inst);
+	CUDA_CALL(cudaGetLastError());
+	cudaThreadSynchronize();
+	CUDA_CALL(cudaGetLastError());
+
+	pso_evaluation_lbest<<<BLOCKS, threads>>>(dev_inst);
+	CUDA_CALL(cudaGetLastError());
+	cudaThreadSynchronize();
+	CUDA_CALL(cudaGetLastError());
+
+	pso_evaluation_gbest<<<BLOCKS, threads>>>(dev_inst);
+	CUDA_CALL(cudaGetLastError());
+	cudaThreadSynchronize();
+	CUDA_CALL(cudaGetLastError());
 
 	for(unsigned long i = 0; i < mopt.rounds; i++) {
 //		if(i % 300 == 0) {

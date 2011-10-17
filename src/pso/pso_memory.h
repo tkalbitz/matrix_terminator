@@ -8,8 +8,10 @@
 #ifndef PSO_MEMORY_H_
 #define PSO_MEMORY_H_
 
-#define P_ROW(y) ((double*) (mem->p_slice + (y) * mem->p_pitch))
-#define R_ROW(y) ((double*) (mem->r_slice + (y) * mem->r_pitch))
+#define P_ROW(y)  ((double*) (mem->p_slice  + (y) * mem->p_pitch))
+#define R_ROW(y)  ((double*) (mem->r_slice  + (y) * mem->r_pitch))
+#define LB_ROW(y) ((double*) (mem->lb_slice + (y) * mem->lb_pitch))
+#define GB_ROW(y) ((double*) (mem->gb_slice + (y) * mem->gb_pitch))
 
 #define W(x)  (mem->param[3*(x)])
 #define C1(x) (mem->param[3*(x)+1])
@@ -19,8 +21,17 @@ struct memory {
 	size_t p_pitch;
 	char  *p_slice;
 
+	size_t lb_pitch;
+	char  *lb_slice;
+
+	size_t gb_pitch;
+	char  *gb_slice;
+
 	size_t r_pitch;
 	char  *r_slice;
+
+	size_t lbr_pitch;
+	char  *lbr_slice;
 
 	int p_zero;
 	int p_end;
@@ -29,6 +40,7 @@ struct memory {
 	int r_end;
 
 	double* p_rat;
+	double* lb_rat;
 	double* param;
 };
 
@@ -41,6 +53,20 @@ __device__ static void pso_init_mem(const struct pso_instance* const inst,
 	char* const p_slice = p_dev_ptr + blockIdx.x /* z */ * p_slice_pitch;
 	mem->p_pitch = p_pitch;
 	mem->p_slice = p_slice;
+
+	char* const lbest_dev_ptr = (char*)inst->dev_particle_lbest.ptr;
+	const size_t lbest_pitch = inst->dev_particle_lbest.pitch;
+	const size_t lbest_slice_pitch = lbest_pitch * inst->dim.matrix_height;
+	char* const lbest_slice = lbest_dev_ptr + blockIdx.x /* z */ * lbest_slice_pitch;
+	mem->lb_pitch = lbest_pitch;
+	mem->lb_slice = lbest_slice;
+
+	char* const gbest_dev_ptr = (char*)inst->dev_particle_gbest.ptr;
+	const size_t gbest_pitch = inst->dev_particle_gbest.pitch;
+	const size_t gbest_slice_pitch = gbest_pitch * inst->dim.matrix_height;
+	char* const gbest_slice = gbest_dev_ptr + blockIdx.x /* z */ * gbest_slice_pitch;
+	mem->gb_pitch = gbest_pitch;
+	mem->gb_slice = gbest_slice;
 
 	/*
 	 * each thread represent one child which has a
@@ -61,6 +87,9 @@ __device__ static void pso_init_mem(const struct pso_instance* const inst,
 
 	const char* const t_dev_ptr2 = (char*)inst->dev_prat.ptr;
 	mem->p_rat = (double*) (t_dev_ptr2 + blockIdx.x * inst->dev_prat.pitch);
+
+	const char* const t_dev_ptr3 = (char*)inst->dev_lbrat.ptr;
+	mem->lb_rat = (double*) (t_dev_ptr3 + blockIdx.x * inst->dev_lbrat.pitch);
 
 	const char* const s_dev_ptr = (char*)inst->dev_params.ptr;
 	mem->param  = (double*)(s_dev_ptr + blockIdx.x * inst->dev_params.pitch);

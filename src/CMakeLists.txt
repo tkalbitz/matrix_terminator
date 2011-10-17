@@ -41,7 +41,7 @@ CUDA_ADD_EXECUTABLE( matrix_generator
   evo/evo_setup.cu
   evo/matrix_copy.cu
   evo/matrix_print.cu
-  OPTIONS -arch=sm_13 -use_fast_math --ptxas-options=-v 
+  OPTIONS -arch=sm_13 -use_fast_math --ptxas-options=-v -ccbin ${CMAKE_CURRENT_SOURCE_DIR}/../ccdir
   RELEASE -O2 --compiler-options -Wall
   DEBUG   -G3 -g -DDEBUG --maxrregcount=60
 ) 
@@ -50,7 +50,9 @@ CUDA_ADD_EXECUTABLE( pso_matrix_generator
   pso_matrix_generator.cu
   pso/pso_instance.cu
   pso/pso_setup.cu
-  OPTIONS -arch=sm_13 -use_fast_math --ptxas-options=-v 
+  pso/pso_rating.cu
+  pso/pso.cu
+  OPTIONS -arch=sm_13 -use_fast_math --ptxas-options=-v -ccbin ${CMAKE_CURRENT_SOURCE_DIR}/../ccdir
   RELEASE -O2 --compiler-options -Wall
   DEBUG   -G3 -g -DDEBUG --maxrregcount=60
 ) 

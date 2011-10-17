@@ -22,7 +22,7 @@ CUDA_ADD_LIBRARY( evo_matrix_generator
   ../ya_malloc.h
 
   SHARED
-  OPTIONS -arch=sm_13 -use_fast_math --ptxas-options=-v 
+  OPTIONS -arch=sm_13 -use_fast_math --ptxas-options=-v -ccbin ${CMAKE_CURRENT_SOURCE_DIR}/../../ccdir 
   RELEASE -O2 --compiler-options -Wall
   DEBUG -G3 -g -DDEBUG --maxrregcount=60
   )

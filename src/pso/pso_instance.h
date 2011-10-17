@@ -50,6 +50,7 @@ struct pso_instance
 	cudaPitchedPtr dev_params;    /* device memory for all childs */
 	cudaPitchedPtr dev_res;       /* result of the evaluation */
 	cudaPitchedPtr dev_prat;      /* rating of the particles */
+	cudaPitchedPtr dev_lbrat;     /* rating of the local best particles */
 
 	curandState *rnd_states;      /* random number generator states */
 
@@ -62,6 +63,7 @@ struct pso_instance
 	cudaExtent dev_params_ext;          /* extent for parameter */
 	cudaExtent dev_res_ext;             /* extend for result */
 	cudaExtent dev_prat_ext;            /* extend for particle rating */
+	cudaExtent dev_lbrat_ext;           /* extend for local best particle rating */
 
 	double delta;                 /* numbers in the matrices are multiple the amount */
 	int*   rules;                 /* rules that must be matched */
