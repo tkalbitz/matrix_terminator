@@ -97,18 +97,21 @@ __device__ static void pso_init_mem(const struct pso_instance* const inst,
 	mem->r_end  = mem->r_zero + inst->dim.matrix_width;
 
 	const char* const t_dev_ptr2 = (char*)inst->dev_prat.ptr;
-	mem->p_rat = (double*) (t_dev_ptr2 + blockIdx.x * inst->dev_prat.pitch);
+	mem->p_rat = (double*)(t_dev_ptr2 + blockIdx.x * inst->dev_prat.pitch);
 
 	const char* const t_dev_ptr3 = (char*)inst->dev_lbrat.ptr;
-	mem->lb_rat = (double*) (t_dev_ptr3 + blockIdx.x * inst->dev_lbrat.pitch);
+	mem->lb_rat = (double*)(t_dev_ptr3 + blockIdx.x * inst->dev_lbrat.pitch);
 
 	const char* const s_dev_ptr = (char*)inst->dev_params.ptr;
 	mem->param  = (double*)(s_dev_ptr + blockIdx.x * inst->dev_params.pitch);
 }
 
 /* calculate the thread id for the current block topology */
-__device__ inline static int get_thread_id() {
-	return threadIdx.x + blockIdx.x * blockDim.x;
+__device__ inline int get_thread_id() {
+	const int uniqueBlockIndex = blockIdx.y * gridDim.x + blockIdx.x;
+	const int uniqueThreadIndex = uniqueBlockIndex * blockDim.y * blockDim.x +
+			              threadIdx.y * blockDim.x + threadIdx.x;
+	return uniqueThreadIndex;
 }
 
 

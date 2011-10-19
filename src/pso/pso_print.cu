@@ -162,3 +162,31 @@ void print_gbest_particle_ratings(struct pso_instance *inst)
 	printf("\n");
 	free(rating);
 }
+
+void print_rules(FILE* f, struct pso_instance *inst)
+{
+	bool mul_sep_count = false;
+	bool old_mul_sep_count = true;
+
+	for(int i = 1; i < inst->rules_len; i++) {
+
+		if(old_mul_sep_count != mul_sep_count) {
+			if(mul_sep_count == false)
+				fprintf(f, "ratsimp(factor(");
+			old_mul_sep_count = mul_sep_count;
+		}
+
+		if(inst->rules[i] == MUL_SEP) {
+			if(mul_sep_count == false)
+				fprintf(f, "ident(%d)-", inst->dim.matrix_height);
+			else
+				fprintf(f, "ident(%d)));\n\n", inst->dim.matrix_height);
+
+			mul_sep_count = !mul_sep_count;
+		} else {
+				fprintf(f, "%c.", 'A' + inst->rules[i]);
+		}
+	}
+
+	fprintf(f, "\n");
+}

@@ -13,7 +13,8 @@
 
 int get_pso_threads(const struct pso_instance * const inst)
 {
-	return inst->dim.particles * inst->dim.matrix_width;
+	return inst->dim.matrix_width *
+	       inst->dim.matrix_height;
 }
 
 void init_rnd_generator(struct pso_instance *inst, int seed)
@@ -22,8 +23,11 @@ void init_rnd_generator(struct pso_instance *inst, int seed)
 	const int count = max(get_pso_threads(inst), inst->dim.matrix_height);
 
 	CUDA_CALL(cudaMalloc((void **)&rnd_states,
-			     count * BLOCKS * sizeof(curandState)));
-	setup_rnd_kernel<<<BLOCKS, count>>>(rnd_states, seed);
+			     count * BLOCKS * PARTICLE_COUNT * sizeof(curandState)));
+
+	const dim3 blocks(BLOCKS, inst->dim.particles);
+	const dim3 threads(inst->dim.matrix_height, inst->dim.matrix_width);
+	setup_rnd_kernel<<<blocks, threads>>>(rnd_states, seed);
 	CUDA_CALL(cudaGetLastError());
 	cudaThreadSynchronize();
 	inst->rnd_states = rnd_states;
@@ -83,7 +87,7 @@ void alloc_params(struct pso_instance *inst)
 	cudaPitchedPtr pitched_ptr;
 
 	inst->dev_params_ext = make_cudaExtent(width,
-					         inst->dim.matrix_height,
+					         1,
 					         inst->dim.blocks);
 	CUDA_CALL(cudaMalloc3D(&pitched_ptr, inst->dev_params_ext));
 	inst->dev_params = pitched_ptr;

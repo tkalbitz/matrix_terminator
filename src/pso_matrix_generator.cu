@@ -118,8 +118,8 @@ static void parse_configuration(struct pso_instance* const inst,
 	mopt->plot_log_enable = 0;
 	mopt->matrix_width    = 5;
 	mopt->w               = 0.7298;
-	mopt->c1              = 2.05;
-	mopt->c2              = 2.05;
+	mopt->c1              = 1.49618;
+	mopt->c2              = 1.49618;
 
 	struct option opt[] =
 	{
@@ -346,7 +346,8 @@ int main(int argc, char** argv)
 		cudaEventDestroy(start);
 		cudaEventDestroy(stop);
 
-		print_gbest_particle_ratings(&inst);
+		if(i % 1000 == 0)
+			print_gbest_particle_ratings(&inst);
 		copy_gb_rating_dev_to_host(&inst, rating);
 //		plot_log(pl, i, rating);
 
@@ -373,8 +374,9 @@ int main(int argc, char** argv)
 	printf("Result was in block: %d, child: %d, selection: %d\n",
 		inst.res_child_block, inst.res_child_idx, inst.res_parent);
 
+	print_gbest_particle_ratings(&inst);
 	print_global_matrix_pretty(stdout, &inst, block);
-
+	print_rules(stdout, &inst);
 //	print_parents(&inst, &mopt, block, thread, rounds);
 
 	printf("Clean up and exit.\n");

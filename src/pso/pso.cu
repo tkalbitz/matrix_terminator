@@ -93,15 +93,15 @@ __device__ void pso_ensure_constraints(struct pso_instance * const inst,
 		const int lidx = start + inst->dim.matrix_width - 1;
 
 		if(inst->cond_left == COND_UPPER_LEFT && row[start] < 1.0) {
-			row[start] = 1338; //pso_mut_new_value(inst, rnd_state);
+			row[start] = pso_mut_new_value(inst, rnd_state);
 		} else if(inst->cond_left == COND_UPPER_RIGHT && row[lidx] < 1.0) {
-			row[lidx] = 1338; //pso_mut_new_value(inst, rnd_state);
+			row[lidx] = pso_mut_new_value(inst, rnd_state);
 		} else if(inst->cond_left == COND_UPPER_LEFT_LOWER_RIGHT) {
 			if(row[start] < 1.0)
-				row[start] = 1338; //pso_mut_new_value(inst, rnd_state);
+				row[start] = pso_mut_new_value(inst, rnd_state);
 
 			if(lrow[lidx] < 1.0)
-				lrow[lidx] = 1338; //pso_mut_new_value(inst, rnd_state);
+				lrow[lidx] = pso_mut_new_value(inst, rnd_state);
 		} else {
 			/*
 			 * This should be recognized ;) It's only a 1.3 card
@@ -124,6 +124,9 @@ __global__ void pso_swarm_step(struct pso_instance* inst)
 
 	struct memory* mem = &m;
 
+	int id = get_thread_id();
+	curandState rnd_state = inst->rnd_states[id];
+
 	if(tx == 0 && ty == 0) {
 		pso_init_mem(inst, mem);
 		w = W(blockIdx.y);
@@ -135,28 +138,28 @@ __global__ void pso_swarm_step(struct pso_instance* inst)
 	const double delta = inst->delta;
 
 	for(int i = 0; i < inst->num_matrices; i++) {
-		const int idx = i * inst->dim.matrix_width + tx;
+		const int e_idx = i * inst->dim.matrix_width + tx;
+		const int p_idx = mem->p_zero + e_idx;
 
-		double xi = P_ROW(ty)[idx];
+		double xi = P_ROW(ty)[p_idx];
 
-		const double cog_part = c1 * (LB_ROW(ty)[idx] - xi);
-		const double soc_part = c2 * (GB_ROW(ty)[tx]  - xi);
+		const double cog_part = curand_normal(&rnd_state) * c1 * (LB_ROW(ty)[p_idx] - xi);
+		const double soc_part = curand_normal(&rnd_state) * c2 * (GB_ROW(ty)[e_idx] - xi);
 
-		V_ROW(ty)[idx] = w * V_ROW(ty)[idx] + cog_part + soc_part;
+		V_ROW(ty)[p_idx] = w * V_ROW(ty)[p_idx] + cog_part + soc_part;
 
-		xi = __dadd_rn(xi, V_ROW(ty)[idx]);
+		xi = __dadd_rn(xi, V_ROW(ty)[p_idx]);
 		/* we want x * delta, where x is an int */
 		xi = __dmul_rn(((unsigned long)(xi / delta)), delta);
 		xi = min(inst->parent_max, max(0., xi));
-		P_ROW(ty)[idx] = xi;
+		P_ROW(ty)[p_idx] = xi;
 	}
 
 	__syncthreads();
 
 	if(tx == 0 && ty == 0) {
-//		int id = get_thread_id();
-//		curandState rnd_state = inst->rnd_states[id];
-		pso_ensure_constraints(inst, mem, NULL /*&rnd_state*/);
-//		inst->rnd_states[id] = rnd_state;
+		pso_ensure_constraints(inst, mem, &rnd_state);
 	}
+
+	inst->rnd_states[id] = rnd_state;
 }
