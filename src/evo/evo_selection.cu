@@ -48,29 +48,30 @@ __device__ void evo_parent_selection_turnier(struct instance * const inst,
 					     curandState* rnd_state,
 					     const uint8_t q)
 {
-	if(threadIdx.y != 0 || threadIdx.x >= PARENTS)
-		return;
-
 	__shared__ struct double2 src[PARENTS * CHILDS];
 	__shared__ struct double2 dest[PARENTS];
 	double2* const arr = (double2*)mem->c_rat;
 
-	for(int i = tx; i < PARENTS * CHILDS; i += inst->dim.matrix_width) {
-		src[i]   = arr[i];
+	if(threadIdx.y == 0 && threadIdx.x < PARENTS) {
+		for(int i = tx; i < PARENTS * CHILDS; i += inst->dim.matrix_width) {
+			src[i]   = arr[i];
+		}
 	}
 
 	__syncthreads();
 
-	for(int pos = tx; pos < PARENTS; pos += inst->dim.matrix_width) {
-		uint32_t idx = curand(rnd_state) % (PARENTS * CHILDS);
-		for(uint8_t t = 0; t < q; t++) {
-			uint32_t opponent = curand(rnd_state) % (PARENTS * CHILDS);
+	if(threadIdx.y == 0 && threadIdx.x < PARENTS) {
+		for(int pos = tx; pos < PARENTS; pos += inst->dim.matrix_width) {
+			uint32_t idx = curand(rnd_state) % (PARENTS * CHILDS);
+			for(uint8_t t = 0; t < q; t++) {
+				uint32_t opponent = curand(rnd_state) % (PARENTS * CHILDS);
 
-			if(src[opponent].x < src[idx].x)
-				idx = opponent;
+				if(src[opponent].x < src[idx].x)
+					idx = opponent;
+			}
+
+			dest[pos] = src[idx];
 		}
-
-		dest[pos] = src[idx];
 	}
 
 	__syncthreads();
@@ -91,10 +92,13 @@ __device__ void evo_parent_selection_turnier(struct instance * const inst,
 		}
 
 	}
+
 	__syncthreads();
 
-	for(int i = tx; i < PARENTS; i += inst->dim.matrix_width) {
-		arr[i] = dest[i];
+	if(threadIdx.y == 0 && threadIdx.x < PARENTS) {
+		for(int i = tx; i < PARENTS; i += inst->dim.matrix_width) {
+			arr[i] = dest[i];
+		}
 	}
 }
 

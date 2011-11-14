@@ -6,6 +6,17 @@
 #define R_ROW(y) ((double*) (mem->r_slice + (y) * mem->r_pitch))
 #define CR_ROW(y) ((double*) (res_mem.r_slice + (y) * res_mem.r_pitch))
 
+#ifdef  DEBUG
+#define MDEBUG(inst, rule, part, value) { \
+	int d_tmp = (inst)->rules_count * 2 * (inst)->dim.matrix_width * blockIdx.y + \
+                    rule * 2 * (inst)->dim.matrix_width + \
+                    part * (inst)->dim.matrix_width; \
+        ((double*) (mem->debug_slice + (ty) * mem->debug_pitch))[d_tmp + tx] = value; \
+}
+#else
+#define MDEBUG(inst, rule, part, value)
+#endif
+
 #define SP(x) (mem->sparam[3*(x)])
 #define MR(x) (mem->sparam[3*(x)+1])
 #define RR(x) (mem->sparam[3*(x)+2])
@@ -29,6 +40,11 @@ struct memory {
 
 	int r_zero;
 	int r_end;
+
+#ifdef DEBUG
+	size_t debug_pitch;
+	char  *debug_slice;
+#endif
 
 	double* c_rat;
 	double* p_rat;
@@ -80,6 +96,15 @@ __device__ static void evo_init_mem(const struct instance* const inst,
 	mem->sparam  = (double*)(s_dev_ptr + blockIdx.x * inst->dev_sparam.pitch);
 	const char* const ps_dev_ptr = (char*)inst->dev_psparam.ptr;
 	mem->psparam = (double*)(ps_dev_ptr + blockIdx.x * inst->dev_psparam.pitch);
+
+#ifdef DEBUG
+	char* const debug_dev_ptr = (char*)inst->dev_debug.ptr;
+	const size_t debug_pitch = inst->dev_debug.pitch;
+	const size_t debug_slice_pitch = debug_pitch * inst->dim.matrix_height;
+	char* const debug_slice = debug_dev_ptr + blockIdx.x /* z */ * debug_slice_pitch;
+	mem->debug_pitch = debug_pitch;
+	mem->debug_slice = debug_slice;
+#endif
 }
 
 /* calculate the thread id for the current block topology */

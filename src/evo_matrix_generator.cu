@@ -334,7 +334,6 @@ int main(int argc, char** argv)
 
 	const dim3 blocks(BLOCKS, PARENTS*CHILDS);
 	const dim3 threads(inst.dim.matrix_width, inst.dim.matrix_height);
-	const dim3 copy_threads(inst.dim.matrix_width, inst.dim.matrix_height);
 	const dim3 setup_threads(inst.dim.matrix_width * inst.dim.matrix_height);
 
 	setup_childs_kernel<<<BLOCKS, setup_threads>>>(dev_inst, false);
@@ -364,7 +363,7 @@ int main(int argc, char** argv)
 	cudaThreadSynchronize();
 	CUDA_CALL(cudaGetLastError());
 
-	evo_kernel_part_two<<<BLOCKS, copy_threads>>>(dev_inst);
+	evo_kernel_part_two<<<BLOCKS, threads>>>(dev_inst);
 	CUDA_CALL(cudaGetLastError());
 	cudaThreadSynchronize();
 	CUDA_CALL(cudaGetLastError());
@@ -375,7 +374,7 @@ int main(int argc, char** argv)
 			CUDA_CALL(cudaGetLastError());
 			evo_calc_res<<<blocks, threads>>>(dev_inst);
 			CUDA_CALL(cudaGetLastError());
-			evo_kernel_part_two<<<BLOCKS, copy_threads>>>(dev_inst);
+			evo_kernel_part_two<<<BLOCKS, threads>>>(dev_inst);
 			CUDA_CALL(cudaGetLastError());
 			setup_sparam<<<BLOCKS, evo_threads>>>(dev_inst,
 					mopt.sparam, mopt.mut_rate, mopt.recomb_rate, true);
@@ -397,7 +396,7 @@ int main(int argc, char** argv)
 		cudaThreadSynchronize();
 		CUDA_CALL(cudaGetLastError());
 
-		evo_kernel_part_two<<<BLOCKS, copy_threads>>>(dev_inst);
+		evo_kernel_part_two<<<BLOCKS, threads>>>(dev_inst);
 		CUDA_CALL(cudaGetLastError());
 		cudaThreadSynchronize();
 		CUDA_CALL(cudaGetLastError());
@@ -428,26 +427,26 @@ int main(int argc, char** argv)
 	clean_plot_log(pl);
 	inst_copy_dev_to_host(dev_inst, &inst);
 
-//	print_sparam(&inst);
 	print_parent_ratings(&inst);
+
+#ifdef DEBUG
+	double *crat = (double*)malloc(2 * get_evo_threads(&inst) *
+			               inst.dim.blocks * sizeof(double));
+	int child = block * inst.dim.parents * inst.dim.childs * 2;
+	copy_child_rating_dev_to_host(&inst, crat);
+	printf("Output block: %d child: %d\n", block, (int)crat[child + 1]);
+	print_debug_pretty(stdout, &inst, block, (int)crat[child + 1]);
+	print_child_matrix_pretty(stdout, &inst, block, (int)crat[child + 1]);
+	free(crat);
+#endif
+
+	print_parents(&inst, &mopt, block, thread, rounds);
 
 	printf("Time needed: %f\n", elapsedTimeTotal);
 	printf("Needed rounds: %d\n", rounds);
 	printf("Result is block: %d, parent: %d\n", block, thread);
 	printf("Result was in block: %d, child: %d, selection: %d\n",
 		inst.res_child_block, inst.res_child_idx, inst.res_parent);
-
-	print_parents(&inst, &mopt, block, thread, rounds);
-
-	#ifdef DEBUG
-	if(rounds != -1) {
-		printf("Result Matrix:\n");
-		print_result_matrix_pretty(&inst, block, 0);
-		print_rules(stdout, &inst);
-		print_result_matrix_pretty(&inst, block, 1);
-		print_rules(stdout, &inst);
-	}
-	#endif
 
 	printf("Clean up and exit.\n");
 	inst_cleanup(&inst, dev_inst);

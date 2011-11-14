@@ -42,6 +42,7 @@ struct instance {
 	cudaPitchedPtr dev_res;    /* result of the evaluation */
 	cudaPitchedPtr dev_crat;   /* rating of the childs */
 	cudaPitchedPtr dev_prat;   /* rating of the parents */
+	cudaPitchedPtr dev_debug;  /* debug infos */
 
 	curandState *rnd_states;   /* random number generator states */
 
@@ -60,6 +61,7 @@ struct instance {
 	cudaExtent dev_res_ext;    /* extend for result */
 	cudaExtent dev_crat_ext;   /* extend for child rating */
 	cudaExtent dev_prat_ext;   /* extend for parent rating */
+	cudaExtent dev_debug_ext;  /* extend for debug infos */
 
 	double delta;		/* numbers in the matrices are multiple the amount */
 	int*   rules;		/* rules that must be matched */

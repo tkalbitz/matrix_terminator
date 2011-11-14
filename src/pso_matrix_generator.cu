@@ -118,8 +118,10 @@ static void parse_configuration(struct pso_instance* const inst,
 	mopt->plot_log_enable = 0;
 	mopt->matrix_width    = 5;
 	mopt->w               = 0.7298;
-	mopt->c1              = 1.49618;
-	mopt->c2              = 1.49618;
+//	mopt->c1              = 0.2;
+//	mopt->c2              = 0.2;
+	mopt->c1              = 2.05;
+	mopt->c2              = 2.05;
 
 	struct option opt[] =
 	{

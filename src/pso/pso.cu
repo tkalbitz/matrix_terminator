@@ -146,7 +146,7 @@ __global__ void pso_swarm_step(struct pso_instance* inst)
 		const double cog_part = curand_normal(&rnd_state) * c1 * (LB_ROW(ty)[p_idx] - xi);
 		const double soc_part = curand_normal(&rnd_state) * c2 * (GB_ROW(ty)[e_idx] - xi);
 
-		V_ROW(ty)[p_idx] = w * V_ROW(ty)[p_idx] + cog_part + soc_part;
+		V_ROW(ty)[p_idx] = w * (V_ROW(ty)[p_idx] + cog_part + soc_part);
 
 		xi = __dadd_rn(xi, V_ROW(ty)[p_idx]);
 		/* we want x * delta, where x is an int */

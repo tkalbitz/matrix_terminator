@@ -108,5 +108,6 @@ __device__ void evo_mutation(struct instance * const inst,
 		}
 	}
 
+	__syncthreads();
 	evo_ensure_constraints(inst, mem, rnd_s);
 }

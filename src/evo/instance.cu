@@ -118,6 +118,27 @@ void alloc_rating(struct instance *inst)
 	inst->dev_prat = pitched_ptr;
 }
 
+void alloc_debug_matrix(struct instance *inst)
+{
+#ifdef DEBUG
+	/* memory for every rule side of every rule */
+	const int width = inst->dim.childs * inst->dim.parents *
+			    inst->dim.matrix_width * inst->rules_count *
+			    2 * sizeof(double);
+#else
+	const int width = 1;
+#endif
+
+	inst->dev_debug_ext = make_cudaExtent(width,
+					    inst->dim.matrix_height,
+					    inst->dim.blocks);
+
+	cudaPitchedPtr pitched_ptr;
+	CUDA_CALL(cudaMalloc3D(&pitched_ptr, inst->dev_debug_ext));
+	CUDA_CALL(cudaMemset3D(pitched_ptr, 1, inst->dev_debug_ext));
+	inst->dev_debug = pitched_ptr;
+}
+
 void init_rnd_generator(struct instance *inst, int seed)
 {
 	curandState *rnd_states;
@@ -164,6 +185,7 @@ void inst_init(struct instance* const inst, int matrix_width)
 	alloc_result_matrix(inst);
 	alloc_rating(inst);
 	alloc_sparam(inst);
+	alloc_debug_matrix(inst);
 	init_rnd_generator(inst, time(0));
 }
 
@@ -180,6 +202,7 @@ void inst_cleanup(struct instance * const inst,
 	cudaFree(inst->dev_crat.ptr);
 	cudaFree(inst->dev_prat.ptr);
 	cudaFree(inst->dev_sparam.ptr);
+	cudaFree(inst->dev_debug.ptr);
 }
 
 struct instance* inst_create_dev_inst(struct instance *inst, int** dev_rules)
@@ -209,3 +232,4 @@ void inst_copy_dev_to_host(struct instance * const dev,
 	CUDA_CALL(cudaMemcpy(host, dev, sizeof(*dev), cudaMemcpyDeviceToHost));
 	host->rules = rules;
 }
+

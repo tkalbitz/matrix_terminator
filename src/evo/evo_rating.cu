@@ -130,35 +130,36 @@ __device__ void evo_result_rating(const struct instance * const inst,
 	res[ty][tx] = __dmul_rn(res[ty][tx], res[ty][tx]);
 	__syncthreads();
 
-	//only lines are processed
-	if(tx != 0)
-		return;
-
 	double c = 0.0;
 	double y, t;
-	double sum = res[ty][0];
+	double sum;
 
-	for(int i = 1; i < MWIDTH; i++) {
-		y = res[ty][i] - c;
-		t = sum + y;
-		c = (t - sum) - y;
-		sum = t;
+	//only lines are processed
+	if(tx == 0) {
+		sum = res[ty][0];
+
+		for(int i = 1; i < MWIDTH; i++) {
+			y = res[ty][i] - c;
+			t = sum + y;
+			c = (t - sum) - y;
+			sum = t;
+		}
+
+		res[ty][0] = sum;
 	}
-
-	res[ty][0] = sum;
 	__syncthreads();
 
-	if(ty != 0)
-		return;
+	if(tx == 0 && ty == 0) {
+		for(int i = 0; i < MHEIGHT; i++) {
+			y = res[i][0] - c;
+			t = rating + y;
+			c = (t - rating) - y;
+			rating = t;
+		}
 
-	for(int i = 0; i < MHEIGHT; i++) {
-		y = res[i][0] - c;
-		t = rating + y;
-		c = (t - rating) - y;
-		rating = t;
+		shrd_rating += sqrtf(rating);
 	}
-
-	shrd_rating += sqrtf(rating);
+	__syncthreads();
 }
 
 __device__ void evo_init_mem2(const struct instance* const inst,
@@ -192,32 +193,30 @@ __global__ void evo_calc_res(struct instance * const inst)
 		evo_init_mem2(inst, &res_mem);
 	}
 
-
 	__syncthreads();
 	uint8_t cur_rule = 0;
 
 	do {
 		eval_set_res_matrix_to_identity();
+                __syncthreads();
 
 		rules++;
 		rules = eval_interpret_rule(inst , mem, rules);
 
                 __syncthreads();
                 CR_ROW(ty)[mem->r_zero + tx] = res[ty][tx];
-                __syncthreads();
+                MDEBUG(inst, cur_rule, 0, res[ty][tx]);
 		eval_set_res_matrix_to_identity();
+                __syncthreads();
 
 		rules++;
 		rules = eval_interpret_rule(inst , mem, rules);
-
-		evo_result_rating(inst, mem);
+                MDEBUG(inst, cur_rule, 1, res[ty][tx]);
 		__syncthreads();
-
+		evo_result_rating(inst, mem);
 		cur_rule++;
 		__syncthreads();
 	} while(rules != end);
-
-	__syncthreads();
 
 	if(tx == 0 && ty == 0) {
 		if(inst->match == MATCH_ANY)
@@ -226,4 +225,5 @@ __global__ void evo_calc_res(struct instance * const inst)
 		res_mem.c_rat[2 * blockIdx.y]     = shrd_rating;
 		res_mem.c_rat[2 * blockIdx.y + 1] = blockIdx.y;
 	}
+	__syncthreads();
 }
