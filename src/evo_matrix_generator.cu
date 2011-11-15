@@ -60,12 +60,16 @@ static void print_usage()
 	printf("	   all          -- log all ratings 1\n");
 	printf("  -x|--enable-maxima\n\n");
 	printf("Rules should be supplied in the form:\n");
-	printf("  X10X01X110X0011X or XbaXabXbbaXaabbX\n");
+	printf("  X10X01X110X0011X or XbaXabYbbaXaabbX\n");
 	printf("  |<--->|<------>|    |<--->|<------>|\n");
 	printf("   first  second  rule  first  second\n\n");
 	printf("  Meaning: BA < AB and BBA < AABB in this case A and B\n");
 	printf("           are matrices of dimension (n,n). Parameter n is\n");
 	printf("           supplied at compile time and is %d\n\n", MATRIX_WIDTH);
+	printf("           If Y is supplied instead of X at the beginning of a\n");
+	printf("           rule right-cond can but must not apply. Between to\n");
+	printf("           rule sides X and Y are interchangeable.\n\n");
+
 	printf("If the option --plot-log is given all ratings will be written in"
 		" a '.dat' file plus a '.plot' file for gnuplot.\n\n");
 	printf("If the option --enable-maxima is given the result will be written"
@@ -134,12 +138,24 @@ static void parse_rules(struct instance * const inst, const char *rules)
 
 	uint8_t tmp = 0;
 	for(int i = 0; i < inst->rules_len; i++) {
-		if(rules[i] >= 'a')
-			inst->rules[i] = (rules[i] == 'X') ? MUL_SEP : rules[i] - 'a';
-		else
-			inst->rules[i] = (rules[i] == 'X') ? MUL_SEP : rules[i] - '0';
+		switch(rules[i]) {
+		case 'X': {
+			inst->rules[i] = MUL_SEP;
+			break;
+		}
+		case 'Y': {
+			inst->rules[i] = MUL_MARK;
+			break;
+		}
+		default:
+			if(rules[i] >= 'a')
+				inst->rules[i] = rules[i] - 'a';
+			else
+				inst->rules[i] = rules[i] - '0';
+			break;
+		}
 
-		if(rules[i] == 'X') {
+		if(rules[i] == 'X' || rules[i] == 'Y') {
 			tmp = (tmp + 1) % 2;
 			if(!tmp) {
 				inst->rules_count++;

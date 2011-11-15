@@ -15,7 +15,9 @@
 
 #include "evo_error.h"
 
-#define MUL_SEP -1
+#define MUL_SEP  -1
+#define MUL_MARK -2
+
 
 /**
  * Create all maintenance structures for the library and must be called before

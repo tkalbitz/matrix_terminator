@@ -67,7 +67,7 @@ __device__ const int* eval_interpret_rule(const struct instance * const inst,
 				    	  struct memory		* const mem,
 				    	  const int             * rule)
 {
-	if(*rule == MUL_SEP)
+	if(*rule == MUL_SEP || *rule == MUL_MARK)
 		return rule;
 
 	/*
@@ -79,7 +79,7 @@ __device__ const int* eval_interpret_rule(const struct instance * const inst,
 
 	__syncthreads();
 
-	for(; *rule != MUL_SEP; rule++) {
+	for(; *rule != MUL_SEP && *rule != MUL_MARK; rule++) {
 		eval_mul_inplace(inst, mem, *rule);
 	}
 
@@ -87,7 +87,8 @@ __device__ const int* eval_interpret_rule(const struct instance * const inst,
 }
 
 __device__ void evo_result_rating(const struct instance * const inst,
-				  struct memory         * const mem)
+				  struct memory         * const mem,
+				  const int		        rule_type)
 {
 	const int rows = MHEIGHT - 1;
 	const int cols = MWIDTH  - 1;
@@ -95,7 +96,7 @@ __device__ void evo_result_rating(const struct instance * const inst,
 
 	const double penalty = 1e9;
 
-        if(ty == 0 && tx == 0) {
+        if(rule_type != MUL_MARK && ty == 0 && tx == 0) {
                 switch(inst->cond_right) {
                 case COND_UPPER_LEFT:
                         if((R_ROW(0)[mem->r_zero] - res[0][0]) < 1.f)
@@ -117,7 +118,7 @@ __device__ void evo_result_rating(const struct instance * const inst,
                         break;
                 }
 
-                if(inst->match == MATCH_ANY) {
+                if(rule_type == MUL_SEP && inst->match == MATCH_ANY) {
                         if(rating == 0.)
                                 matrix_form = 0.;
 
@@ -200,6 +201,7 @@ __global__ void evo_calc_res(struct instance * const inst)
 		eval_set_res_matrix_to_identity();
                 __syncthreads();
 
+                const int rule_type = *rules;
 		rules++;
 		rules = eval_interpret_rule(inst , mem, rules);
 
@@ -213,7 +215,7 @@ __global__ void evo_calc_res(struct instance * const inst)
 		rules = eval_interpret_rule(inst , mem, rules);
                 MDEBUG(inst, cur_rule, 1, res[ty][tx]);
 		__syncthreads();
-		evo_result_rating(inst, mem);
+		evo_result_rating(inst, mem, rule_type);
 		cur_rule++;
 		__syncthreads();
 	} while(rules != end);

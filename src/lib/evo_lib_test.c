@@ -19,7 +19,7 @@ static void print_solution(const double* const result);
 int main(int argc, char **argv)
 {
 	/* rule where a solution should be found */
-	char* crules = "XaaaXbXbbXbabXbbbXabbX";
+	char* crules = "YaaaYbXbbXbabXbbbXabbX";
 	int*  rules  = parse_rules(crules);
 
 	/* the solution will be stored here */
@@ -80,10 +80,22 @@ static int* parse_rules(const char *crules)
 	int* rules = (int*)ya_malloc(sizeof(int) * rules_len);
 
 	for(int i = 0; i < rules_len; i++) {
-		if(crules[i] >= 'a')
-			rules[i] = (crules[i] == 'X') ? MUL_SEP : crules[i] - 'a';
-		else
-			rules[i] = (crules[i] == 'X') ? MUL_SEP : crules[i] - '0';
+		switch(crules[i]) {
+		case 'X': {
+			rules[i] = MUL_SEP;
+			break;
+		}
+		case 'Y': {
+			rules[i] = MUL_MARK;
+			break;
+		}
+		default:
+			if(crules[i] >= 'a')
+				rules[i] = crules[i] - 'a';
+			else
+				rules[i] = crules[i] - '0';
+			break;
+		}
 	}
 
 	return rules;

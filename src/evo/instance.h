@@ -34,6 +34,7 @@ struct dimension
 };
 
 #define MUL_SEP       -1
+#define MUL_MARK      -2
 
 struct instance {
 	struct dimension dim;	   /* dimension of the matrix */
