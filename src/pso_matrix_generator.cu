@@ -376,6 +376,7 @@ int main(int argc, char** argv)
 	printf("Result was in block: %d, child: %d, selection: %d\n",
 		inst.res_child_block, inst.res_child_idx, inst.res_parent);
 
+	print_particle_ratings(&inst);
 	print_gbest_particle_ratings(&inst);
 	print_global_matrix_pretty(stdout, &inst, block);
 	print_rules(stdout, &inst);

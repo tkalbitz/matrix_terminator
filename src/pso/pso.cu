@@ -12,19 +12,15 @@ __global__ void pso_evaluation_lbest(struct pso_instance* inst)
 	struct memory* mem = &m;
 	pso_init_mem(inst, mem);
 
-	if(mem->lb_rat[blockIdx.y] < mem->p_rat[blockIdx.y]) {
-		return;
+	if(mem->lb_rat[blockIdx.y] > mem->p_rat[blockIdx.y]) {
+		for(int i = 0; i < inst->num_matrices; i++) {
+			int delta = mem->p_zero + i * inst->dim.matrix_width;
+			LB_ROW(ty)[delta + tx] = P_ROW(ty)[delta + tx];
+		}
+
+		if(tx == 0 && ty == 0)
+			mem->lb_rat[blockIdx.y] = mem->p_rat[blockIdx.y];
 	}
-
-	for(int i = 0; i < inst->num_matrices; i++) {
-		int delta = mem->p_zero + i * inst->dim.matrix_width;
-		LB_ROW(ty)[delta + tx] = P_ROW(ty)[delta + tx];
-	}
-
-	__syncthreads();
-
-	if(tx == 0 && ty == 0)
-		mem->lb_rat[blockIdx.y] = mem->p_rat[blockIdx.y];
 }
 
 __global__ void pso_evaluation_gbest(struct pso_instance* inst)
@@ -115,6 +111,61 @@ __device__ void pso_ensure_constraints(struct pso_instance * const inst,
 	}
 }
 
+
+__device__ void pso_neighbor_best(struct pso_instance* const inst,
+		                  struct memory*       const mem)
+{
+	int n_block    = blockIdx.x;
+	int n_particle = blockIdx.y + 1;
+	int p_block    = blockIdx.x;
+	int p_particle = blockIdx.y - 1;
+
+	if(n_particle == PARTICLE_COUNT) {
+		n_particle = 0;
+		n_block++;
+
+		if(n_block == BLOCKS)
+			n_block = 0;
+	}
+
+	if(p_particle == -1) {
+		p_particle = PARTICLE_COUNT - 1;
+		p_block--;
+
+		if(p_block == -1)
+			p_block = BLOCKS - 1;
+	}
+
+	const char* const lbrat_ptr = (char*)inst->dev_lbrat.ptr;
+	double lb_rat_p = ((double*)(lbrat_ptr + p_block    * inst->dev_lbrat.pitch))[p_particle];
+	double lb_rat_c = ((double*)(lbrat_ptr + blockIdx.x * inst->dev_lbrat.pitch))[blockIdx.y];
+	double lb_rat_n = ((double*)(lbrat_ptr + n_block    * inst->dev_lbrat.pitch))[n_particle];
+
+	double res = min(min(lb_rat_p, lb_rat_c), lb_rat_n);
+
+	int block;
+	int particle;
+
+	if(res == lb_rat_p) {
+		block = p_block;
+		particle = p_particle;
+	} else if(res == lb_rat_c) {
+		block = blockIdx.x;
+		particle = blockIdx.y;
+	} else if(res == lb_rat_n) {
+		block = n_block;
+		particle = n_particle;
+	}
+
+	char* const  lbest_dev_ptr = (char*)inst->dev_particle_lbest.ptr;
+	const size_t lbest_pitch = inst->dev_particle_lbest.pitch;
+	const size_t lbest_slice_pitch = lbest_pitch * inst->dim.matrix_height;
+	char* const  lbest_slice = lbest_dev_ptr + block /* z */ * lbest_slice_pitch;
+	mem->lbn_pitch = lbest_pitch;
+	mem->lbn_slice = lbest_slice;
+	mem->lbn_zero = inst->width_per_inst * particle;
+}
+
 __global__ void pso_swarm_step(struct pso_instance* inst)
 {
 	__shared__ struct memory m;
@@ -129,6 +180,7 @@ __global__ void pso_swarm_step(struct pso_instance* inst)
 
 	if(tx == 0 && ty == 0) {
 		pso_init_mem(inst, mem);
+		pso_neighbor_best(inst, mem);
 		w = W(blockIdx.y);
 		c1 = C1(blockIdx.y);
 		c2 = C2(blockIdx.y);
@@ -140,14 +192,18 @@ __global__ void pso_swarm_step(struct pso_instance* inst)
 	for(int i = 0; i < inst->num_matrices; i++) {
 		const int e_idx = i * inst->dim.matrix_width + tx;
 		const int p_idx = mem->p_zero + e_idx;
+		const int n_idx = mem->lbn_zero + e_idx;
 
 		double xi = P_ROW(ty)[p_idx];
 
-		const double cog_part = curand_normal(&rnd_state) * c1 * (LB_ROW(ty)[p_idx] - xi);
-		const double soc_part = curand_normal(&rnd_state) * c2 * (GB_ROW(ty)[e_idx] - xi);
+		const double cog_part = curand_normal(&rnd_state) * c1 * (LB_ROW(ty) [p_idx] - xi);
+		const double soc_part = curand_normal(&rnd_state) * c2 * (LBN_ROW(ty)[n_idx] - xi);
+
+//		if(blockIdx.x < (BLOCKS / 2))
+//			soc_part = curand_normal(&rnd_state) * c2 * (GB_ROW(ty)[e_idx] - xi);
 
 		V_ROW(ty)[p_idx] = w * (V_ROW(ty)[p_idx] + cog_part + soc_part);
-
+		xi = min(inst->parent_max, max(0., xi));
 		xi = __dadd_rn(xi, V_ROW(ty)[p_idx]);
 		/* we want x * delta, where x is an int */
 		xi = __dmul_rn(((unsigned long)(xi / delta)), delta);

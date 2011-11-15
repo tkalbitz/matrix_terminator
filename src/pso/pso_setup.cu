@@ -74,18 +74,20 @@ setup_particle_kernel(struct pso_instance * const inst, bool half)
 	for(uint32_t x = tp; x < end; x += inst->dim.matrix_width) {
 
 		//init velocity of particle
-		v_row[x] = curand_uniform(&rnd) * 2;
+		v_row[x] = curand_uniform(&rnd) * inst->parent_max;
+		if(curand_normal(&rnd) < 0)
+			v_row[x] = -v_row[x];
 
 		if(x % width == 0) {
 			flag = (flag + 1) & 1;
 		}
 
 		if(curand_uniform(&rnd) < MATRIX_TAKEN_POS) {
-//	                if(flag) {
+	                if(flag) {
 	                	p_row[x] = curand(&rnd) % max1 ;
-//	                } else {
-//	                        p_row[x] = min(max(0., curand_normal(&rnd)*(curand(&rnd) % max2) + max2), inst->parent_max);
-//	                }
+	                } else {
+	                        p_row[x] = min(max(0., curand_normal(&rnd)*(curand(&rnd) % max2) + max2), inst->parent_max);
+	                }
 		} else {
 			p_row[x] = 0;
 		}
@@ -93,43 +95,41 @@ setup_particle_kernel(struct pso_instance * const inst, bool half)
 
 	inst->rnd_states[id] = rnd;
 
-	if(threadIdx.x != 0)
-		return;
+	if(threadIdx.x == 0) {
+		const int matrices = inst->num_matrices * inst->dim.particles;
+		int y;
+		int i;
 
-	const int matrices = inst->num_matrices * inst->dim.particles;
-	int y;
-	int i;
+		if(inst->cond_left == COND_UPPER_LEFT) {
+			y = 0;
+			p_row = (double*) (p_slice + y * p_pitch);
 
-	if(inst->cond_left == COND_UPPER_LEFT) {
-		y = 0;
-		p_row = (double*) (p_slice + y * p_pitch);
+			for(i = 0; i < matrices; i++) {
+				p_row[i * inst->dim.matrix_width] = evo_mut_new_value(inst, &rnd);
+			}
+		} else if(inst->cond_left == COND_UPPER_RIGHT) {
+			y = 0;
+			p_row = (double*) (p_slice + y * p_pitch);
 
-		for(i = 0; i < matrices; i++) {
-			p_row[i * inst->dim.matrix_width] = evo_mut_new_value(inst, &rnd);
-		}
-	} else if(inst->cond_left == COND_UPPER_RIGHT) {
-		y = 0;
-		p_row = (double*) (p_slice + y * p_pitch);
+			for(i = 0; i < matrices; i++) {
+				int idx = i * inst->dim.matrix_width + (inst->dim.matrix_width - 1);
+				p_row[idx] = evo_mut_new_value(inst, &rnd);
+			}
+		} else if(inst->cond_left == COND_UPPER_LEFT_LOWER_RIGHT) {
+			y = 0;
+			p_row = (double*) (p_slice + y * p_pitch);
+			for(i = 0; i < matrices; i++) {
+				p_row[i * inst->dim.matrix_width] = evo_mut_new_value(inst, &rnd);
+			}
 
-		for(i = 0; i < matrices; i++) {
-			int idx = i * inst->dim.matrix_width + (inst->dim.matrix_width - 1);
-			p_row[idx] = evo_mut_new_value(inst, &rnd);
-		}
-	} else if(inst->cond_left == COND_UPPER_LEFT_LOWER_RIGHT) {
-		y = 0;
-		p_row = (double*) (p_slice + y * p_pitch);
-		for(i = 0; i < matrices; i++) {
-			p_row[i * inst->dim.matrix_width] = evo_mut_new_value(inst, &rnd);
-		}
-
-		y = (inst->dim.matrix_height - 1);
-		p_row = (double*) (p_slice + y * p_pitch);
-		for(i = 0; i < matrices; i++) {
-			int idx = i * inst->dim.matrix_width + (inst->dim.matrix_width - 1);
-			p_row[idx] = evo_mut_new_value(inst, &rnd);
+			y = (inst->dim.matrix_height - 1);
+			p_row = (double*) (p_slice + y * p_pitch);
+			for(i = 0; i < matrices; i++) {
+				int idx = i * inst->dim.matrix_width + (inst->dim.matrix_width - 1);
+				p_row[idx] = evo_mut_new_value(inst, &rnd);
+			}
 		}
 	}
-
 	inst->rnd_states[id] = rnd;
 }
 

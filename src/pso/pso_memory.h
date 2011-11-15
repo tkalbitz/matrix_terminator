@@ -8,11 +8,12 @@
 #ifndef PSO_MEMORY_H_
 #define PSO_MEMORY_H_
 
-#define P_ROW(y)  ((double*) (mem->p_slice  + (y) * mem->p_pitch))
-#define R_ROW(y)  ((double*) (mem->r_slice  + (y) * mem->r_pitch))
-#define V_ROW(y)  ((double*) (mem->v_slice  + (y) * mem->v_pitch))
-#define LB_ROW(y) ((double*) (mem->lb_slice + (y) * mem->lb_pitch))
-#define GB_ROW(y) ((double*) (mem->gb_slice + (y) * mem->gb_pitch))
+#define P_ROW(y)   ((double*) (mem->p_slice  + (y) * mem->p_pitch))
+#define R_ROW(y)   ((double*) (mem->r_slice  + (y) * mem->r_pitch))
+#define V_ROW(y)   ((double*) (mem->v_slice  + (y) * mem->v_pitch))
+#define LB_ROW(y)  ((double*) (mem->lb_slice + (y) * mem->lb_pitch))
+#define GB_ROW(y)  ((double*) (mem->gb_slice + (y) * mem->gb_pitch))
+#define LBN_ROW(y) ((double*) (mem->lbn_slice + (y) * mem->lbn_pitch))
 
 #define W(x)  (mem->param[3*(x)])
 #define C1(x) (mem->param[3*(x)+1])
@@ -36,6 +37,10 @@ struct memory {
 
 	size_t lbr_pitch;
 	char  *lbr_slice;
+
+	size_t lbn_pitch;
+	char  *lbn_slice;
+	int lbn_zero;
 
 	int p_zero;
 	int p_end;

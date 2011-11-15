@@ -128,35 +128,36 @@ __device__ void pso_result_rating(const struct pso_instance * const inst,
 	res[ty][tx] = __dmul_rn(res[ty][tx], res[ty][tx]);
 	__syncthreads();
 
-	//only lines are processed
-	if(tx != 0)
-		return;
-
 	double c = 0.0;
 	double y, t;
-	double sum = res[ty][0];
+	double sum;
 
-	for(int i = 1; i < MWIDTH; i++) {
-		y = res[ty][i] - c;
-		t = sum + y;
-		c = (t - sum) - y;
-		sum = t;
+	//only lines are processed
+	if(tx == 0) {
+		sum = res[ty][0];
+
+		for(int i = 1; i < MWIDTH; i++) {
+			y = res[ty][i] - c;
+			t = sum + y;
+			c = (t - sum) - y;
+			sum = t;
+		}
+
+		res[ty][0] = sum;
 	}
-
-	res[ty][0] = sum;
 	__syncthreads();
 
-	if(ty != 0)
-		return;
+	if(tx == 0 && ty == 0) {
+		for(int i = 0; i < MHEIGHT; i++) {
+			y = res[i][0] - c;
+			t = rating + y;
+			c = (t - rating) - y;
+			rating = t;
+		}
 
-	for(int i = 0; i < MHEIGHT; i++) {
-		y = res[i][0] - c;
-		t = rating + y;
-		c = (t - rating) - y;
-		rating = t;
+		shrd_rating += sqrtf(rating);
 	}
-
-	shrd_rating += sqrtf(rating);
+	__syncthreads();
 }
 
 __global__ void pso_calc_res(struct pso_instance * const inst)
@@ -187,11 +188,12 @@ __global__ void pso_calc_res(struct pso_instance * const inst)
 
                 __syncthreads();
                 R_ROW(ty)[mem->r_zero + tx] = res[ty][tx];
-                __syncthreads();
 		eval_set_res_matrix_to_identity();
+                __syncthreads();
 
 		rules++;
 		rules = eval_interpret_rule(inst , mem, rules);
+                __syncthreads();
 
 		pso_result_rating(inst, mem);
 		__syncthreads();

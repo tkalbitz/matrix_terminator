@@ -430,7 +430,7 @@ int main(int argc, char** argv)
 	print_parent_ratings(&inst);
 
 #ifdef DEBUG
-	double *crat = (double*)malloc(2 * get_evo_threads(&inst) *
+	double *crat = (double*)ya_malloc(2 * get_evo_threads(&inst) *
 			               inst.dim.blocks * sizeof(double));
 	int child = block * inst.dim.parents * inst.dim.childs * 2;
 	copy_child_rating_dev_to_host(&inst, crat);
