@@ -19,7 +19,7 @@ static int evo_get_rules_count(const int * const rules,
 	uint8_t tmp = 0;
 	int rules_count = 0;
 	for(size_t i = 0; i < rules_len; i++) {
-		if(rules[i] == MUL_SEP) {
+		if(rules[i] == MUL_SEP || rules[i] == MUL_MARK) {
 			tmp = (tmp + 1) % 2;
 			if(!tmp) {
 				rules_count++;
@@ -27,7 +27,7 @@ static int evo_get_rules_count(const int * const rules,
 		}
 	}
 
-	if(rules[rules_len - 1] != MUL_SEP || tmp != 1)
+	if((rules[rules_len - 1] != MUL_SEP && rules[rules_len - 1] != MUL_MARK) || tmp != 1)
 		return E_RULES_FORMAT_WRONG;
 
 	return rules_count;
