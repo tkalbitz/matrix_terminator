@@ -30,10 +30,12 @@ __device__ void evo_ensure_constraints(struct instance * const inst,
 	for(int start = mem->c_zero; start < end; start += inst->dim.matrix_width) {
 		const int lidx = start + inst->dim.matrix_width - 1;
 
-		if(inst->cond_left == COND_UPPER_LEFT && row[start] < 1.0) {
-			row[start] = evo_mut_new_value(inst, rnd_state);
-		} else if(inst->cond_left == COND_UPPER_RIGHT && row[lidx] < 1.0) {
-			row[lidx] = evo_mut_new_value(inst, rnd_state);
+		if(inst->cond_left == COND_UPPER_LEFT) {
+			if(row[start] < 1.0)
+				row[start] = evo_mut_new_value(inst, rnd_state);
+		} else if(inst->cond_left == COND_UPPER_RIGHT) {
+			if(row[lidx] < 1.0)
+				row[lidx] = evo_mut_new_value(inst, rnd_state);
 		} else if(inst->cond_left == COND_UPPER_LEFT_LOWER_RIGHT) {
 			if(row[start] < 1.0)
 				row[start] = evo_mut_new_value(inst, rnd_state);

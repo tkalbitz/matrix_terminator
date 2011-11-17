@@ -202,8 +202,10 @@ __global__ void pso_swarm_step(struct pso_instance* inst)
 //		if(blockIdx.x < (BLOCKS / 2))
 //			soc_part = curand_normal(&rnd_state) * c2 * (GB_ROW(ty)[e_idx] - xi);
 
+		double tmp = max(inst->parent_max / 4, inst->delta);
 		V_ROW(ty)[p_idx] = w * (V_ROW(ty)[p_idx] + cog_part + soc_part);
-		xi = min(inst->parent_max, max(0., xi));
+		V_ROW(ty)[p_idx] = min(max(V_ROW(ty)[p_idx], -tmp), tmp);
+
 		xi = __dadd_rn(xi, V_ROW(ty)[p_idx]);
 		/* we want x * delta, where x is an int */
 		xi = __dmul_rn(((unsigned long)(xi / delta)), delta);

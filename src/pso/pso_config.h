@@ -8,7 +8,7 @@
 #ifndef CONFIG_H_
 #define CONFIG_H_
 
-#define PARTICLE_COUNT 224
+#define PARTICLE_COUNT 64
 #define PARENT_MAX     10.
 
 #define MATRIX_TAKEN_POS 0.3f
