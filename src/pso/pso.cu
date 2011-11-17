@@ -137,11 +137,11 @@ __device__ void pso_neighbor_best(struct pso_instance* const inst,
 	}
 
 	const char* const lbrat_ptr = (char*)inst->dev_lbrat.ptr;
-	double lb_rat_p = ((double*)(lbrat_ptr + p_block    * inst->dev_lbrat.pitch))[p_particle];
-	double lb_rat_c = ((double*)(lbrat_ptr + blockIdx.x * inst->dev_lbrat.pitch))[blockIdx.y];
-	double lb_rat_n = ((double*)(lbrat_ptr + n_block    * inst->dev_lbrat.pitch))[n_particle];
+	const double lb_rat_p = ((double*)(lbrat_ptr + p_block    * inst->dev_lbrat.pitch))[p_particle];
+	const double lb_rat_c = ((double*)(lbrat_ptr + blockIdx.x * inst->dev_lbrat.pitch))[blockIdx.y];
+	const double lb_rat_n = ((double*)(lbrat_ptr + n_block    * inst->dev_lbrat.pitch))[n_particle];
 
-	double res = min(min(lb_rat_p, lb_rat_c), lb_rat_n);
+	const double res = min(min(lb_rat_p, lb_rat_c), lb_rat_n);
 
 	int block;
 	int particle;
@@ -213,6 +213,48 @@ __global__ void pso_swarm_step(struct pso_instance* inst)
 		P_ROW(ty)[p_idx] = xi;
 	}
 
+	__syncthreads();
+
+	if(tx == 0 && ty == 0) {
+		pso_ensure_constraints(inst, mem, &rnd_state);
+	}
+
+	inst->rnd_states[id] = rnd_state;
+}
+
+__global__ void pso_swarm_step_ccpso(struct pso_instance* inst)
+{
+	__shared__ struct memory m;
+	struct memory* const mem = &m;
+	const double delta = inst->delta;
+	const int id = get_thread_id();
+	curandState rnd_state = inst->rnd_states[id];
+
+	if(tx == 0 && ty == 0) {
+		pso_init_mem(inst, mem);
+		pso_neighbor_best(inst, mem);
+	}
+	__syncthreads();
+
+	for(int i = 0; i < inst->num_matrices; i++) {
+		const int e_idx = i * inst->dim.matrix_width + tx;
+		const int p_idx = mem->p_zero + e_idx;
+		const int n_idx = mem->lbn_zero + e_idx;
+
+		double xi = P_ROW(ty)[p_idx];
+
+		if(curand_normal(&rnd_state) <= 0.5)
+			xi = LB_ROW(ty)[p_idx] + /* cauchy */
+			     curand_normal(&rnd_state)*
+			     abs((LB_ROW(ty)[p_idx] - LBN_ROW(ty)[n_idx]));
+		else
+			xi = LBN_ROW(ty)[p_idx] + curand_normal(&rnd_state)*
+			     abs((LB_ROW(ty)[p_idx] - LBN_ROW(ty)[n_idx]));
+
+		xi = __dmul_rn(((unsigned long)(xi / delta)), delta);
+		xi = min(inst->parent_max, max(0., xi));
+		P_ROW(ty)[p_idx] = xi;
+	}
 	__syncthreads();
 
 	if(tx == 0 && ty == 0) {

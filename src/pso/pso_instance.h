@@ -72,6 +72,9 @@ struct pso_instance
 	size_t rules_len;             /* number of elements in rules */
 	size_t rules_count;           /* number of rules */
 	double* gb_rat;               /* rating of the global best particles */
+	double gb_best;               /* rating of the global best particles */
+	double gb_old;                /* rating of the global best particles */
+
 
 	unsigned int res_block;       /* in which block is the result */
 	unsigned int res_parent;      /* which parent is the result */
