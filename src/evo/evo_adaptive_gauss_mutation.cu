@@ -1,6 +1,12 @@
 #include <cuda.h>
 #include <math.h>
 
+#if __CUDA_ARCH__ >= 200
+	#define DIV(x,y) __ddiv_rn((x),(y))
+#else
+	#define DIV(x,y) ((x)/(y))
+#endif
+
 __device__ static double evo_mut_new_value(struct instance * const inst,
 					   curandState     * const rnd_state)
 {
@@ -70,10 +76,10 @@ __device__ void evo_mutation(struct instance * const inst,
 	MR(tx) = PMR(parent);
 	SP(tx) = PSP(parent);
 
-	SP(tx) *= exp((1 / sqrtf(elems)) * curand_normal(rnd_s));
+	SP(tx) *= __expf((1 / __fsqrt_rn(elems)) * curand_normal(rnd_s));
 	SP(tx) = min(max(SP(tx), 2*delta), inst->parent_max);
 
-	MR(tx) = MR(tx) + (curand_normal(rnd_s) / 20);
+	MR(tx) = MR(tx) + DIV(curand_normal(rnd_s), 20);
 	MR(tx) = min(max(MR(tx), 1./elems), 1.);
 
 	const double mr = MR(tx);
@@ -88,9 +94,9 @@ __device__ void evo_mutation(struct instance * const inst,
 		for(int c = mem->c_zero, p = parent * inst->width_per_inst; c < mem->c_end; c++, p++) {
 
 			if(curand_uniform(rnd_s) > mr) {
-				if(curand_uniform(rnd_s) < mr/10) {
+				if(curand_uniform(rnd_s) < DIV(mr, 10)) {
 					c_row[c] = 0.;
-				} if(curand_uniform(rnd_s) < mr/10) {
+				} if(curand_uniform(rnd_s) < DIV(mr, 10)) {
 					c_row[c] = evo_mut_new_value(inst, rnd_s);
 				} else {
 					c_row[c] = p_row[p];
@@ -102,7 +108,7 @@ __device__ void evo_mutation(struct instance * const inst,
 			tmp = __dmul_rn((tmp < 0 ? -1 : 1), max(delta, fabs(tmp)));
 			tmp = __dadd_rn(p_row[p], tmp);
 			/* we want x * delta, where x is an int */
-			tmp = __dmul_rn(((unsigned long)(tmp / delta)), delta);
+			tmp = __dmul_rn((__double2uint_rn(DIV(tmp, delta))), delta);
 			tmp = max(tmp, 0.0);
 			tmp = min(inst->parent_max, tmp);
 

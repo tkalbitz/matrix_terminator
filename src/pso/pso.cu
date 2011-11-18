@@ -6,6 +6,12 @@
 #include "pso_config.h"
 #include "pso_memory.h"
 
+#if __CUDA_ARCH__ >= 200
+	#define DIV(x,y) __ddiv_rn((x),(y))
+#else
+	#define DIV(x,y) ((x)/(y))
+#endif
+
 __global__ void pso_evaluation_lbest(struct pso_instance* inst)
 {
 	struct memory m;
@@ -88,10 +94,12 @@ __device__ void pso_ensure_constraints(struct pso_instance * const inst,
 	for(int start = mem->p_zero; start < end; start += inst->dim.matrix_width) {
 		const int lidx = start + inst->dim.matrix_width - 1;
 
-		if(inst->cond_left == COND_UPPER_LEFT && row[start] < 1.0) {
+		if(inst->cond_left == COND_UPPER_LEFT) {
+			if(row[start] < 1.0)
 			row[start] = pso_mut_new_value(inst, rnd_state);
-		} else if(inst->cond_left == COND_UPPER_RIGHT && row[lidx] < 1.0) {
-			row[lidx] = pso_mut_new_value(inst, rnd_state);
+		} else if(inst->cond_left == COND_UPPER_RIGHT) {
+			if(row[lidx] < 1.0)
+				row[lidx] = pso_mut_new_value(inst, rnd_state);
 		} else if(inst->cond_left == COND_UPPER_LEFT_LOWER_RIGHT) {
 			if(row[start] < 1.0)
 				row[start] = pso_mut_new_value(inst, rnd_state);
@@ -208,7 +216,7 @@ __global__ void pso_swarm_step(struct pso_instance* inst)
 
 		xi = __dadd_rn(xi, V_ROW(ty)[p_idx]);
 		/* we want x * delta, where x is an int */
-		xi = __dmul_rn(((unsigned long)(xi / delta)), delta);
+		xi = __dmul_rn(((unsigned long)DIV(xi, delta)), delta);
 		xi = min(inst->parent_max, max(0., xi));
 		P_ROW(ty)[p_idx] = xi;
 	}
@@ -220,6 +228,18 @@ __global__ void pso_swarm_step(struct pso_instance* inst)
 	}
 
 	inst->rnd_states[id] = rnd_state;
+}
+
+__device__ float curand_cauchy(curandState* rnd)
+{
+	float v = 0.0f;
+
+	do {
+		v = curand_normal(rnd);
+	} while(v == 0);
+
+	return curand_normal(rnd) / v;
+//	return tan(M_PI * curand_uniform(rnd));
 }
 
 __global__ void pso_swarm_step_ccpso(struct pso_instance* inst)
@@ -243,15 +263,14 @@ __global__ void pso_swarm_step_ccpso(struct pso_instance* inst)
 
 		double xi = P_ROW(ty)[p_idx];
 
-		if(curand_normal(&rnd_state) <= 0.5)
-			xi = LB_ROW(ty)[p_idx] + /* cauchy */
-			     curand_normal(&rnd_state)*
+		if(curand_uniform(&rnd_state) <= 0.5)
+			xi = LB_ROW(ty)[p_idx] + curand_cauchy(&rnd_state) *
 			     abs((LB_ROW(ty)[p_idx] - LBN_ROW(ty)[n_idx]));
 		else
-			xi = LBN_ROW(ty)[p_idx] + curand_normal(&rnd_state)*
+			xi = LBN_ROW(ty)[p_idx] + curand_normal(&rnd_state) *
 			     abs((LB_ROW(ty)[p_idx] - LBN_ROW(ty)[n_idx]));
 
-		xi = __dmul_rn(((unsigned long)(xi / delta)), delta);
+		xi = __dmul_rn(__double2uint_rn(DIV(xi, delta)), delta);
 		xi = min(inst->parent_max, max(0., xi));
 		P_ROW(ty)[p_idx] = xi;
 	}
