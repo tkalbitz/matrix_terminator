@@ -16,6 +16,8 @@
 
 #define tx (threadIdx.x)
 #define ty (threadIdx.y)
+#define bx (blockIdx.x)
+#define by (blockIdx.y)
 
 #define MATCH_ALL 0
 #define MATCH_ANY 1

@@ -148,19 +148,19 @@ void print_particle_ratings(struct pso_instance *inst)
 
 void print_gbest_particle_ratings(struct pso_instance *inst)
 {
-	int width = inst->dim.blocks;
-	double *rating = (double*)ya_malloc(width * sizeof(double));
-	memset(rating, 1, width * sizeof(double));
-
-	CUDA_CALL(cudaMemcpy(rating, inst->gb_rat,
-			width * sizeof(double), cudaMemcpyDeviceToHost));
-
-	printf("------------------- GLOBAL RATINGS-------------------------\n");
-	for (int i = 0; i < width; i++) {
-		printf("%3.2e ", rating[i]);
-	}
-	printf("\n");
-	free(rating);
+//	int width = inst->dim.blocks;
+//	double *rating = (double*)ya_malloc(width * sizeof(double));
+//	memset(rating, 1, width * sizeof(double));
+//
+//	CUDA_CALL(cudaMemcpy(rating, inst->gb_rat,
+//			width * sizeof(double), cudaMemcpyDeviceToHost));
+//
+//	printf("------------------- GLOBAL RATINGS-------------------------\n");
+//	for (int i = 0; i < width; i++) {
+//		printf("%3.2e ", rating[i]);
+//	}
+//	printf("\n");
+//	free(rating);
 }
 
 void print_rules(FILE* f, struct pso_instance *inst)

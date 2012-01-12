@@ -13,21 +13,20 @@
 
 int get_pso_threads(const struct pso_instance * const inst)
 {
-	return inst->dim.matrix_width *
-	       inst->dim.matrix_height;
+	return min(512, inst->width_per_line);
 }
 
 void init_rnd_generator(struct pso_instance *inst, int seed)
 {
 	curandState *rnd_states;
-	const int count = max(get_pso_threads(inst), inst->dim.matrix_height);
+	const int count = get_pso_threads(inst);
 
-	CUDA_CALL(cudaMalloc((void **)&rnd_states,
+	//TODO: How many?
+	CUDA_CALL(cudaMalloc(&rnd_states,
 			     count * BLOCKS * PARTICLE_COUNT * sizeof(curandState)));
 
 	const dim3 blocks(BLOCKS, inst->dim.particles);
-	const dim3 threads(inst->dim.matrix_height, inst->dim.matrix_width);
-	setup_rnd_kernel<<<blocks, threads>>>(rnd_states, seed);
+	setup_rnd_kernel<<<blocks, count>>>(rnd_states, seed);
 	CUDA_CALL(cudaGetLastError());
 	cudaThreadSynchronize();
 	inst->rnd_states = rnd_states;
@@ -36,7 +35,7 @@ void init_rnd_generator(struct pso_instance *inst, int seed)
 void set_num_matrices(struct pso_instance* inst)
 {
 	int m = INT_MIN;
-	for(int i = 0; i < inst->rules_len; i++)
+	for(size_t i = 0; i < inst->rules_len; i++)
 		m = max(m, inst->rules[i]);
 
 	inst->num_matrices = m + 1; /* matrices are zero based */
@@ -46,88 +45,38 @@ void alloc_particle_matrix(struct pso_instance *inst)
 {
 	assert(inst->num_matrices != 0);
 
-	int width = inst->dim.particles  * /* there are n particles per block */
-		    inst->width_per_inst *
-		    sizeof(double);
+	const size_t len = inst->total * sizeof(double);
 
-	cudaPitchedPtr pitched_ptr;
+	const size_t gbest_len = inst->width_per_line *
+				 inst->dim.blocks * sizeof(double);
 
-	inst->dev_velocity_ext = make_cudaExtent(width,
-					         inst->dim.matrix_height,
-					         inst->dim.blocks);
-	CUDA_CALL(cudaMalloc3D(&pitched_ptr, inst->dev_velocity_ext));
-	inst->dev_velocity = pitched_ptr;
-
-	inst->dev_particle_ext = make_cudaExtent(width,
-					         inst->dim.matrix_height,
-					         inst->dim.blocks);
-	CUDA_CALL(cudaMalloc3D(&pitched_ptr, inst->dev_particle_ext));
-	inst->dev_particle = pitched_ptr;
-
-	inst->dev_particle_lbest_ext = make_cudaExtent(width,
-					               inst->dim.matrix_height,
-					               inst->dim.blocks);
-	CUDA_CALL(cudaMalloc3D(&pitched_ptr, inst->dev_particle_lbest_ext));
-	inst->dev_particle_lbest = pitched_ptr;
-
-	inst->dev_particle_gbest_ext = make_cudaExtent(inst->width_per_inst * sizeof(double),
-					               inst->dim.matrix_height,
-					               inst->dim.blocks);
-	CUDA_CALL(cudaMalloc3D(&pitched_ptr, inst->dev_particle_gbest_ext));
-	inst->dev_particle_gbest = pitched_ptr;
-}
-
-void alloc_params(struct pso_instance *inst)
-{
-	assert(inst->num_matrices != 0);
-
-	int width = PARAM_COUNT * inst->dim.particles *
-		    sizeof(double);
-
-	cudaPitchedPtr pitched_ptr;
-
-	inst->dev_params_ext = make_cudaExtent(width,
-					         1,
-					         inst->dim.blocks);
-	CUDA_CALL(cudaMalloc3D(&pitched_ptr, inst->dev_params_ext));
-	inst->dev_params = pitched_ptr;
+	CUDA_CALL(cudaMalloc(&(inst->particle),       len));
+	CUDA_CALL(cudaMalloc(&(inst->particle_lbest), len));
+	CUDA_CALL(cudaMalloc(&(inst->particle_gbest), gbest_len));
+	CUDA_CALL(cudaMalloc(&(inst->rat_tmp), gbest_len * inst->dim.particles));
+	CUDA_CALL(cudaMalloc(&(inst->col_permut), inst->width_per_line * BLOCKS * sizeof(int)));
 }
 
 void alloc_result_matrix(struct pso_instance *inst)
 {
-	const int width = inst->dim.particles *
-			    inst->dim.matrix_width * sizeof(double);
+	const size_t len = inst->dim.particles * inst->dim.matrix_width *
+			   inst->dim.matrix_height * inst->dim.blocks *
+			   sizeof(double);
 
-	inst->dev_res_ext = make_cudaExtent(width,
-					    inst->dim.matrix_height,
-					    inst->dim.blocks);
-
-	cudaPitchedPtr pitched_ptr;
-	CUDA_CALL(cudaMalloc3D(&pitched_ptr, inst->dev_res_ext));
-	CUDA_CALL(cudaMemset3D(pitched_ptr, 1, inst->dev_res_ext));
-	inst->dev_res = pitched_ptr;
+	CUDA_CALL(cudaMalloc(&(inst->res), len));
 }
 
 void alloc_rating(struct pso_instance *inst)
 {
-	cudaPitchedPtr pitched_ptr;
+	size_t len = inst->width_per_line * inst->dim.particles *
+		     inst->dim.blocks;
 
-	inst->dev_prat_ext = make_cudaExtent(inst->dim.particles * sizeof(double),
-					     1,
-					     inst->dim.blocks);
-	CUDA_CALL(cudaMalloc3D(&pitched_ptr, inst->dev_prat_ext));
-	CUDA_CALL(cudaMemset3D(pitched_ptr, 33, inst->dev_prat_ext));
-	inst->dev_prat = pitched_ptr;
-
-	inst->dev_lbrat_ext = make_cudaExtent(inst->dim.particles * sizeof(double),
-					      1,
-					      inst->dim.blocks);
-	CUDA_CALL(cudaMalloc3D(&pitched_ptr, inst->dev_lbrat_ext));
-	CUDA_CALL(cudaMemset3D(pitched_ptr, 33, inst->dev_lbrat_ext));
-	inst->dev_lbrat = pitched_ptr;
-
-	cudaMalloc(&inst->gb_rat, BLOCKS * sizeof(double));
-
+	CUDA_CALL(cudaMalloc(&(inst->prat) , len * sizeof(double)));
+	CUDA_CALL(cudaMalloc(&(inst->lbrat), len * sizeof(double)));
+	CUDA_CALL(cudaMalloc(&(inst->gbrat), inst->width_per_line * inst->dim.blocks * sizeof(double)));
+	CUDA_CALL(cudaMalloc(&(inst->lbest_idx), inst->width_per_line * sizeof(int)));
+	CUDA_CALL(cudaMalloc(&(inst->gb_best), inst->dim.blocks * sizeof(double)));
+	CUDA_CALL(cudaMalloc(&(inst->gb_old) , inst->dim.blocks * sizeof(double)));
 }
 
 void pso_inst_init(struct pso_instance* const inst, int matrix_width)
@@ -147,11 +96,13 @@ void pso_inst_init(struct pso_instance* const inst, int matrix_width)
 	inst->width_per_inst = inst->num_matrices *    /* there are n matrices needed for the rules */
 			       inst->dim.matrix_width; /* each one has a fixed width */
 
+	inst->width_per_matrix = inst->dim.matrix_width * inst->dim.matrix_height;
+	inst->width_per_line = inst->width_per_inst * inst->dim.matrix_height;
+	inst->total = inst->width_per_line * inst->dim.particles * inst->dim.blocks;
 	alloc_particle_matrix(inst);
-	alloc_params(inst);
 	alloc_result_matrix(inst);
 	alloc_rating(inst);
-	init_rnd_generator(inst, time(0));
+	init_rnd_generator(inst, (int)time(0));
 }
 
 void pso_inst_cleanup(struct pso_instance * const inst,
@@ -161,15 +112,17 @@ void pso_inst_cleanup(struct pso_instance * const inst,
 		cudaFree(dev_inst);
 
 	cudaFree(inst->rnd_states);
-	cudaFree(inst->dev_params.ptr);
-	cudaFree(inst->dev_velocity.ptr);
-	cudaFree(inst->dev_particle.ptr);
-	cudaFree(inst->dev_particle_gbest.ptr);
-	cudaFree(inst->dev_particle_lbest.ptr);
-	cudaFree(inst->dev_res.ptr);
-	cudaFree(inst->dev_prat.ptr);
-	cudaFree(inst->dev_lbrat.ptr);
-	cudaFree(inst->gb_rat);
+	cudaFree(inst->col_permut);
+	cudaFree(inst->particle);
+	cudaFree(inst->particle_gbest);
+	cudaFree(inst->particle_lbest);
+	cudaFree(inst->res);
+	cudaFree(inst->prat);
+	cudaFree(inst->lbrat);
+	cudaFree(inst->lbest_idx);
+	cudaFree(inst->gb_best);
+	cudaFree(inst->gb_old);
+	cudaFree(inst->rat_tmp);
 
 }
 
@@ -182,11 +135,12 @@ struct pso_instance* pso_inst_create_dev_inst(struct pso_instance *inst,
 	CUDA_CALL(cudaMalloc(&tmp_dev_rules, inst->rules_len * sizeof(int)));
 	CUDA_CALL(cudaMemcpy(tmp_dev_rules,  rules, inst->rules_len * sizeof(int),
 					cudaMemcpyHostToDevice));
+
 	inst->rules = tmp_dev_rules;
 	CUDA_CALL(cudaMalloc(&dev_inst, sizeof(*dev_inst)));
 	CUDA_CALL(cudaMemcpy(dev_inst, inst, sizeof(*dev_inst),
 					cudaMemcpyHostToDevice));
-	inst->rules = rules;
+//	inst->rules = rules;
 
 	if(dev_rules != NULL)
 		*dev_rules = tmp_dev_rules;
