@@ -5,6 +5,12 @@ cmake_minimum_required(VERSION 2.8.0)
 project(MatrixTerminator)
 
 set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/CMake/cuda" ${CMAKE_MODULE_PATH})
+INCLUDE(CMake/cuda/FindCUDA.cmake)
+
+# Turn off the annoying warning.
+OPTION(CUDA_REMOVE_GLOBAL_MEMORY_SPACE_WARNING "Suppress the \"Advisory: Cannot tell what pointer points to, assuming global memory space\" warning nvcc makes." ON)
+
+SET(CUDA_REMOVE_GLOBAL_MEMORY_SPACE_WARNING ON)
 
 # find_package(CUDA)
 find_package(CUDA QUIET REQUIRED)

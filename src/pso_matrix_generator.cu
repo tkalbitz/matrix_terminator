@@ -323,7 +323,7 @@ int main(int argc, char** argv)
 		// Start record
 		cudaEventRecord(start, 0);
 
-		pso_swarm_step_ccpso2<<<BLOCKS, PARTICLE_COUNT>>>(inst, s);
+		pso_swarm_step_ccpso2<<<BLOCKS, 64>>>(inst, s);
 		CUDA_CALL(cudaGetLastError());
 		cudaThreadSynchronize();
 		CUDA_CALL(cudaGetLastError());

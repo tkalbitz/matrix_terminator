@@ -29,7 +29,7 @@ __global__ void pso_evaluation_lbest(struct pso_instance inst,
 	__shared__ int    shm_pos[PARTICLE_COUNT];
 
 	const int block_pos = BLOCK_POS2;
-	const int s_count = inst.width_per_line / s * PARTICLE_COUNT;
+	const int s_count = inst.width_per_line / s;
 	const int * const col_permut = inst.col_permut + inst.width_per_line * bx;
 
 	const double * const prat = inst.prat  + s_count * bx * PARTICLE_COUNT;
@@ -85,7 +85,7 @@ __global__ void pso_evaluation_lbest(struct pso_instance inst,
 
 __global__ void pso_neighbor_best(struct pso_instance inst, const int s)
 {
-	const int s_count = inst.width_per_line / s * PARTICLE_COUNT;
+	const int s_count = inst.width_per_line / s;
 
 	double * const lbrat  = inst.lbrat     + s_count * bx * PARTICLE_COUNT;
 	int    * const lb_idx = inst.lbest_idx + s_count * bx * PARTICLE_COUNT;
@@ -205,7 +205,7 @@ __global__ void pso_swarm_step_ccpso2(struct pso_instance inst, const int s)
 	for(int i = col_start; i < end; i += col_add) {
 		const int idx   = ELEM_BIDX(block_pos, particle, col_perm[i]);
 		const int cur_s = i / s;
-		const double lb  = particle_lbest[ELEM_BIDX(block_pos, i, col_perm[i])];
+		const double lb  = particle_lbest[idx];
 		const double lbn = particle_lbest[ELEM_BIDX(block_pos, lb_idx[cur_s], col_perm[i])];
 
 		double xi = elems[idx];

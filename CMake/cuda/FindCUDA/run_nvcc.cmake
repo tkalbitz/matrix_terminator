@@ -74,6 +74,7 @@ set(CUDA_NVCC_FLAGS "@CUDA_NVCC_FLAGS@;;@CUDA_WRAP_OPTION_NVCC_FLAGS@")
 set(nvcc_flags "@nvcc_flags@")
 set(CUDA_NVCC_INCLUDE_ARGS "@CUDA_NVCC_INCLUDE_ARGS@")
 set(format_flag "@format_flag@")
+set(CUDA_REMOVE_GLOBAL_MEMORY_SPACE_WARNING "@CUDA_REMOVE_GLOBAL_MEMORY_SPACE_WARNING@")
 
 if(build_cubin AND NOT generated_cubin_file)
   message(FATAL_ERROR "You must specify generated_cubin_file on the command line")
@@ -170,6 +171,11 @@ endif()
 # define this for now until a future version fixes this bug.
 set(CUDACC_DEFINE -D__CUDACC__)
 
+if(CUDA_REMOVE_GLOBAL_MEMORY_SPACE_WARNING)
+  set(get_error ERROR_VARIABLE  stderr)
+  set(get_out   OUTPUT_VARIABLE stderr)
+endif()
+
 # Generate the dependency file
 cuda_execute_process(
   "Generating dependency file: ${NVCC_generated_dependency_file}"
@@ -218,7 +224,7 @@ endif()
 # Delete the temporary file
 cuda_execute_process(
   "Removing ${cmake_dependency_file}.tmp and ${NVCC_generated_dependency_file}"
-  COMMAND "${CMAKE_COMMAND}" -E remove "${cmake_dependency_file}.tmp" "${NVCC_generated_dependency_file}"
+  COMMAND "${CMAKE_COMMAND}" -E remove "${cmake_dependency_file}.tmp" "${NVCC_generated_dependency_file}"  
   )
 
 if(CUDA_result)
@@ -237,7 +243,19 @@ cuda_execute_process(
   ${CUDA_NVCC_FLAGS}
   -DNVCC
   ${CUDA_NVCC_INCLUDE_ARGS}
+  ${get_error}
   )
+
+if(get_error)
+  if(stderr)
+    # Filter out the annoying Advisory about point stuff.
+    # Advisory: Cannot tell what pointer points to, assuming global memory space
+    string(REGEX REPLACE "(^|\n)[^\n]*\(Advisory|Warning\): Cannot tell what pointer points to, assuming global memory space\n" "" stderr_clean ${stderr})
+  endif()
+  if(stderr_clean)
+    message("${stderr_clean}")
+  endif()
+endif()
 
 if(CUDA_result)
   # Since nvcc can sometimes leave half done files make sure that we delete the output file.

@@ -71,10 +71,10 @@ void alloc_rating(struct pso_instance *inst)
 	size_t len = inst->width_per_line * inst->dim.particles *
 		     inst->dim.blocks;
 
-	CUDA_CALL(cudaMalloc(&(inst->prat) , len * sizeof(double)));
-	CUDA_CALL(cudaMalloc(&(inst->lbrat), len * sizeof(double)));
+	CUDA_CALL(cudaMalloc(&(inst->prat) ,     len * sizeof(double)));
+	CUDA_CALL(cudaMalloc(&(inst->lbrat),     len * sizeof(double)));
+	CUDA_CALL(cudaMalloc(&(inst->lbest_idx), len * sizeof(int)));
 	CUDA_CALL(cudaMalloc(&(inst->gbrat), inst->width_per_line * inst->dim.blocks * sizeof(double)));
-	CUDA_CALL(cudaMalloc(&(inst->lbest_idx), inst->width_per_line * sizeof(int)));
 	CUDA_CALL(cudaMalloc(&(inst->gb_best), inst->dim.blocks * sizeof(double)));
 	CUDA_CALL(cudaMalloc(&(inst->gb_old) , inst->dim.blocks * sizeof(double)));
 }

@@ -26,6 +26,7 @@ CUDA_INCLUDE_DIRECTORIES(
 # Set CUDA_ATTACH_VS_BUILD_RULE_TO_CUDA_FILE when you want to add the same .cu
 # file to multiple targets.
 set(CUDA_ATTACH_VS_BUILD_RULE_TO_CUDA_FILE OFF)
+set(CUDA_REMOVE_GLOBAL_MEMORY_SPACE_WARNING ON)
 
 set(CMAKE_C_FLAGS "${CMAKE_C_CFLAGS} -std=gnu99 -Wall")
 
