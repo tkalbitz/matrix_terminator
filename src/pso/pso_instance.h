@@ -56,14 +56,6 @@ struct pso_instance
 	double* gbrat;
 	double* rat_tmp;
 
-//	cudaPitchedPtr dev_particle;       /* device memory for all particles */
-//	cudaPitchedPtr dev_particle_lbest; /* device memory for all particles */
-//	cudaPitchedPtr dev_particle_gbest; /* device memory for all particles */
-//	cudaPitchedPtr dev_res;       /* result of the evaluation */
-//	cudaPitchedPtr dev_prat;      /* rating of the particles */
-//	cudaPitchedPtr dev_lbrat;     /* rating of the local best particles */
-//	cudaPitchedPtr dev_rat_tmp;   /* rating of the local best particles */
-
 	curandState *rnd_states;      /* random number generator states */
 
 	int num_matrices;          /* number of matrices of the problem */
@@ -71,15 +63,7 @@ struct pso_instance
 	int width_per_line;        /* how many elements are stored for problem */
 	int width_per_matrix;      /* how many elements per matrix */
 	int total;		   /* complete length of all elements */
-	int s;                     /* current group size */
-
-//	cudaExtent dev_particle_ext;       /* extent for particles */
-//	cudaExtent dev_particle_lbest_ext; /* extent for best local particle */
-//	cudaExtent dev_particle_gbest_ext; /* extent for best global particle */
-//	cudaExtent dev_res_ext;             /* extend for result */
-//	cudaExtent dev_prat_ext;            /* extend for particle rating */
-//	cudaExtent dev_lbrat_ext;           /* extend for local best particle rating */
-//	cudaExtent dev_rat_tmp_ext;         /* extend for rating, hold tmp matrices  */
+	int* s;                    /* current group size */
 
 	double delta;                 /* numbers in the matrices are multiple the amount */
 	int*   rules;                 /* rules that must be matched */

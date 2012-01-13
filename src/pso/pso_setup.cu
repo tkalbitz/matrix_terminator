@@ -106,6 +106,11 @@ __global__ void setup_rating(struct pso_instance * const inst)
 		inst->gb_best[tx] = FLT_MAX;
 		inst->gb_old[tx]  = FLT_MAX;
 	}
+
+	//TODO
+	if(tx < BLOCKS) {
+		inst->s[tx] = 2;
+	}
 }
 
 __global__ void setup_col_permut(int* const col_permut,

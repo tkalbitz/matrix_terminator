@@ -183,65 +183,67 @@ __device__ void prepare_tmp_matrix(struct pso_instance * const inst,
 	const int mat_elems = inst->dim.matrix_width * inst->dim.matrix_width;
 	for(i = cur * s + tx; i < end; i += blockDim.x) {
 		const int perm_idx = inst->col_permut[blockIdx.x * inst->width_per_line + i];
-//		const int mat = perm_idx / mat_elems;
-//		const int row = (perm_idx - mat * mat_elems) / inst->dim.matrix_width;
-//		const int col = (perm_idx - mat * mat_elems - inst->dim.matrix_width * row);
 		const int dest_idx = RMAT(0) + perm_idx;
 		inst->rat_tmp[dest_idx] = inst->particle[ELEM_IDX(perm_idx)];
 	}
 
 }
 
-__global__ void pso_calc_res(struct pso_instance * const inst,
-		             const int s, const int cur)
+__global__ void pso_calc_res(struct pso_instance * const inst)
 {
-	const int* end = inst->rules + inst->rules_len - 1;
-	const int* rules = inst->rules;
+	const int s       = inst->s[bx];
+	const int s_count = inst->width_per_line / s;
 
-	if(tx == 0 && ty == 0) {
-		MHEIGHT = inst->dim.matrix_height;
-		MWIDTH  = inst->dim.matrix_width;
-		shrd_rating = 0.;
-		matrix_form = 1e9;
-	}
+	for(int cur = 0; cur < s_count; cur++) {
 
-	__syncthreads();
-	prepare_tmp_matrix(inst, s, cur);
-	__syncthreads();
+		const int* end = inst->rules + inst->rules_len - 1;
+		const int* rules = inst->rules;
 
-	uint8_t cur_rule = 0;
+		if(tx == 0 && ty == 0) {
+			MHEIGHT = inst->dim.matrix_height;
+			MWIDTH  = inst->dim.matrix_width;
+			shrd_rating = 0.;
+			matrix_form = 1e9;
+		}
 
-	do {
-		eval_set_res_matrix_to_identity();
-
-		rules++;
-		rules = eval_interpret_rule(inst , rules);
-
-                __syncthreads();
-                TRES(ty, tx) = RES(ty, tx);
-		eval_set_res_matrix_to_identity();
-                __syncthreads();
-
-		rules++;
-		rules = eval_interpret_rule(inst , rules);
-                __syncthreads();
-
-		pso_result_rating(inst);
+		__syncthreads();
+		prepare_tmp_matrix(inst, s, cur);
 		__syncthreads();
 
-		cur_rule++;
+		uint8_t cur_rule = 0;
+
+		do {
+			eval_set_res_matrix_to_identity();
+
+			rules++;
+			rules = eval_interpret_rule(inst , rules);
+
+			__syncthreads();
+			TRES(ty, tx) = RES(ty, tx);
+			eval_set_res_matrix_to_identity();
+			__syncthreads();
+
+			rules++;
+			rules = eval_interpret_rule(inst , rules);
+			__syncthreads();
+
+			pso_result_rating(inst);
+			__syncthreads();
+
+			cur_rule++;
+			__syncthreads();
+		} while(rules != end);
+
 		__syncthreads();
-	} while(rules != end);
 
-	__syncthreads();
+		if(tx == 0 && ty == 0) {
+			if(inst->match == MATCH_ANY)
+				shrd_rating += matrix_form;
 
-	if(tx == 0 && ty == 0) {
-		if(inst->match == MATCH_ANY)
-			shrd_rating += matrix_form;
-
-		const int idx = inst->dim.particles * blockIdx.x *
-				(inst->width_per_line / s) + cur *
-				inst->dim.particles + blockIdx.y;
-		inst->prat[idx] = shrd_rating;
+			const int idx = inst->dim.particles * blockIdx.x *
+					(inst->width_per_line / s) + cur *
+					inst->dim.particles + blockIdx.y;
+			inst->prat[idx] = shrd_rating;
+		}
 	}
 }

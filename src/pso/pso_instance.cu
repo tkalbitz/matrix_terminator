@@ -50,6 +50,7 @@ void alloc_particle_matrix(struct pso_instance *inst)
 	const size_t gbest_len = inst->width_per_line *
 				 inst->dim.blocks * sizeof(double);
 
+	CUDA_CALL(cudaMalloc(&(inst->s), BLOCKS * sizeof(int)));
 	CUDA_CALL(cudaMalloc(&(inst->particle),       len));
 	CUDA_CALL(cudaMalloc(&(inst->particle_lbest), len));
 	CUDA_CALL(cudaMalloc(&(inst->particle_gbest), gbest_len));
@@ -123,7 +124,7 @@ void pso_inst_cleanup(struct pso_instance * const inst,
 	cudaFree(inst->gb_best);
 	cudaFree(inst->gb_old);
 	cudaFree(inst->rat_tmp);
-
+	cudaFree(inst->s);
 }
 
 struct pso_instance* pso_inst_create_dev_inst(struct pso_instance *inst,
