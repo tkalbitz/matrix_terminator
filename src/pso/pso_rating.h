@@ -3,6 +3,6 @@
 
 #include "pso_instance.h"
 
-__global__ void pso_calc_res(struct pso_instance * const inst);
+__global__ void pso_calc_res(struct pso_instance inst, const int cur);
 
 #endif /* PSO_RATING_H_ */

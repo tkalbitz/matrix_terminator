@@ -9,10 +9,10 @@
 #define PSO_MEMORY_H_
 
 #define BLOCK_POS2      (blockIdx.x * inst.width_per_line * inst.dim.particles)
-#define BLOCK_POS       (blockIdx.x * inst->width_per_line * inst->dim.particles)
-#define MAT_POS(mat)    (BLOCK_POS + inst->dim.matrix_width * inst->dim.matrix_width * inst->dim.particles * (mat))
-#define ELEM(mat, cy, cx) (MAT_POS(mat) + (cy) * inst->dim.matrix_width * inst->dim.particles + (cx) * inst->dim.particles + blockIdx.y)
-#define ELEM_IDX(idx) (BLOCK_POS + (idx) * inst->dim.particles + blockIdx.y)
+#define BLOCK_POS       (blockIdx.x * inst.width_per_line * inst.dim.particles)
+#define MAT_POS(mat)    (BLOCK_POS + inst.dim.matrix_width * inst.dim.matrix_width * inst.dim.particles * (mat))
+#define ELEM(mat, cy, cx) (MAT_POS(mat) + (cy) * inst.dim.matrix_width * inst.dim.particles + (cx) * inst.dim.particles + blockIdx.y)
+#define ELEM_IDX(idx) (BLOCK_POS + (idx) * inst.dim.particles + blockIdx.y)
 #define ELEM_BIDX(block_pos, particle, idx) ((block_pos) + (idx) * PARTICLE_COUNT + particle)
 
 #define P_ROW(y)   ((double*) (mem->p_slice  + (y) * mem->p_pitch))

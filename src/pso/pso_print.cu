@@ -6,29 +6,29 @@ static void print_global_matrix_line_pretty(FILE* f, struct pso_instance *inst,
 					    double* global_cpy,
 					    int idx, int m)
 {
-	int count = idx * inst->width_per_inst + (m + 1) * inst->dim.matrix_width - 1;
-	int w = idx * inst->width_per_inst + m * inst->dim.matrix_width;
-
-	fprintf(f, "[ ");
-
-	for (; w < count; w++) {
-		fprintf(f, "%10.9e, ", global_cpy[w]);
-	}
-
-	fprintf(f, "%10.9e ]", global_cpy[w]);
+//	int count = idx * inst->width_per_inst + (m + 1) * inst->dim.matrix_width - 1;
+//	int w = idx * inst->width_per_inst + m * inst->dim.matrix_width;
+//
+//	fprintf(f, "[ ");
+//
+//	for (; w < count; w++) {
+//		fprintf(f, "%10.9e, ", global_cpy[w]);
+//	}
+//
+//	fprintf(f, "%10.9e ]", global_cpy[w]);
 }
 
 void print_global_matrix_pretty(FILE* f, struct pso_instance* inst, int block)
 {
 	int width = inst->dim.blocks *
-		    inst->width_per_inst *
-		    inst->dim.matrix_height *
+		    inst->width_per_line *
 		    sizeof(double);
 
 	double* global_cpy = (double*)ya_malloc(width);
 	memset(global_cpy, 1, width);
 
-	copy_globals_dev_to_host(inst, global_cpy);
+	CUDA_CALL(cudaMemcpy(global_cpy, inst->particle_gbest, width,
+			cudaMemcpyDeviceToHost));
 
 	int line = inst->width_per_inst;
 	int block_offset = line * inst->dim.matrix_height;
@@ -38,9 +38,14 @@ void print_global_matrix_pretty(FILE* f, struct pso_instance* inst, int block)
 		char matrix = 'A' + m;
 		fprintf(f, "%c: matrix(\n", matrix);
 		for (int h = 0; h < inst->dim.matrix_height; h++) {
-			print_global_matrix_line_pretty(f, inst,
-							block_ptr + h*line,
-							0, m);
+			int pos = h * inst->dim.matrix_width;
+			fprintf(f, "[ ");
+
+			for (int w = 0; w < inst->dim.matrix_width - 1; w++) {
+				fprintf(f, "%10.9e, ", global_cpy[pos + w]);
+			}
+
+			fprintf(f, "%10.9e ]", global_cpy[pos + inst->dim.matrix_width - 1]);
 
 			if(h < (inst->dim.matrix_height - 1))
 				fprintf(f, ",");
@@ -146,21 +151,21 @@ void print_particle_ratings(struct pso_instance *inst)
 	free(rating);
 }
 
-void print_gbest_particle_ratings(struct pso_instance *inst)
+void print_gbest_particle_ratings(struct pso_instance& inst)
 {
-//	int width = inst->dim.blocks;
-//	double *rating = (double*)ya_malloc(width * sizeof(double));
-//	memset(rating, 1, width * sizeof(double));
-//
-//	CUDA_CALL(cudaMemcpy(rating, inst->gb_rat,
-//			width * sizeof(double), cudaMemcpyDeviceToHost));
-//
-//	printf("------------------- GLOBAL RATINGS-------------------------\n");
-//	for (int i = 0; i < width; i++) {
-//		printf("%3.2e ", rating[i]);
-//	}
-//	printf("\n");
-//	free(rating);
+	int width = inst.dim.blocks;
+	double *rating = (double*)ya_malloc(width * sizeof(double));
+	memset(rating, 1, width * sizeof(double));
+
+	CUDA_CALL(cudaMemcpy(rating, inst.gbrat,
+			width * sizeof(double), cudaMemcpyDeviceToHost));
+
+	printf("------------------- GLOBAL RATINGS-------------------------\n");
+	for (int i = 0; i < width; i++) {
+		printf("%3.2e ", rating[i]);
+	}
+	printf("\n");
+	free(rating);
 }
 
 void print_rules(FILE* f, struct pso_instance *inst)

@@ -44,7 +44,52 @@ __global__ void setup_rnd_kernel(curandState* const rnd_states,
  * Initialize the child memory with random values.
  */
 __global__ void
-setup_particle_kernel(struct pso_instance * const inst, bool half)
+setup_global_particle_kernel(struct pso_instance * const inst)
+{
+	const int id = get_thread_id();
+	curandState rnd = inst->rnd_states[id];
+
+	const int max1 = (int)inst->parent_max;
+	int x;
+
+	const int gbest_len = inst->width_per_line * BLOCKS;
+	for(x = tx; x < gbest_len; x += blockDim.x) {
+		if(curand_uniform(&rnd) < MATRIX_TAKEN_POS) {
+			inst->particle_gbest[x] = curand(&rnd) % max1 ;
+		} else {
+			inst->particle_gbest[x] = 0;
+		}
+	}
+
+	__syncthreads();
+
+	const int matrices = inst->num_matrices *
+			     inst->dim.blocks;
+
+	if(inst->cond_left == COND_UPPER_LEFT) {
+		for(x = tx; x < matrices; x += blockDim.x) {
+			const int matrix = x * inst->width_per_matrix;
+                        inst->particle_gbest[matrix] = evo_mut_new_value(inst, &rnd);
+		}
+	} else if(inst->cond_left == COND_UPPER_RIGHT) {
+		for(x = tx; x < matrices; x += blockDim.x) {
+			const int matrix = x * inst->width_per_matrix +
+					   inst->dim.matrix_width - 1;
+                        inst->particle_gbest[matrix] = evo_mut_new_value(inst, &rnd);
+		}
+	} else if(inst->cond_left == COND_UPPER_LEFT_LOWER_RIGHT) {
+		for(x = tx; x < matrices; x += blockDim.x) {
+			const int matrix1 = x * inst->width_per_matrix;
+			const int matrix2 = (x + 1) * inst->width_per_matrix - 1;
+                        inst->particle_gbest[matrix1] = evo_mut_new_value(inst, &rnd);
+                        inst->particle_gbest[matrix2] = evo_mut_new_value(inst, &rnd);
+		}
+	}
+	inst->rnd_states[id] = rnd;
+}
+
+__global__ void
+setup_particle_kernel(struct pso_instance * const inst)
 {
 	const int id = get_thread_id();
 	curandState rnd = inst->rnd_states[id];
@@ -64,30 +109,30 @@ setup_particle_kernel(struct pso_instance * const inst, bool half)
 	__syncthreads();
 
 	const int matrices = inst->num_matrices *
-			     inst->dim.particles *
 			     inst->dim.blocks;
 
-	if(inst->cond_left == COND_UPPER_LEFT) {
-		for(x = tx; x < matrices; x += blockDim.x) {
-			const int matrix = x * inst->width_per_matrix;
-                        inst->particle[matrix] = evo_mut_new_value(inst, &rnd);
-		}
-	} else if(inst->cond_left == COND_UPPER_RIGHT) {
-		for(x = tx; x < matrices; x += blockDim.x) {
-			const int matrix = x * inst->width_per_matrix +
-					   inst->dim.matrix_width - 1;
-                        inst->particle[matrix] = evo_mut_new_value(inst, &rnd);
-		}
-	} else if(inst->cond_left == COND_UPPER_LEFT_LOWER_RIGHT) {
-		for(x = tx; x < matrices; x += blockDim.x) {
-			const int matrix1 = x * inst->width_per_matrix;
-			const int matrix2 = (x + 1) * inst->width_per_matrix - 1;
-                        inst->particle[matrix1] = evo_mut_new_value(inst, &rnd);
-                        inst->particle[matrix2] = evo_mut_new_value(inst, &rnd);
+	if(tx < PARTICLE_COUNT) {
+		if(inst->cond_left == COND_UPPER_LEFT) {
+			for(x = 0; x < matrices; x++) {
+				const int matrix = x * inst->width_per_matrix * PARTICLE_COUNT + tx;
+				inst->particle[matrix] = evo_mut_new_value(inst, &rnd);
+			}
+		} else if(inst->cond_left == COND_UPPER_RIGHT) {
+			for(x = 0; x < matrices; x++) {
+				const int matrix = x * inst->width_per_matrix * PARTICLE_COUNT +
+						   inst->dim.matrix_width * PARTICLE_COUNT - 1 - tx;
+				inst->particle[matrix] = evo_mut_new_value(inst, &rnd);
+			}
+		} else if(inst->cond_left == COND_UPPER_LEFT_LOWER_RIGHT) {
+			for(x = 0; x < matrices; x++) {
+				const int matrix1 = x * inst->width_per_matrix * PARTICLE_COUNT + tx;
+				const int matrix2 = (x + 1) * inst->width_per_matrix * PARTICLE_COUNT - 1 - tx;
+				inst->particle[matrix1] = evo_mut_new_value(inst, &rnd);
+				inst->particle[matrix2] = evo_mut_new_value(inst, &rnd);
+			}
 		}
 	}
 	inst->rnd_states[id] = rnd;
-	__syncthreads();
 }
 
 __global__ void setup_rating(struct pso_instance * const inst)
@@ -103,8 +148,7 @@ __global__ void setup_rating(struct pso_instance * const inst)
 
 	const int end = inst->dim.blocks;
 	if(tx < end) {
-		inst->gb_best[tx] = FLT_MAX;
-		inst->gb_old[tx]  = FLT_MAX;
+		inst->gbrat[tx] = FLT_MAX;
 	}
 
 	//TODO

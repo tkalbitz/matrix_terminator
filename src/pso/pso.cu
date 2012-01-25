@@ -22,7 +22,7 @@
 /**
  * can only be launched with PARTICLE_COUNT threads
  */
-__global__ void pso_evaluation_lbest(struct pso_instance inst)
+__global__ void pso_evaluation_lbest(const struct pso_instance inst, const int cur)
 {
 	const int s = inst.s[bx];
 
@@ -31,6 +31,7 @@ __global__ void pso_evaluation_lbest(struct pso_instance inst)
 
 	const int block_pos = BLOCK_POS2;
 	const int s_count = inst.width_per_line / s;
+	const int c = cur / PARTICLE_COUNT;
 	const int * const col_permut = inst.col_permut + inst.width_per_line * bx;
 
 	const double * const prat = inst.prat  + s_count * bx * PARTICLE_COUNT;
@@ -41,49 +42,48 @@ __global__ void pso_evaluation_lbest(struct pso_instance inst)
 	double* const particle_lbest = inst.particle_lbest;
 	double* const particle_gbest = inst.particle_gbest + bx * inst.width_per_line * PARTICLE_COUNT;
 
-	for(int i = 0; i < s_count; i+= PARTICLE_COUNT){
+	//copy rating to shm
+	shm_rat[tx] = lbrat[cur + tx];
+	shm_pos[tx] = tx;
 
-		//copy rating to shm
-		shm_rat[tx] = lbrat[i + tx];
-		shm_pos[tx] = tx;
-
-		//new particle is better than his memory
-		if(prat[i + tx] < shm_rat[tx]) {
-			for(int j = 0; j < s; j++) {
-				const int idx = ELEM_BIDX(block_pos, tx, col_permut[i * s + j]);
-				particle_lbest[idx + j] = particle[idx + j];
-			}
-
-			shm_rat[tx] = lbrat[i + tx] = prat[i + tx];
+	//new particle is better than his memory
+	if(prat[cur + tx] < shm_rat[tx]) {
+		for(int j = 0; j < s; j++) {
+			const int idx = ELEM_BIDX(block_pos, tx, col_permut[c * s + j]);
+			particle_lbest[idx + j] = particle[idx + j];
 		}
 
-		__syncthreads();
+		shm_rat[tx] = lbrat[cur + tx] = prat[cur + tx];
+	}
 
-		//reduction step
-		if (PARTICLE_COUNT >= 256) { PRED_STEP(128); __syncthreads(); }
-		if (PARTICLE_COUNT >= 128) { PRED_STEP(64);  __syncthreads(); }
-		if (PARTICLE_COUNT >=  64) { PRED_STEP(32);  __syncthreads(); }
-		if (PARTICLE_COUNT >=  32) { PRED_STEP(16);  __syncthreads(); }
-		if (PARTICLE_COUNT >=  16) { PRED_STEP( 8);  __syncthreads(); }
-		if (PARTICLE_COUNT >=   8) { PRED_STEP( 4);  __syncthreads(); }
-		if (PARTICLE_COUNT >=   4) { PRED_STEP( 2);  __syncthreads(); }
-		if (PARTICLE_COUNT >=   2) { PRED_STEP( 1);  __syncthreads(); }
+	__syncthreads();
 
-		//copy step
-		if(shm_rat[0] < gbrat[bx]) {
-			for(int j = tx; j < s; j += blockDim.x) {
-				const int col = col_permut[i * s + j];
-				const int idx = ELEM_BIDX(block_pos, shm_pos[0], col);
-				particle_gbest[col] = particle_lbest[idx + j];
-			}
+	//reduction step
+	if (PARTICLE_COUNT >= 256) { PRED_STEP(128); __syncthreads(); }
+	if (PARTICLE_COUNT >= 128) { PRED_STEP(64);  __syncthreads(); }
+	if (PARTICLE_COUNT >=  64) { PRED_STEP(32);  __syncthreads(); }
+	if (PARTICLE_COUNT >=  32) { PRED_STEP(16);  __syncthreads(); }
+	if (PARTICLE_COUNT >=  16) { PRED_STEP( 8);  __syncthreads(); }
+	if (PARTICLE_COUNT >=   8) { PRED_STEP( 4);  __syncthreads(); }
+	if (PARTICLE_COUNT >=   4) { PRED_STEP( 2);  __syncthreads(); }
+	if (PARTICLE_COUNT >=   2) { PRED_STEP( 1);  __syncthreads(); }
+
+	__syncthreads();
+
+	//copy step
+	if(shm_rat[0] < gbrat[bx]) {
+		for(int j = tx; j < s; j += blockDim.x) {
+			const int col = col_permut[c * s + j];
+			const int idx = ELEM_BIDX(block_pos, shm_pos[0], col);
+			particle_gbest[col] = particle_lbest[idx + j];
+		}
+
+		if(tx == 0)
 			gbrat[bx] = shm_rat[0];
-		}
-
-		__syncthreads();
 	}
 }
 
-__global__ void pso_neighbor_best(struct pso_instance inst)
+__global__ void pso_neighbor_best(const struct pso_instance inst)
 {
 	const int s = inst.s[bx];
 	const int s_count = inst.width_per_line / s;
@@ -134,7 +134,7 @@ __device__ float curand_cauchy(curandState* rnd)
 //	return tan(M_PI * curand_uniform(rnd));
 }
 
-__device__ static double pso_mut_new_value(struct pso_instance & inst,
+__device__ static double pso_mut_new_value(const struct pso_instance & inst,
 					   curandState         * const rnd_state)
 {
 	/* we want to begin with small numbers */
@@ -151,40 +151,52 @@ __device__ static double pso_mut_new_value(struct pso_instance & inst,
 	return factor * inst.delta;
 }
 
-__device__ void pso_ensure_constraints(struct pso_instance & inst,
-				       curandState         * const rnd_state,
+__device__ void pso_ensure_constraints(const struct pso_instance & inst,
+				       curandState         * const rnd,
 				       double              * const elems)
 {
-	const int end = inst.width_per_line;
-	const int width_per_matrix = inst.width_per_matrix;
-	const int width_per_line = inst.dim.matrix_width;
+	const int matrices = inst.num_matrices;
+	int x;
 
-	for(int start = 0; start < end; start += width_per_matrix) {
+	if(tx < PARTICLE_COUNT) {
 		if(inst.cond_left == COND_UPPER_LEFT) {
-			if(elems[start] < 1.0)
-				elems[start] = pso_mut_new_value(inst, rnd_state);
-		} else if(inst.cond_left == COND_UPPER_RIGHT) {
-			if(elems[start + width_per_line] < 1.0)
-				elems[start + width_per_line] = pso_mut_new_value(inst, rnd_state);
-		} else if(inst.cond_left == COND_UPPER_LEFT_LOWER_RIGHT) {
-			if(elems[start] < 1.0)
-				elems[start] = pso_mut_new_value(inst, rnd_state);
+			for(x = 0; x < matrices; x++) {
+				const int matrix = x * inst.width_per_matrix * PARTICLE_COUNT + tx;
 
-			if(elems[start + width_per_matrix - 1] < 1.0)
-				elems[start + width_per_matrix - 1] = pso_mut_new_value(inst, rnd_state);
+				if(elems[matrix] < 1.0)
+					elems[matrix] = pso_mut_new_value(inst, rnd);
+			}
+		} else if(inst.cond_left == COND_UPPER_RIGHT) {
+			for(x = 0; x < matrices; x++) {
+				const int matrix = x * inst.width_per_matrix * PARTICLE_COUNT +
+						   inst.dim.matrix_width * PARTICLE_COUNT - 1 - tx;
+				if(elems[matrix] < 1.0)
+					elems[matrix] = pso_mut_new_value(inst, rnd);
+			}
+		} else if(inst.cond_left == COND_UPPER_LEFT_LOWER_RIGHT) {
+			for(x = 0; x < matrices; x++) {
+				const int matrix1 = x * inst.width_per_matrix * PARTICLE_COUNT + tx;
+				const int matrix2 = (x + 1) * inst.width_per_matrix * PARTICLE_COUNT - 1 - tx;
+
+				if(elems[matrix1] < 1.0)
+					elems[matrix1] = pso_mut_new_value(inst, rnd);
+
+				if(elems[matrix2] < 1.0)
+					elems[matrix2] = pso_mut_new_value(inst, rnd);
+			}
 		} else {
 			/*
 			 * This should be recognized ;) It's only a 1.3 card
 			 *  so there is no printf :/
 			 */
-			for(int i = 0; i < width_per_matrix; i++) {
-				elems[start + i] = 1337;
+			for(int i = 0; i < inst.width_per_matrix * PARTICLE_COUNT; i++) {
+				elems[i] = 1337;
 			}
 		}
 	}
 }
 
-__global__ void pso_swarm_step_ccpso2(struct pso_instance inst)
+__global__ void pso_swarm_step_ccpso2(const struct pso_instance inst)
 {
 	const int s = inst.s[bx];
 
@@ -227,7 +239,7 @@ __global__ void pso_swarm_step_ccpso2(struct pso_instance inst)
 	__syncthreads();
 
 	if(tx < PARTICLE_COUNT) {
-		const int idx   = ELEM_BIDX(block_pos, tx, 0);
+		const int idx   = ELEM_BIDX(block_pos, 0, 0);
 		pso_ensure_constraints(inst, &rnd_state, elems + idx);
 	}
 

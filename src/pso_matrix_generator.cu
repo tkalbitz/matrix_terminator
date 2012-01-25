@@ -261,6 +261,7 @@ int main(int argc, char** argv)
 	struct pso_instance inst;
 	struct matrix_option mopt;
 	struct pso_instance *dev_inst;
+	struct pso_instance host_inst;
 	int* dev_rules;
 	size_t freeBefore, freeAfter, total;
 
@@ -268,6 +269,7 @@ int main(int argc, char** argv)
 
 	CUDA_CALL(cudaMemGetInfo(&freeBefore, &total));
 	pso_inst_init(&inst, mopt.matrix_width);
+	host_inst = inst;
 	dev_inst = pso_inst_create_dev_inst(&inst, &dev_rules);
 	CUDA_CALL(cudaMemGetInfo(&freeAfter, &total));
 	printf("Allocated %.2f MiB from %.2f MiB\n",
@@ -277,7 +279,9 @@ int main(int argc, char** argv)
 	const dim3 blocks(BLOCKS, inst.dim.particles);
 	const dim3 threads(inst.dim.matrix_width, inst.dim.matrix_height);
 
-	setup_particle_kernel<<<1, 320>>>(dev_inst, false);
+	setup_global_particle_kernel<<<1, 320>>>(dev_inst);
+	CUDA_CALL(cudaGetLastError());
+	setup_particle_kernel<<<1, 320>>>(dev_inst);
 	CUDA_CALL(cudaGetLastError());
 
 	setup_rating<<<1, 512>>>(dev_inst);
@@ -300,21 +304,26 @@ int main(int argc, char** argv)
 //
 	int rounds = -1;
 	int block = 0; int thread = 0;
+	int s_count = 50 / s;
 
-	pso_calc_res<<<blocks, threads>>>(dev_inst);
+//	for(int c = 0; c < s_count; c++) {
+//		pso_calc_res<<<blocks, threads>>>(inst, c);
+//		CUDA_CALL(cudaGetLastError());
+//		cudaThreadSynchronize();
+//		CUDA_CALL(cudaGetLastError());
+//
+//		pso_evaluation_lbest<<<BLOCKS, PARTICLE_COUNT>>>(inst, c * PARTICLE_COUNT);
+//		CUDA_CALL(cudaGetLastError());
+//		cudaThreadSynchronize();
+//		CUDA_CALL(cudaGetLastError());
+//	}
+//
+//	pso_neighbor_best<<<BLOCKS, PARTICLE_COUNT>>>(inst);
 	CUDA_CALL(cudaGetLastError());
 	cudaThreadSynchronize();
 	CUDA_CALL(cudaGetLastError());
 
-	pso_evaluation_lbest<<<BLOCKS, PARTICLE_COUNT>>>(inst);
-	CUDA_CALL(cudaGetLastError());
-	cudaThreadSynchronize();
-	CUDA_CALL(cudaGetLastError());
-
-	pso_neighbor_best<<<BLOCKS, PARTICLE_COUNT>>>(inst);
-	CUDA_CALL(cudaGetLastError());
-	cudaThreadSynchronize();
-	CUDA_CALL(cudaGetLastError());
+	print_gbest_particle_ratings(inst);
 
 	for(unsigned long i = 0; i < mopt.rounds; i++) {
 		cudaEventCreate(&start);
@@ -322,22 +331,24 @@ int main(int argc, char** argv)
 		// Start record
 		cudaEventRecord(start, 0);
 
-		pso_swarm_step_ccpso2<<<BLOCKS, 64>>>(inst);
-		CUDA_CALL(cudaGetLastError());
-		cudaThreadSynchronize();
-		CUDA_CALL(cudaGetLastError());
+		for(int c = 0; c < s_count; c++) {
+			pso_calc_res<<<blocks, threads>>>(inst, c);
+			CUDA_CALL(cudaGetLastError());
+			cudaThreadSynchronize();
+			CUDA_CALL(cudaGetLastError());
 
-		pso_calc_res<<<blocks, threads>>>(dev_inst);
-		CUDA_CALL(cudaGetLastError());
-		cudaThreadSynchronize();
-		CUDA_CALL(cudaGetLastError());
-
-		pso_evaluation_lbest<<<BLOCKS, PARTICLE_COUNT>>>(inst);
-		CUDA_CALL(cudaGetLastError());
-		cudaThreadSynchronize();
-		CUDA_CALL(cudaGetLastError());
+			pso_evaluation_lbest<<<BLOCKS, PARTICLE_COUNT>>>(inst, c * PARTICLE_COUNT);
+			CUDA_CALL(cudaGetLastError());
+			cudaThreadSynchronize();
+			CUDA_CALL(cudaGetLastError());
+		}
 
 		pso_neighbor_best<<<BLOCKS, PARTICLE_COUNT>>>(inst);
+		CUDA_CALL(cudaGetLastError());
+		cudaThreadSynchronize();
+		CUDA_CALL(cudaGetLastError());
+
+		pso_swarm_step_ccpso2<<<BLOCKS, 64>>>(inst);
 		CUDA_CALL(cudaGetLastError());
 		cudaThreadSynchronize();
 		CUDA_CALL(cudaGetLastError());
@@ -350,9 +361,9 @@ int main(int argc, char** argv)
 		// Clean up:
 		cudaEventDestroy(start);
 		cudaEventDestroy(stop);
-//
+
 //		if(i % 1000 == 0)
-//			print_gbest_particle_ratings(&inst);
+			print_gbest_particle_ratings(inst);
 //		copy_gb_rating_dev_to_host(&inst, rating);
 ////		plot_log(pl, i, rating);
 //
@@ -380,9 +391,9 @@ int main(int argc, char** argv)
 		inst.res_child_block, inst.res_child_idx, inst.res_parent);
 
 //	print_particle_ratings(&inst);
-//	print_gbest_particle_ratings(&inst);
-//	print_global_matrix_pretty(stdout, &inst, block);
-//	print_rules(stdout, &inst);
+	print_gbest_particle_ratings(inst);
+	print_global_matrix_pretty(stdout, &inst, block);
+	print_rules(stdout, &host_inst);
 ////	print_parents(&inst, &mopt, block, thread, rounds);
 
 	printf("Clean up and exit.\n");

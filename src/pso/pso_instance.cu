@@ -150,7 +150,7 @@ struct pso_instance* pso_inst_create_dev_inst(struct pso_instance *inst,
 }
 
 void pso_inst_copy_dev_to_host(struct pso_instance * const dev,
-			   struct pso_instance * const host)
+			      struct pso_instance * const host)
 {
 	int *rules = host->rules;
 	CUDA_CALL(cudaMemcpy(host, dev, sizeof(*dev), cudaMemcpyDeviceToHost));

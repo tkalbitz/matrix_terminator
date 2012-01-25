@@ -16,7 +16,7 @@ void print_particle_matrix_pretty(FILE* f, struct pso_instance* inst,
 				 int block, int particle);
 void print_lbest_particle_matrix_pretty(FILE* f, struct pso_instance* inst,
 				        int block, int particle);
-void print_gbest_particle_ratings(struct pso_instance *inst);
+void print_gbest_particle_ratings(struct pso_instance& inst);
 void print_rules(FILE* f, struct pso_instance *inst);
 
 #endif /* PSO_PRINT_H_ */
