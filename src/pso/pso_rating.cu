@@ -42,7 +42,7 @@ __device__ inline void eval_set_res_matrix_to_identity()
 __device__ inline void eval_copy_matrix_to_res(const struct pso_instance& inst,
 		    	    	    	       const int cmatrix)
 {
-	RES(ty, tx) = inst.rat_tmp[RELEM(cmatrix, tx, ty)];
+	RES(ty, tx) = inst.rat_tmp[RELEM(cmatrix, ty, tx)];
 }
 
 __device__ void eval_mul_inplace(const struct pso_instance& inst,
@@ -164,7 +164,7 @@ __device__ void pso_result_rating(const struct pso_instance& inst)
 	__syncthreads();
 }
 
-__device__ void prepare_tmp_matrix(struct pso_instance& inst,
+__device__ void prepare_tmp_matrix(const struct pso_instance& inst,
 		                   const int s, const int cur)
 {
 	int i;
@@ -190,7 +190,8 @@ __device__ void prepare_tmp_matrix(struct pso_instance& inst,
 
 }
 
-__global__ void pso_calc_res(struct pso_instance inst, const int s, const int cur)
+__global__ void pso_calc_res(const struct pso_instance inst,
+		             const int s, const int cur)
 {
 	const int* end = inst.rules + inst.rules_len - 1;
 	const int* rules = inst.rules;
@@ -216,6 +217,7 @@ __global__ void pso_calc_res(struct pso_instance inst, const int s, const int cu
 
 		__syncthreads();
 		TRES(ty, tx) = RES(ty, tx);
+		__syncthreads();
 		eval_set_res_matrix_to_identity();
 		__syncthreads();
 
