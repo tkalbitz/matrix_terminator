@@ -36,11 +36,10 @@ __global__ void pso_evaluation_lbest(const struct pso_instance inst, const int c
 
 	const double * const prat = inst.prat  + s_count * bx * PARTICLE_COUNT;
 	double * const lbrat      = inst.lbrat + s_count * bx * PARTICLE_COUNT;
-	double * const gbrat      = inst.gbrat + s_count * bx;
 
 	double* const particle = inst.particle;
 	double* const particle_lbest = inst.particle_lbest;
-	double* const particle_gbest = inst.particle_gbest + bx * inst.width_per_line * PARTICLE_COUNT;
+	double* const particle_gbest = inst.particle_gbest + bx * inst.width_per_line;
 
 	//copy rating to shm
 	shm_rat[tx] = lbrat[cur + tx];
@@ -71,7 +70,7 @@ __global__ void pso_evaluation_lbest(const struct pso_instance inst, const int c
 	__syncthreads();
 
 	//copy step
-	if(shm_rat[0] < gbrat[bx]) {
+	if(shm_rat[0] < inst.gbrat[bx]) {
 		for(int j = tx; j < s; j += blockDim.x) {
 			const int col = col_permut[c * s + j];
 			const int idx = ELEM_BIDX(block_pos, shm_pos[0], col);
@@ -79,7 +78,7 @@ __global__ void pso_evaluation_lbest(const struct pso_instance inst, const int c
 		}
 
 		if(tx == 0)
-			gbrat[bx] = shm_rat[0];
+			inst.gbrat[bx] = shm_rat[0];
 	}
 }
 

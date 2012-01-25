@@ -138,7 +138,7 @@ setup_particle_kernel(struct pso_instance * const inst)
 __global__ void setup_rating(struct pso_instance * const inst)
 {
 	int i = 0;
-	int len = (inst->width_per_line / 2 + 1) * inst->dim.particles *
+	int len = inst->width_per_line * inst->dim.particles *
 		   inst->dim.blocks;
 
 	for(i = tx; i < len; i += blockDim.x) {

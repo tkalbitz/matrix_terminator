@@ -6,6 +6,8 @@
 
 #include "pso_rating.h"
 #include "pso_memory.h"
+#include "pso_config.h"
+
 
 #define RBLOCK           (blockIdx.x * inst.width_per_line * inst.dim.particles + blockIdx.y * inst.width_per_line)
 #define RMAT(mat)        (RBLOCK + (mat) * inst.width_per_matrix)
@@ -188,10 +190,8 @@ __device__ void prepare_tmp_matrix(struct pso_instance& inst,
 
 }
 
-__global__ void pso_calc_res(struct pso_instance inst, const int cur)
+__global__ void pso_calc_res(struct pso_instance inst, const int s, const int cur)
 {
-	const int s       = inst.s[bx];
-
 	const int* end = inst.rules + inst.rules_len - 1;
 	const int* rules = inst.rules;
 
@@ -236,9 +236,10 @@ __global__ void pso_calc_res(struct pso_instance inst, const int cur)
 		if(inst.match == MATCH_ANY)
 			shrd_rating += matrix_form;
 
-		const int idx = inst.dim.particles * blockIdx.x *
-				(inst.width_per_line / s) + cur *
-				inst.dim.particles + blockIdx.y;
+		const int s_count = inst.width_per_line / s;
+		const int idx = PARTICLE_COUNT * blockIdx.x * s_count +
+				cur * s_count +
+				blockIdx.y;
 		inst.prat[idx] = shrd_rating;
 	}
 }

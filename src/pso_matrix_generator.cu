@@ -306,19 +306,19 @@ int main(int argc, char** argv)
 	int block = 0; int thread = 0;
 	int s_count = 50 / s;
 
-//	for(int c = 0; c < s_count; c++) {
-//		pso_calc_res<<<blocks, threads>>>(inst, c);
-//		CUDA_CALL(cudaGetLastError());
-//		cudaThreadSynchronize();
-//		CUDA_CALL(cudaGetLastError());
-//
-//		pso_evaluation_lbest<<<BLOCKS, PARTICLE_COUNT>>>(inst, c * PARTICLE_COUNT);
-//		CUDA_CALL(cudaGetLastError());
-//		cudaThreadSynchronize();
-//		CUDA_CALL(cudaGetLastError());
-//	}
-//
-//	pso_neighbor_best<<<BLOCKS, PARTICLE_COUNT>>>(inst);
+	for(int c = 0; c < s_count; c++) {
+		pso_calc_res<<<blocks, threads>>>(inst, s, c);
+		CUDA_CALL(cudaGetLastError());
+		cudaThreadSynchronize();
+		CUDA_CALL(cudaGetLastError());
+
+		pso_evaluation_lbest<<<BLOCKS, PARTICLE_COUNT>>>(inst, c * PARTICLE_COUNT);
+		CUDA_CALL(cudaGetLastError());
+		cudaThreadSynchronize();
+		CUDA_CALL(cudaGetLastError());
+	}
+
+	pso_neighbor_best<<<BLOCKS, PARTICLE_COUNT>>>(inst);
 	CUDA_CALL(cudaGetLastError());
 	cudaThreadSynchronize();
 	CUDA_CALL(cudaGetLastError());
@@ -332,7 +332,7 @@ int main(int argc, char** argv)
 		cudaEventRecord(start, 0);
 
 		for(int c = 0; c < s_count; c++) {
-			pso_calc_res<<<blocks, threads>>>(inst, c);
+			pso_calc_res<<<blocks, threads>>>(inst, s, c);
 			CUDA_CALL(cudaGetLastError());
 			cudaThreadSynchronize();
 			CUDA_CALL(cudaGetLastError());

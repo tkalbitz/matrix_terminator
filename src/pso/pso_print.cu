@@ -38,7 +38,8 @@ void print_global_matrix_pretty(FILE* f, struct pso_instance* inst, int block)
 		char matrix = 'A' + m;
 		fprintf(f, "%c: matrix(\n", matrix);
 		for (int h = 0; h < inst->dim.matrix_height; h++) {
-			int pos = h * inst->dim.matrix_width;
+			int pos = m * inst->width_per_matrix +
+				  h * inst->dim.matrix_width;
 			fprintf(f, "[ ");
 
 			for (int w = 0; w < inst->dim.matrix_width - 1; w++) {
