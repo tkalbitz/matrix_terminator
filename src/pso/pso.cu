@@ -47,8 +47,8 @@ __global__ void pso_evaluation_lbest(struct pso_instance inst)
 		shm_rat[tx] = lbrat[i + tx];
 		shm_pos[tx] = tx;
 
-		//copy better parts
-		if(shm_rat[tx] > prat[i + tx]) {
+		//new particle is better than his memory
+		if(prat[i + tx] < shm_rat[tx]) {
 			for(int j = 0; j < s; j++) {
 				const int idx = ELEM_BIDX(block_pos, tx, col_permut[i * s + j]);
 				particle_lbest[idx + j] = particle[idx + j];
@@ -70,18 +70,17 @@ __global__ void pso_evaluation_lbest(struct pso_instance inst)
 		if (PARTICLE_COUNT >=   2) { PRED_STEP( 1);  __syncthreads(); }
 
 		//copy step
-		if(gbrat[i] > shm_rat[0]) {
+		if(shm_rat[0] < gbrat[bx]) {
 			for(int j = tx; j < s; j += blockDim.x) {
 				const int col = col_permut[i * s + j];
 				const int idx = ELEM_BIDX(block_pos, shm_pos[0], col);
 				particle_gbest[col] = particle_lbest[idx + j];
 			}
-			gbrat[i] = shm_rat[0];
+			gbrat[bx] = shm_rat[0];
 		}
+
+		__syncthreads();
 	}
-
-	__syncthreads();
-
 }
 
 __global__ void pso_neighbor_best(struct pso_instance inst)

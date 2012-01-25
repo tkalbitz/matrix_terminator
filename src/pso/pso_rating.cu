@@ -247,3 +247,4 @@ __global__ void pso_calc_res(struct pso_instance * const inst)
 		}
 	}
 }
+

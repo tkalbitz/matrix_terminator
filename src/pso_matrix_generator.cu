@@ -276,7 +276,6 @@ int main(int argc, char** argv)
 
 	const dim3 blocks(BLOCKS, inst.dim.particles);
 	const dim3 threads(inst.dim.matrix_width, inst.dim.matrix_height);
-	const dim3 setup_threads(min(512, inst.width_per_line));
 
 	setup_particle_kernel<<<1, 320>>>(dev_inst, false);
 	CUDA_CALL(cudaGetLastError());
