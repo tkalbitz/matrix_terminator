@@ -312,7 +312,7 @@ int main(int argc, char** argv)
 		cudaThreadSynchronize();
 		CUDA_CALL(cudaGetLastError());
 
-		pso_evaluation_lbest<<<BLOCKS, PARTICLE_COUNT>>>(inst, c * PARTICLE_COUNT);
+		pso_evaluation_lbest<<<BLOCKS, PARTICLE_COUNT>>>(inst, s, c * PARTICLE_COUNT);
 		CUDA_CALL(cudaGetLastError());
 		cudaThreadSynchronize();
 		CUDA_CALL(cudaGetLastError());
@@ -337,7 +337,7 @@ int main(int argc, char** argv)
 			cudaThreadSynchronize();
 			CUDA_CALL(cudaGetLastError());
 
-			pso_evaluation_lbest<<<BLOCKS, PARTICLE_COUNT>>>(inst, c * PARTICLE_COUNT);
+			pso_evaluation_lbest<<<BLOCKS, PARTICLE_COUNT>>>(inst, s, c * PARTICLE_COUNT);
 			CUDA_CALL(cudaGetLastError());
 			cudaThreadSynchronize();
 			CUDA_CALL(cudaGetLastError());

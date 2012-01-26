@@ -240,7 +240,7 @@ __global__ void pso_calc_res(const struct pso_instance inst,
 
 		const int s_count = inst.width_per_line / s;
 		const int idx = PARTICLE_COUNT * blockIdx.x * s_count +
-				cur * s_count +
+				cur * PARTICLE_COUNT +
 				blockIdx.y;
 		inst.prat[idx] = shrd_rating;
 	}

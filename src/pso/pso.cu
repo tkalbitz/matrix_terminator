@@ -22,14 +22,14 @@
 /**
  * can only be launched with PARTICLE_COUNT threads
  */
-__global__ void pso_evaluation_lbest(const struct pso_instance inst, const int cur)
+__global__ void pso_evaluation_lbest(const struct pso_instance inst,
+				     const int s,
+				     const int cur)
 {
-	const int s = inst.s[bx];
-
 	__shared__ double shm_rat[PARTICLE_COUNT];
 	__shared__ int    shm_pos[PARTICLE_COUNT];
 
-	const int block_pos = BLOCK_POS2;
+	const int block_pos = BLOCK_POS;
 	const int s_count = inst.width_per_line / s;
 	const int c = cur / PARTICLE_COUNT;
 	const int * const col_permut = inst.col_permut + inst.width_per_line * bx;
@@ -38,7 +38,7 @@ __global__ void pso_evaluation_lbest(const struct pso_instance inst, const int c
 	double * const lbrat      = inst.lbrat + s_count * bx * PARTICLE_COUNT;
 
 	double* const particle = inst.particle;
-	double* const particle_lbest = inst.particle_lbest;
+	double* const particle_lbest = inst.particle_lbest + bx * s_count;
 	double* const particle_gbest = inst.particle_gbest + bx * inst.width_per_line;
 
 	//copy rating to shm
@@ -58,9 +58,9 @@ __global__ void pso_evaluation_lbest(const struct pso_instance inst, const int c
 	__syncthreads();
 
 	//reduction step
-	if (PARTICLE_COUNT >= 256) { PRED_STEP(128); __syncthreads(); }
-	if (PARTICLE_COUNT >= 128) { PRED_STEP(64);  __syncthreads(); }
-	if (PARTICLE_COUNT >=  64) { PRED_STEP(32);  __syncthreads(); }
+//	if (PARTICLE_COUNT >= 256) { PRED_STEP(128); __syncthreads(); }
+//	if (PARTICLE_COUNT >= 128) { PRED_STEP(64);  __syncthreads(); }
+//	if (PARTICLE_COUNT >=  64) { PRED_STEP(32);  __syncthreads(); }
 	if (PARTICLE_COUNT >=  32) { PRED_STEP(16);  __syncthreads(); }
 	if (PARTICLE_COUNT >=  16) { PRED_STEP( 8);  __syncthreads(); }
 	if (PARTICLE_COUNT >=   8) { PRED_STEP( 4);  __syncthreads(); }
@@ -212,7 +212,7 @@ __global__ void pso_swarm_step_ccpso2(const struct pso_instance inst)
 	const int col_add   = blockDim.x / PARTICLE_COUNT;
 	const int end	    = inst.width_per_line;
 	const int particle  = tx - col_start * PARTICLE_COUNT;
-	const int block_pos = BLOCK_POS2;
+	const int block_pos = BLOCK_POS;
 
 	const int* const lb_idx = inst.lbest_idx + (end / s) * bx * PARTICLE_COUNT;
 
