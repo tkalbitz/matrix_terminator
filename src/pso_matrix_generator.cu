@@ -13,6 +13,7 @@
 #include <getopt.h>
 #include <ctype.h>
 #include <errno.h>
+#include <float.h>
 
 #include <sys/wait.h>
 
@@ -25,6 +26,7 @@
 #include "pso.h"
 #include "pso_rating.h"
 #include "pso_setup.h"
+#include "pso_param_s.h"
 
 #include "pso_print.h"
 #include "pso_copy.h"
@@ -256,6 +258,24 @@ static void parse_configuration(struct pso_instance* const inst,
 	parse_rules(inst, argv[optind]);
 }
 
+void update_lbest(struct pso_instance& inst, struct param_s& ps)
+{
+	const dim3 blocks(BLOCKS, inst.dim.particles);
+	const dim3 threads(inst.dim.matrix_width, inst.dim.matrix_height);
+
+	for(int c = 0; c < ps.s_count; c++) {
+		pso_calc_res<<<blocks, threads>>>(inst, ps.s, c);
+		CUDA_CALL(cudaGetLastError());
+		cudaThreadSynchronize();
+		CUDA_CALL(cudaGetLastError());
+
+		pso_evaluation_lbest<<<BLOCKS, PARTICLE_COUNT>>>(inst, ps.s, c * PARTICLE_COUNT);
+		CUDA_CALL(cudaGetLastError());
+		cudaThreadSynchronize();
+		CUDA_CALL(cudaGetLastError());
+	}
+}
+
 int main(int argc, char** argv)
 {
 	struct pso_instance inst;
@@ -265,19 +285,20 @@ int main(int argc, char** argv)
 	int* dev_rules;
 	size_t freeBefore, freeAfter, total;
 
+	srand(time(0));
 	parse_configuration(&inst, &mopt, argc, argv);
 
 	CUDA_CALL(cudaMemGetInfo(&freeBefore, &total));
+
 	pso_inst_init(&inst, mopt.matrix_width);
 	host_inst = inst;
 	dev_inst = pso_inst_create_dev_inst(&inst, &dev_rules);
+
 	CUDA_CALL(cudaMemGetInfo(&freeAfter, &total));
 	printf("Allocated %.2f MiB from %.2f MiB\n",
 			(freeBefore - freeAfter) / 1024 / 1024.f,
 			total / 1024 / 1024.f);
 
-	const dim3 blocks(BLOCKS, inst.dim.particles);
-	const dim3 threads(inst.dim.matrix_width, inst.dim.matrix_height);
 
 	setup_global_particle_kernel<<<1, 320>>>(dev_inst);
 	CUDA_CALL(cudaGetLastError());
@@ -296,7 +317,9 @@ int main(int argc, char** argv)
 	cudaEvent_t start, stop;
 	float elapsedTime;
 	float elapsedTimeTotal = 0.f;
-	int s = 2;
+
+	struct param_s ps;
+	param_s_init(inst, ps);
 //
 //	double * const rating = (double*)ya_malloc(BLOCKS * sizeof(double));
 ////	struct plot_log* pl = init_plot_log(mopt.plot_log_enable,
@@ -304,26 +327,6 @@ int main(int argc, char** argv)
 //
 	int rounds = -1;
 	int block = 0; int thread = 0;
-	int s_count = 50 / s;
-
-	for(int c = 0; c < s_count; c++) {
-		pso_calc_res<<<blocks, threads>>>(inst, s, c);
-		CUDA_CALL(cudaGetLastError());
-		cudaThreadSynchronize();
-		CUDA_CALL(cudaGetLastError());
-
-		pso_evaluation_lbest<<<BLOCKS, PARTICLE_COUNT>>>(inst, s, c * PARTICLE_COUNT);
-		CUDA_CALL(cudaGetLastError());
-		cudaThreadSynchronize();
-		CUDA_CALL(cudaGetLastError());
-	}
-
-	pso_neighbor_best<<<BLOCKS, PARTICLE_COUNT>>>(inst);
-	CUDA_CALL(cudaGetLastError());
-	cudaThreadSynchronize();
-	CUDA_CALL(cudaGetLastError());
-
-	print_gbest_particle_ratings(inst);
 
 	for(unsigned long i = 0; i < mopt.rounds; i++) {
 		cudaEventCreate(&start);
@@ -331,24 +334,15 @@ int main(int argc, char** argv)
 		// Start record
 		cudaEventRecord(start, 0);
 
-		for(int c = 0; c < s_count; c++) {
-			pso_calc_res<<<blocks, threads>>>(inst, s, c);
-			CUDA_CALL(cudaGetLastError());
-			cudaThreadSynchronize();
-			CUDA_CALL(cudaGetLastError());
+		update_lbest(inst, ps);
+		param_s_update(inst, ps);
 
-			pso_evaluation_lbest<<<BLOCKS, PARTICLE_COUNT>>>(inst, s, c * PARTICLE_COUNT);
-			CUDA_CALL(cudaGetLastError());
-			cudaThreadSynchronize();
-			CUDA_CALL(cudaGetLastError());
-		}
-
-		pso_neighbor_best<<<BLOCKS, PARTICLE_COUNT>>>(inst);
+		pso_neighbor_best<<<BLOCKS, PARTICLE_COUNT>>>(inst, ps.s);
 		CUDA_CALL(cudaGetLastError());
 		cudaThreadSynchronize();
 		CUDA_CALL(cudaGetLastError());
 
-		pso_swarm_step_ccpso2<<<BLOCKS, 64>>>(inst);
+		pso_swarm_step_ccpso2<<<BLOCKS, 64>>>(inst, ps.s);
 		CUDA_CALL(cudaGetLastError());
 		cudaThreadSynchronize();
 		CUDA_CALL(cudaGetLastError());
@@ -363,6 +357,8 @@ int main(int argc, char** argv)
 		cudaEventDestroy(stop);
 
 //		if(i % 1000 == 0)
+
+
 			print_gbest_particle_ratings(inst);
 //		copy_gb_rating_dev_to_host(&inst, rating);
 ////		plot_log(pl, i, rating);
@@ -390,14 +386,13 @@ int main(int argc, char** argv)
 	printf("Result was in block: %d, child: %d, selection: %d\n",
 		inst.res_child_block, inst.res_child_idx, inst.res_parent);
 
-//	print_particle_ratings(&inst);
 	print_gbest_particle_ratings(inst);
 	print_global_matrix_pretty(stdout, &inst, block);
 	print_rules(stdout, &host_inst);
-////	print_parents(&inst, &mopt, block, thread, rounds);
 
 	printf("Clean up and exit.\n");
 	pso_inst_cleanup(&inst, dev_inst);
+	param_s_destroy(ps);
 	cudaFree(dev_rules);
 	cudaThreadExit();
 

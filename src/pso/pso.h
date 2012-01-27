@@ -12,9 +12,9 @@
 #include "pso_memory.h"
 #include "pso_config.h"
 
-__global__ void pso_swarm_step_ccpso2(const struct pso_instance inst);
+__global__ void pso_swarm_step_ccpso2(const struct pso_instance inst, const int s);
 __global__ void pso_evaluation_lbest(const struct pso_instance inst,
 		                     const int s, const int cur);
-__global__ void pso_neighbor_best(const struct pso_instance inst);
+__global__ void pso_neighbor_best(const struct pso_instance inst, const int s);
 
 #endif /* PSO_H_ */

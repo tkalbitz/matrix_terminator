@@ -49,6 +49,7 @@ CUDA_ADD_EXECUTABLE( matrix_generator
 
 CUDA_ADD_EXECUTABLE( pso_matrix_generator
   pso_matrix_generator.cu
+  pso/pso_param_s.cu
   pso/pso_instance.cu
   pso/pso_setup.cu
   pso/pso_rating.cu

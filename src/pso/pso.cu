@@ -84,9 +84,8 @@ __global__ void pso_evaluation_lbest(const struct pso_instance inst,
 	}
 }
 
-__global__ void pso_neighbor_best(const struct pso_instance inst)
+__global__ void pso_neighbor_best(const struct pso_instance inst, const int s)
 {
-	const int s = inst.s[bx];
 	const int s_count = inst.width_per_line / s;
 
 	double * const lbrat  = inst.lbrat     + s_count * bx * PARTICLE_COUNT;
@@ -197,10 +196,8 @@ __device__ void pso_ensure_constraints(const struct pso_instance & inst,
 	}
 }
 
-__global__ void pso_swarm_step_ccpso2(const struct pso_instance inst)
+__global__ void pso_swarm_step_ccpso2(const struct pso_instance inst, const int s)
 {
-	const int s = inst.s[bx];
-
 	const double delta = inst.delta;
 	const int id = get_thread_id();
 	curandState rnd_state = inst.rnd_states[id];
