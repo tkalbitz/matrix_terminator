@@ -9,8 +9,10 @@
 #include <stdio.h>
 #include <string.h>
 #include <float.h>
+#include <curand_kernel.h>
 
 #include "pso_param_s.h"
+#include "pso_memory.h"
 #include "ya_malloc.h"
 
 extern void update_lbest(struct pso_instance& inst, struct param_s& ps);
@@ -46,6 +48,39 @@ __global__ void reset_lbest(struct pso_instance inst) {
 	}
 }
 
+__global__ void permutate_columns(struct pso_instance inst) {
+	const int len = inst.width_per_line;
+	int* cols = inst.col_permut + len * tx;
+	int tmp, r1, r2;
+
+	const int id = get_thread_id();
+	curandState rnd = inst.rnd_states[id];
+
+	for(int i = 0; i < len; i++) {
+		r1 = curand(&rnd) % len;
+		r2 = curand(&rnd) % len;
+
+		tmp  = cols[r1];
+		cols[r1] = cols[r2];
+		cols[r2]  = tmp;
+	}
+
+	inst.rnd_states[id] = rnd;
+}
+
+void print_col_permut(struct pso_instance& inst)
+{
+	const int width = inst.width_per_line * sizeof(int);
+	int* col = (int*)ya_malloc(width);
+	CUDA_CALL(cudaMemcpy(col, inst.col_permut, width, cudaMemcpyDeviceToHost));
+
+	printf("col perm:");
+	for(int i = 0; i < inst.width_per_line; i++) {
+		printf("%d ", col[i]);
+	}
+	printf("\n");
+}
+
 void param_s_update(struct pso_instance& inst, struct param_s& ps)
 {
 	const int width = BLOCKS * sizeof(double);
@@ -60,7 +95,9 @@ void param_s_update(struct pso_instance& inst, struct param_s& ps)
 		ps.s = ps.s_set[rand() % ps.s_set_len];
 		ps.s_count = inst.width_per_line / ps.s;
 		printf("set s:%d %f %f\n", ps.s, new_rat[0], ps.old_rat[0]);
-		reset_lbest<<<512, 1>>>(inst);
+		reset_lbest<<<512, BLOCKS>>>(inst);
+		permutate_columns<<<BLOCKS, 1>>>(inst);
+//		print_col_permut(inst);
 		update_lbest(inst, ps);
 	}
 
