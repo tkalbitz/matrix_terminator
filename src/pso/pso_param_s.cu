@@ -92,13 +92,19 @@ void param_s_update(struct pso_instance& inst, struct param_s& ps)
 
 	//TODO: More than one block
 	if(abs(new_rat[0] - ps.old_rat[0]) < eps) {
+		CUDA_CALL(cudaMemcpy(inst.particle, inst.particle_lbest,
+				     inst.total * sizeof(double),
+				     cudaMemcpyDeviceToDevice));
+		reset_lbest<<<512, BLOCKS>>>(inst);
+
 		ps.s = ps.s_set[rand() % ps.s_set_len];
 		ps.s_count = inst.width_per_line / ps.s;
-		printf("set s:%d %f %f\n", ps.s, new_rat[0], ps.old_rat[0]);
-		reset_lbest<<<512, BLOCKS>>>(inst);
-		permutate_columns<<<BLOCKS, 1>>>(inst);
-//		print_col_permut(inst);
 		update_lbest(inst, ps);
+		permutate_columns<<<BLOCKS, 1>>>(inst);
+
+		printf("set s:%d %f %f\n", ps.s, new_rat[0], ps.old_rat[0]);
+
+//		print_col_permut(inst);
 	}
 
 	printf("s:%d %f %f\n", ps.s, new_rat[0], ps.old_rat[0]);
