@@ -36,9 +36,6 @@
 
 struct matrix_option {
 	int      matrix_width;
-	double   w;
-	double   c1;
-	double   c2;
 	uint32_t rounds;
 	char enable_maxima;
 	char plot_log_enable;
@@ -88,7 +85,7 @@ static void parse_rules(struct pso_instance * const inst, const char *rules)
 	inst->rules = (int*)ya_malloc(sizeof(int) * inst->rules_len);
 
 	uint8_t tmp = 0;
-	for(int i = 0; i < inst->rules_len; i++) {
+	for(size_t i = 0; i < inst->rules_len; i++) {
 		if(rules[i] >= 'a')
 			inst->rules[i] = (rules[i] == 'X') ? MUL_SEP : rules[i] - 'a';
 		else
@@ -120,11 +117,6 @@ static void parse_configuration(struct pso_instance* const inst,
 	mopt->enable_maxima   = 0;
 	mopt->plot_log_enable = 0;
 	mopt->matrix_width    = 5;
-	mopt->w               = 0.7298;
-//	mopt->c1              = 0.2;
-//	mopt->c2              = 0.2;
-	mopt->c1              = 2.05;
-	mopt->c2              = 2.05;
 
 	struct option opt[] =
 	{
@@ -320,8 +312,9 @@ int main(int argc, char** argv)
 
 	struct param_s ps;
 	param_s_init(inst, ps);
-//
-//	double * const rating = (double*)ya_malloc(BLOCKS * sizeof(double));
+
+	int width = inst.dim.blocks;
+	double *rating = (double*)ya_malloc(width * sizeof(double));
 ////	struct plot_log* pl = init_plot_log(mopt.plot_log_enable,
 ////					    mopt.plot_log_best);
 //
@@ -356,30 +349,21 @@ int main(int argc, char** argv)
 		cudaEventDestroy(start);
 		cudaEventDestroy(stop);
 
-//		if(i % 1000 == 0)
-
-
+		if(i % 200 == 0)
 			print_gbest_particle_ratings(inst);
-//		copy_gb_rating_dev_to_host(&inst, rating);
-////		plot_log(pl, i, rating);
-//
-//		for(int j = 0; j < BLOCKS; j++) {
-//			if(rating[j] == 0.) {
-//				block = j;
-//				rounds = i;
-//				i = mopt.rounds;
-//				break;
-//			}
-//		}
+		CUDA_CALL(cudaMemcpy(rating, inst.gbrat, width * sizeof(double),
+						cudaMemcpyDeviceToHost));
+
+		if(rating[0] == 0.) {
+			rounds = i;
+			block = i;
+			i = mopt.rounds;
+		}
 	}
-//
-//	free(rating);
+
+	free(rating);
 ////	clean_plot_log(pl);
-//	pso_inst_copy_dev_to_host(dev_inst, &inst);
-//
-////	print_sparam(&inst);
-////	print_parent_ratings(&inst);
-//
+
 	printf("Time needed: %f\n", elapsedTimeTotal);
 	printf("Needed rounds: %d\n", rounds);
 	printf("Result is block: %d, parent: %d\n", block, thread);

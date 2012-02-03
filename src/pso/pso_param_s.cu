@@ -19,9 +19,9 @@ extern void update_lbest(struct pso_instance& inst, struct param_s& ps);
 
 void param_s_init(struct pso_instance& inst, struct param_s& ps)
 {
-	int s_set[] = {1, 2, 5, 10, 25, 50};
+	int s_set[] = {1, 2, 5, 10, 25};
 
-	ps.s_set_len = 6;
+	ps.s_set_len = 5;
 	ps.s = 2;
 	ps.s_count = inst.width_per_line / ps.s;
 
@@ -99,14 +99,10 @@ void param_s_update(struct pso_instance& inst, struct param_s& ps)
 
 		ps.s = ps.s_set[rand() % ps.s_set_len];
 		ps.s_count = inst.width_per_line / ps.s;
-		update_lbest(inst, ps);
 		permutate_columns<<<BLOCKS, 1>>>(inst);
-
-		printf("set s:%d %f %f\n", ps.s, new_rat[0], ps.old_rat[0]);
-
-//		print_col_permut(inst);
+		update_lbest(inst, ps);
 	}
 
-	printf("s:%d %f %f\n", ps.s, new_rat[0], ps.old_rat[0]);
+//	printf("s:%d %f %f\n", ps.s, new_rat[0], ps.old_rat[0]);
 	memcpy(ps.old_rat, new_rat, width);
 }

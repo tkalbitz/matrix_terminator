@@ -10,28 +10,8 @@ extern "C" {
 }
 
 #include "instance.h"
-#include "evo_info.h"
+#include "mat_lib_info.h"
 #include "ya_malloc.h"
-
-static int evo_get_rules_count(const int * const rules,
-			       const size_t      rules_len)
-{
-	uint8_t tmp = 0;
-	int rules_count = 0;
-	for(size_t i = 0; i < rules_len; i++) {
-		if(rules[i] == MUL_SEP || rules[i] == MUL_MARK) {
-			tmp = (tmp + 1) % 2;
-			if(!tmp) {
-				rules_count++;
-			}
-		}
-	}
-
-	if((rules[rules_len - 1] != MUL_SEP && rules[rules_len - 1] != MUL_MARK) || tmp != 1)
-		return E_RULES_FORMAT_WRONG;
-
-	return rules_count;
-}
 
 int evo_create_instance(const int         matrix_width,
 		        const int * const rules,
@@ -63,7 +43,7 @@ int evo_create_instance(const int         matrix_width,
 	inst->rules       = (int*)ya_malloc(sizeof(int) * rules_len);
 	memcpy(inst->rules, rules, sizeof(int) * rules_len);
 
-	int rules_count = evo_get_rules_count(rules, rules_len);
+	int rules_count = get_rules_count(rules, rules_len);
 	if(rules_count < 0)
 		return rules_count;
 	inst->rules_count = rules_count;

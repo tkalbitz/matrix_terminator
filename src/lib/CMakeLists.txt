@@ -6,11 +6,23 @@ CUDA_INCLUDE_DIRECTORIES(
   )
 
 CUDA_ADD_LIBRARY( evo_matrix_generator
-  matrix_generator.cu
+  evo_matrix_generator.cu
+  pso_matrix_generator.cu
   matrix_generator.h
-  evo_info.cu
-  evo_info.h
-  evo_instance.cu
+  mat_lib_info.cu
+  mat_lib_info.h
+  evo_lib_instance.cu
+  pso_lib_instance.cu
+  ../pso/pso_instance.cu
+  ../pso/pso_instance.h
+  ../pso/pso.cu
+  ../pso/pso.h
+  ../pso/pso_rating.cu
+  ../pso/pso_rating.h
+  ../pso/pso_setup.cu
+  ../pso/pso_setup.h
+  ../pso/pso_param_s.h
+  ../pso/pso_param_s.cu
   ../evo/instance.cu
   ../evo/instance.h
   ../evo/evo.cu
@@ -28,7 +40,7 @@ CUDA_ADD_LIBRARY( evo_matrix_generator
   )
 
 ADD_EXECUTABLE( evo_lib_test
-  evo_lib_test.c
+  lib_test.c
   matrix_generator.h
 )  
 

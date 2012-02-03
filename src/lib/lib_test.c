@@ -28,7 +28,7 @@ int main(int argc, char **argv)
 				    MAT_WIDTH /* rows */ * sizeof(double));
 
 	/* initialize the library and allocate instance slots */
-	evo_lib_init();
+	mat_lib_init();
 
 	/*
 	 * Create a instance with a desired matrix width and rule set. All
@@ -70,7 +70,7 @@ end:
 	evo_destroy_instance(inst);
 
 	/* destroy all create slots and management structures */
-	evo_lib_destroy();
+	mat_lib_destroy();
 	return 0;
 }
 

@@ -33,6 +33,7 @@ void print_global_matrix_pretty(FILE* f, struct pso_instance* inst, int block)
 	int line = inst->width_per_inst;
 	int block_offset = line * inst->dim.matrix_height;
 	double* block_ptr = global_cpy + block_offset * block;
+	double tmp;
 
 	for(int m = 0; m < inst->num_matrices; m++) {
 		char matrix = 'A' + m;
@@ -46,7 +47,8 @@ void print_global_matrix_pretty(FILE* f, struct pso_instance* inst, int block)
 				fprintf(f, "%10.9e, ", global_cpy[pos + w]);
 			}
 
-			fprintf(f, "%10.9e ]", global_cpy[pos + inst->dim.matrix_width - 1]);
+			tmp = global_cpy[pos + inst->dim.matrix_width - 1];
+			fprintf(f, "%10.9e ]", tmp);
 
 			if(h < (inst->dim.matrix_height - 1))
 				fprintf(f, ",");

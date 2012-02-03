@@ -26,7 +26,7 @@ void init_rnd_generator(struct pso_instance *inst, int seed)
 			     count * BLOCKS * PARTICLE_COUNT * sizeof(curandState)));
 
 	const dim3 blocks(BLOCKS, inst->dim.particles);
-	setup_rnd_kernel<<<blocks, count>>>(rnd_states, seed);
+	setup_pso_rnd_kernel<<<blocks, count>>>(rnd_states, seed);
 	CUDA_CALL(cudaGetLastError());
 	cudaThreadSynchronize();
 	inst->rnd_states = rnd_states;

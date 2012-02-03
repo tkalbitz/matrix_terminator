@@ -10,7 +10,7 @@ extern "C"
 #include "matrix_generator.h"
 }
 
-#include "evo_info.h"
+#include "mat_lib_info.h"
 #include "evo_error.h"
 #include <stdlib.h>
 #include <unistd.h>
@@ -178,4 +178,3 @@ int evo_run(const int     instance,
 	cudaFree(dev_rules);
 	return rounds;
 }
-

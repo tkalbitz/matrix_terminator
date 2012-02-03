@@ -19,7 +19,7 @@ __device__ static double evo_mut_new_value(struct pso_instance * const inst,
 	const int rnd_val = (curand(rnd_state) % (tmp - 1)) + 1;
 	int factor = (int)(rnd_val / inst->delta);
 	if((factor * inst->delta) < 1.0)
-		factor*=2;
+		factor++;
 
 	const double val = factor * inst->delta;
 	if(val < 1.0)
@@ -28,7 +28,7 @@ __device__ static double evo_mut_new_value(struct pso_instance * const inst,
 	return val;
 }
 
-__global__ void setup_rnd_kernel(curandState* const rnd_states,
+__global__ void setup_pso_rnd_kernel(curandState* const rnd_states,
 				 const int seed)
 {
 	const int id = get_thread_id();
@@ -54,11 +54,7 @@ setup_global_particle_kernel(struct pso_instance * const inst)
 
 	const int gbest_len = inst->width_per_line * BLOCKS;
 	for(x = tx; x < gbest_len; x += blockDim.x) {
-		if(curand_uniform(&rnd) < MATRIX_TAKEN_POS) {
-			inst->particle_gbest[x] = curand(&rnd) % max1 ;
-		} else {
-			inst->particle_gbest[x] = 0;
-		}
+		inst->particle_gbest[x] = curand(&rnd) % max1 ;
 	}
 
 	__syncthreads();
@@ -99,11 +95,7 @@ setup_particle_kernel(struct pso_instance * const inst)
 	int x;
 
 	for(x = tx; x < end; x += blockDim.x) {
-		if(curand_uniform(&rnd) < MATRIX_TAKEN_POS) {
-			inst->particle[x] = curand(&rnd) % max1 ;
-		} else {
-			inst->particle[x] = 0;
-		}
+		inst->particle[x] = curand(&rnd) % max1 ;
 	}
 
 	__syncthreads();

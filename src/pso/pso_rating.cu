@@ -95,7 +95,7 @@ __device__ void pso_result_rating(const struct pso_instance& inst)
 	const int cols = MWIDTH  - 1;
 	double rating = 0.;
 
-	const double penalty = 1e9;
+	const double penalty = 1e6;
 
         if(ty == 0 && tx == 0) {
                 switch(inst.cond_right) {
@@ -128,8 +128,15 @@ __device__ void pso_result_rating(const struct pso_instance& inst)
         }
 	__syncthreads();
 	// keep only negative numbers
-	RES(ty, tx) = fabs(min(TRES(ty, tx) - RES(ty, tx), 0.));
-	RES(ty, tx) = __dmul_rn(RES(ty, tx), RES(ty, tx));
+	const double m = (RES(ty, tx) + 1) / (TRES(ty, tx) + 1);
+
+	if(min(TRES(ty, tx) - (RES(ty, tx)), 0.) == 0.)
+		RES(ty, tx) = 0;
+	else
+		RES(ty, tx) = m;
+
+//	RES(ty, tx) = fabs(min(TRES(ty, tx) - (RES(ty, tx)), 0.));
+//	RES(ty, tx) = __dmul_rn(RES(ty, tx), RES(ty, tx));
 	__syncthreads();
 
 	double c = 0.0;
@@ -138,9 +145,9 @@ __device__ void pso_result_rating(const struct pso_instance& inst)
 
 	//only lines are processed
 	if(tx == 0) {
-		sum = RES(ty, 0);
+		sum = 0.;
 
-		for(int i = 1; i < MWIDTH; i++) {
+		for(int i = 0; i < MWIDTH; i++) {
 			y = RES(ty, i) - c;
 			t = sum + y;
 			c = (t - sum) - y;
@@ -159,7 +166,7 @@ __device__ void pso_result_rating(const struct pso_instance& inst)
 			rating = t;
 		}
 
-		shrd_rating += sqrtf(rating);
+		shrd_rating += rating;
 	}
 	__syncthreads();
 }

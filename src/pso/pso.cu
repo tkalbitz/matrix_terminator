@@ -224,9 +224,9 @@ __global__ void pso_swarm_step_ccpso2(const struct pso_instance inst, const int 
 		double xi = elems[idx];
 
 		if(curand_uniform(&rnd_state) <= 0.5)
-			xi = lb  + curand_cauchy(&rnd_state) * abs((lb - lbn));
+			xi = lb  + curand_cauchy(&rnd_state) * abs(lb - lbn);
 		else
-			xi = lbn + curand_normal(&rnd_state) * abs((lb - lbn));
+			xi = lbn + curand_normal(&rnd_state) * abs(lb - lbn);
 
 		xi = __dmul_rn(__double2uint_rn(DIV(xi, delta)), delta);
 		xi = min(inst.parent_max, max(0., xi));
