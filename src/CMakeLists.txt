@@ -72,6 +72,16 @@ CUDA_ADD_EXECUTABLE( pso_matrix_generator
   DEBUG   -G3 -g -DDEBUG --maxrregcount=60
 )
 
+CUDA_ADD_EXECUTABLE( c_matrix_generator
+  custom_matrix_generator.cu
+  custom/c_instance.cu
+  custom/c_setup.cu
+  custom/c_rating.cu
+  OPTIONS -arch=sm_13 -use_fast_math --ptxas-options=-v -ccbin ${CMAKE_CURRENT_SOURCE_DIR}/../ccdir
+  RELEASE -O2 --compiler-options -Wall
+  DEBUG   -G3 -g -DDEBUG --maxrregcount=60
+)
+
 # Or compile the cuda code into a shared library.
 
 # Anything other than -D or /D is not passed along to nvcc.
@@ -98,6 +108,10 @@ add_definitions()
 #  main.c
 #  evo.cu
 #)
+
+ADD_EXECUTABLE( matrix
+  matrix.c
+)
 
 # Add a special target to clean nvcc generated files.
 CUDA_BUILD_CLEAN_TARGET()

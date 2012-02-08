@@ -1,7 +1,7 @@
 #!/bin/bash
 
 TARGET_DIR=build
-BLOCKS=1
+BLOCKS=8
 MATRIX_WIDTH=15
 
 if [ ! -f "$TARGET_DIR"/Makefile ] ; then

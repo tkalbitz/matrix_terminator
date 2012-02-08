@@ -1,4 +1,4 @@
-#ifndef EVO_RATING_H_
+#ifndef PSO_RATING_H_
 #define PSO_RATING_H_
 
 #include "pso_instance.h"
