@@ -9,7 +9,7 @@ extern "C" {
 #include "matrix_generator.h"
 }
 
-#include "instance.h"
+#include "evo/instance.h"
 #include "mat_lib_info.h"
 #include "ya_malloc.h"
 

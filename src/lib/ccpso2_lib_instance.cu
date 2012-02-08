@@ -9,7 +9,7 @@ extern "C" {
 #include "matrix_generator.h"
 }
 
-#include "pso_instance.h"
+#include "ccpso2/pso_instance.h"
 #include "mat_lib_info.h"
 #include "ya_malloc.h"
 

@@ -16,19 +16,20 @@ __device__ static double evo_mut_new_value(struct pso_instance * const inst,
 {
 	/* we want to begin with small numbers */
 	const int tmp = (inst->parent_max > 10) ? 10 : (int)inst->parent_max;
+
 	const int rnd_val = (curand(rnd_state) % (tmp - 1)) + 1;
 	int factor = (int)(rnd_val / inst->delta);
 	if((factor * inst->delta) < 1.0)
 		factor++;
 
-	const double val = factor * inst->delta;
+	double val = factor * inst->delta;
 	if(val < 1.0)
 		return 1.0;
 
-	return val;
+	return factor * inst->delta;
 }
 
-__global__ void setup_pso_rnd_kernel(curandState* const rnd_states,
+__global__ void setup_rnd_kernel(curandState* const rnd_states,
 				 const int seed)
 {
 	const int id = get_thread_id();
@@ -44,118 +45,116 @@ __global__ void setup_pso_rnd_kernel(curandState* const rnd_states,
  * Initialize the child memory with random values.
  */
 __global__ void
-setup_global_particle_kernel(struct pso_instance * const inst)
+setup_particle_kernel(struct pso_instance * const inst, bool half)
 {
+	if(half && blockIdx.x >= 16)
+		return;
+
 	const int id = get_thread_id();
 	curandState rnd = inst->rnd_states[id];
 
-	const int max1 = (int)inst->parent_max;
-	int x;
+	const uint32_t tp = threadIdx.x % inst->dim.matrix_width;
 
-	const int gbest_len = inst->width_per_line * BLOCKS;
-	for(x = tx; x < gbest_len; x += blockDim.x) {
-		inst->particle_gbest[x] = curand(&rnd) % max1 ;
+	const size_t p_pitch = inst->dev_particle.pitch;
+	char* const p_slice = ((char*)inst->dev_particle.ptr) + blockIdx.x *
+			              p_pitch * inst->dim.matrix_height;
+	double* p_row = (double*) (p_slice + (threadIdx.x / inst->dim.matrix_height) * p_pitch);
+
+	const size_t v_pitch = inst->dev_velocity.pitch;
+	char* const v_slice = ((char*)inst->dev_velocity.ptr) + blockIdx.x *
+			              v_pitch * inst->dim.matrix_height;
+	double* v_row = (double*) (v_slice + (threadIdx.x / inst->dim.matrix_height) * v_pitch);
+
+	const int max1 = (int)inst->parent_max;
+	const int max2 = (int)inst->parent_max / 2;
+	const int width = inst->width_per_inst;
+	const int end = inst->dim.particles * width;
+	uint8_t flag = 1;
+
+	for(uint32_t x = tp; x < end; x += inst->dim.matrix_width) {
+
+		//init velocity of particle
+		v_row[x] = curand_uniform(&rnd) * inst->parent_max;
+		if(curand_normal(&rnd) < 0)
+			v_row[x] = -v_row[x];
+
+		if(x % width == 0) {
+			flag = (flag + 1) & 1;
+		}
+
+		if(curand_uniform(&rnd) < MATRIX_TAKEN_POS) {
+	                if(flag) {
+	                	p_row[x] = curand(&rnd) % max1 ;
+	                } else {
+	                        p_row[x] = min(max(0., curand_normal(&rnd)*(curand(&rnd) % max2) + max2), inst->parent_max);
+	                }
+		} else {
+			p_row[x] = 0;
+		}
 	}
 
-	__syncthreads();
+	inst->rnd_states[id] = rnd;
 
-	const int matrices = inst->num_matrices *
-			     inst->dim.blocks;
+	if(threadIdx.x == 0) {
+		const int matrices = inst->num_matrices * inst->dim.particles;
+		int y;
+		int i;
 
-	if(inst->cond_left == COND_UPPER_LEFT) {
-		for(x = tx; x < matrices; x += blockDim.x) {
-			const int matrix = x * inst->width_per_matrix;
-                        inst->particle_gbest[matrix] = evo_mut_new_value(inst, &rnd);
-		}
-	} else if(inst->cond_left == COND_UPPER_RIGHT) {
-		for(x = tx; x < matrices; x += blockDim.x) {
-			const int matrix = x * inst->width_per_matrix +
-					   inst->dim.matrix_width - 1;
-                        inst->particle_gbest[matrix] = evo_mut_new_value(inst, &rnd);
-		}
-	} else if(inst->cond_left == COND_UPPER_LEFT_LOWER_RIGHT) {
-		for(x = tx; x < matrices; x += blockDim.x) {
-			const int matrix1 = x * inst->width_per_matrix;
-			const int matrix2 = (x + 1) * inst->width_per_matrix - 1;
-                        inst->particle_gbest[matrix1] = evo_mut_new_value(inst, &rnd);
-                        inst->particle_gbest[matrix2] = evo_mut_new_value(inst, &rnd);
+		if(inst->cond_left == COND_UPPER_LEFT) {
+			y = 0;
+			p_row = (double*) (p_slice + y * p_pitch);
+
+			for(i = 0; i < matrices; i++) {
+				p_row[i * inst->dim.matrix_width] = evo_mut_new_value(inst, &rnd);
+			}
+		} else if(inst->cond_left == COND_UPPER_RIGHT) {
+			y = 0;
+			p_row = (double*) (p_slice + y * p_pitch);
+
+			for(i = 0; i < matrices; i++) {
+				int idx = i * inst->dim.matrix_width + (inst->dim.matrix_width - 1);
+				p_row[idx] = evo_mut_new_value(inst, &rnd);
+			}
+		} else if(inst->cond_left == COND_UPPER_LEFT_LOWER_RIGHT) {
+			y = 0;
+			p_row = (double*) (p_slice + y * p_pitch);
+			for(i = 0; i < matrices; i++) {
+				p_row[i * inst->dim.matrix_width] = evo_mut_new_value(inst, &rnd);
+			}
+
+			y = (inst->dim.matrix_height - 1);
+			p_row = (double*) (p_slice + y * p_pitch);
+			for(i = 0; i < matrices; i++) {
+				int idx = i * inst->dim.matrix_width + (inst->dim.matrix_width - 1);
+				p_row[idx] = evo_mut_new_value(inst, &rnd);
+			}
 		}
 	}
 	inst->rnd_states[id] = rnd;
 }
 
-__global__ void
-setup_particle_kernel(struct pso_instance * const inst)
+__global__ void setup_param(struct pso_instance * const inst,
+			    const double weigth,
+			    const double c1,
+			    const double c2, bool half)
 {
-	const int id = get_thread_id();
-	curandState rnd = inst->rnd_states[id];
+	if(half && blockIdx.x >= 16)
+		return;
 
-	const int max1 = (int)inst->parent_max;
-	const int end = inst->total;
-	int x;
-
-	for(x = tx; x < end; x += blockDim.x) {
-		inst->particle[x] = curand(&rnd) % max1 ;
-	}
-
-	__syncthreads();
-
-	const int matrices = inst->num_matrices *
-			     inst->dim.blocks;
-
-	if(tx < PARTICLE_COUNT) {
-		if(inst->cond_left == COND_UPPER_LEFT) {
-			for(x = 0; x < matrices; x++) {
-				const int matrix = x * inst->width_per_matrix * PARTICLE_COUNT + tx;
-				inst->particle[matrix] = evo_mut_new_value(inst, &rnd);
-			}
-		} else if(inst->cond_left == COND_UPPER_RIGHT) {
-			for(x = 0; x < matrices; x++) {
-				const int matrix = x * inst->width_per_matrix * PARTICLE_COUNT +
-						   inst->dim.matrix_width * PARTICLE_COUNT - 1 - tx;
-				inst->particle[matrix] = evo_mut_new_value(inst, &rnd);
-			}
-		} else if(inst->cond_left == COND_UPPER_LEFT_LOWER_RIGHT) {
-			for(x = 0; x < matrices; x++) {
-				const int matrix1 = x * inst->width_per_matrix * PARTICLE_COUNT + tx;
-				const int matrix2 = (x + 1) * inst->width_per_matrix * PARTICLE_COUNT - 1 - tx;
-				inst->particle[matrix1] = evo_mut_new_value(inst, &rnd);
-				inst->particle[matrix2] = evo_mut_new_value(inst, &rnd);
-			}
-		}
-	}
-	inst->rnd_states[id] = rnd;
+	struct memory mem;
+	pso_init_mem(inst, &mem);
+	mem.param[3 * tx]     = weigth;
+	mem.param[3 * tx + 1] = c1;
+	mem.param[3 * tx + 2] = c2;
 }
 
 __global__ void setup_rating(struct pso_instance * const inst)
 {
-	int i = 0;
-	const int len = inst->width_per_line * inst->dim.particles *
-			inst->dim.blocks;
+	struct memory mem;
+	pso_init_mem(inst, &mem);
+	mem.lb_rat[tx] = FLT_MAX;
+	mem.p_rat[tx]  = FLT_MAX;
 
-	for(i = tx; i < len; i += blockDim.x) {
-		inst->prat[i] = FLT_MAX;
-		inst->lbrat[i] = FLT_MAX;
-	}
-
-	const int end = inst->dim.blocks;
-	if(tx < end) {
-		inst->gbrat[tx] = FLT_MAX;
-	}
-
-	//TODO
-	if(tx < BLOCKS) {
-		inst->s[tx] = 2;
-	}
-}
-
-__global__ void setup_col_permut(int* const col_permut,
-		                 const int total,
-		                 const int width_per_line)
-{
-	int i;
-
-	for(i = tx; i < total; i += blockDim.x) {
-		col_permut[i] = (i % width_per_line);
-	}
+	if(tx == 0)
+		inst->gb_rat[blockIdx.x] = FLT_MAX;
 }

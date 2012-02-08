@@ -6,68 +6,63 @@
 
 #include "pso_rating.h"
 #include "pso_memory.h"
-#include "pso_config.h"
-
-
-#define RBLOCK           (blockIdx.x * inst.width_per_line * inst.dim.particles + blockIdx.y * inst.width_per_line)
-#define RMAT(mat)        (RBLOCK + (mat) * inst.width_per_matrix)
-#define RELEM(mat, cy, cx) (RMAT(mat) + (cy) * inst.dim.matrix_width + (cx))
-#define RE(mat, cy, cx)   (inst.rat_tmp[RELEM(mat, cy, cx)])
-
-#define TIDX(cy, cx) (blockIdx.x * inst.width_per_matrix * inst.dim.particles + blockIdx.y * inst.width_per_matrix + cy * inst.dim.matrix_width + cx)
-#define TRES(cy, cx) inst.res[TIDX(cy, cx)]
-#define RES(cy, cx) res[((cy) * blockDim.y + (cx))]
 
 __shared__ int MHEIGHT;
 __shared__ int MWIDTH;
 
-__shared__ double res[MATRIX_HEIGHT * MATRIX_WIDTH];
+__shared__ double res[MATRIX_HEIGHT][MATRIX_WIDTH];
 __shared__ double shrd_rating;
 __shared__ double matrix_form;
 
 __device__ inline void eval_set_res_matrix_to_zero()
 {
-	RES(ty, tx) = 0.;
+	res[threadIdx.y][threadIdx.x] = 0.;
 }
 
 __device__ inline void eval_set_res_matrix_to_identity()
 {
-	if(tx != ty) {
-		RES(ty, tx) = 0.;
+	if(threadIdx.x != threadIdx.y) {
+		res[threadIdx.y][threadIdx.x] = 0.;
 	} else {
-		RES(ty, tx) = 1.;
+		res[threadIdx.y][threadIdx.x] = 1.;
 	}
 }
 
-__device__ inline void eval_copy_matrix_to_res(const struct pso_instance& inst,
+__device__ inline void eval_copy_matrix_to_res(const struct pso_instance * const inst,
+					       struct memory * const mem,
 		    	    	    	       const int cmatrix)
 {
-	RES(ty, tx) = inst.rat_tmp[RELEM(cmatrix, ty, tx)];
+	const int cstart = mem->p_zero + cmatrix * MWIDTH;
+	res[ty][tx] = P_ROW(ty)[cstart + tx];
 }
 
-__device__ void eval_mul_inplace(const struct pso_instance& inst,
+__device__ void eval_mul_inplace(const struct pso_instance * const inst,
+				 struct memory         * const mem,
 				 const int cmatrix)
 {
 	const int rows = MHEIGHT;
+	const int cstart = mem->p_zero  + cmatrix * MWIDTH;
 
 	double y, t;
 	double c = 0;
 	double sum = 0;
 
 	/* result rows */
+	#pragma unroll
 	for(int i = 0; i < rows; i++) {
-		y = __dmul_rn(RES(ty, i), RE(cmatrix, i, tx)) - c;
+		y = __dmul_rn(res[ty][i], P_ROW(i)[cstart + tx]) - c;
 		t = __dadd_rn(sum, y);
 		c = (t - sum) - y;
 		sum = t;
 	}
 
 	__syncthreads();
-	RES(ty, tx) = sum;
+	res[ty][tx] = sum;
 	__syncthreads();
 }
 
-__device__ const int* eval_interpret_rule(const struct pso_instance& inst,
+__device__ const int* eval_interpret_rule(const struct pso_instance * const inst,
+				    	  struct memory		    * const mem,
 				    	  const int                 * rule)
 {
 	if(*rule == MUL_SEP)
@@ -77,41 +72,42 @@ __device__ const int* eval_interpret_rule(const struct pso_instance& inst,
 	 * all multiplications are inplace,
 	 * so we copy the first matrix to our result
 	 */
-	eval_copy_matrix_to_res(inst, *rule);
+	eval_copy_matrix_to_res(inst, mem, *rule);
 	rule++;
 
 	__syncthreads();
 
 	for(; *rule != MUL_SEP; rule++) {
-		eval_mul_inplace(inst, *rule);
+		eval_mul_inplace(inst, mem, *rule);
 	}
 
 	return rule;
 }
 
-__device__ void pso_result_rating(const struct pso_instance& inst)
+__device__ void pso_result_rating(const struct pso_instance * const inst,
+				  struct memory         * const mem)
 {
 	const int rows = MHEIGHT - 1;
 	const int cols = MWIDTH  - 1;
 	double rating = 0.;
 
-	const double penalty = 1e6;
+	const double penalty = 1e9;
 
         if(ty == 0 && tx == 0) {
-                switch(inst.cond_right) {
+                switch(inst->cond_right) {
                 case COND_UPPER_LEFT:
-                        if((TRES(0, 0) - RES(0, 0)) < 1.f)
+                        if((R_ROW(0)[mem->r_zero] - res[0][0]) < 1.f)
                                 rating += penalty;
                         break;
                 case COND_UPPER_RIGHT:
-                        if((TRES(0, cols) - RES(0, cols)) < 1.f)
+                        if((R_ROW(0)[mem->r_zero + cols] - res[0][cols]) < 1.f)
                                 rating += penalty;
                         break;
                 case COND_UPPER_LEFT_LOWER_RIGHT:
-                        if((TRES(0, 0) - RES(0, 0)) < 1.f)
+                        if((R_ROW(0)[mem->r_zero] - res[0][0]) < 1.f)
                                 rating += penalty;
 
-                        if((TRES(rows, cols) - RES(rows, cols)) < 1.f)
+                        if((R_ROW(rows)[mem->r_zero + cols] - res[rows][cols]) < 1.f)
                                 rating += penalty;
                         break;
                 default:
@@ -119,7 +115,7 @@ __device__ void pso_result_rating(const struct pso_instance& inst)
                         break;
                 }
 
-                if(inst.match == MATCH_ANY) {
+                if(inst->match == MATCH_ANY) {
                         if(rating == 0.)
                                 matrix_form = 0.;
 
@@ -128,15 +124,8 @@ __device__ void pso_result_rating(const struct pso_instance& inst)
         }
 	__syncthreads();
 	// keep only negative numbers
-	const double m = (RES(ty, tx) + 1) / (TRES(ty, tx) + 1);
-
-	if(min(TRES(ty, tx) - (RES(ty, tx)), 0.) == 0.)
-		RES(ty, tx) = 0;
-	else
-		RES(ty, tx) = m;
-
-//	RES(ty, tx) = fabs(min(TRES(ty, tx) - (RES(ty, tx)), 0.));
-//	RES(ty, tx) = __dmul_rn(RES(ty, tx), RES(ty, tx));
+	res[ty][tx] = fabs(min(R_ROW(ty)[mem->r_zero + tx] - res[ty][tx], 0.));
+	res[ty][tx] = __dmul_rn(res[ty][tx], res[ty][tx]);
 	__syncthreads();
 
 	double c = 0.0;
@@ -145,94 +134,68 @@ __device__ void pso_result_rating(const struct pso_instance& inst)
 
 	//only lines are processed
 	if(tx == 0) {
-		sum = 0.;
+		sum = res[ty][0];
 
-		for(int i = 0; i < MWIDTH; i++) {
-			y = RES(ty, i) - c;
+		for(int i = 1; i < MWIDTH; i++) {
+			y = res[ty][i] - c;
 			t = sum + y;
 			c = (t - sum) - y;
 			sum = t;
 		}
 
-		RES(ty, 0) = sum;
+		res[ty][0] = sum;
 	}
 	__syncthreads();
 
 	if(tx == 0 && ty == 0) {
 		for(int i = 0; i < MHEIGHT; i++) {
-			y = RES(i, 0) - c;
+			y = res[i][0] - c;
 			t = rating + y;
 			c = (t - rating) - y;
 			rating = t;
 		}
 
-		shrd_rating += rating;
+		shrd_rating += sqrtf(rating);
 	}
 	__syncthreads();
 }
 
-__device__ void prepare_tmp_matrix(const struct pso_instance& inst,
-		                   const int s, const int cur)
+__global__ void pso_calc_res(struct pso_instance * const inst)
 {
-	int i;
-	int rpos = RELEM(0, ty, tx);
-	int gpos = blockIdx.x * inst.width_per_line +
-		   ty * inst.dim.matrix_width + tx;
+	__shared__ struct memory res_mem;
 
-	const int add = inst.width_per_matrix;
-
-	for(i = 0; i < inst.num_matrices; i++) {
-		inst.rat_tmp[rpos] = inst.particle_gbest[gpos];
-		gpos += add;
-		rpos += add;
-	}
-	__syncthreads();
-
-	const int end = cur * s + s;
-	for(i = cur * s + tx; i < end; i += blockDim.x) {
-		const int perm_idx = inst.col_permut[blockIdx.x * inst.width_per_line + i];
-		const int dest_idx = RMAT(0) + perm_idx;
-		inst.rat_tmp[dest_idx] = inst.particle[ELEM_IDX(perm_idx)];
-	}
-
-}
-
-__global__ void pso_calc_res(const struct pso_instance inst,
-		             const int s, const int cur)
-{
-	const int* end = inst.rules + inst.rules_len - 1;
-	const int* rules = inst.rules;
+	const int* end = inst->rules + inst->rules_len - 1;
+	const int* rules = inst->rules;
+	struct memory * const mem = &res_mem;
 
 	if(tx == 0 && ty == 0) {
-		MHEIGHT = inst.dim.matrix_height;
-		MWIDTH  = inst.dim.matrix_width;
+		MHEIGHT = inst->dim.matrix_height;
+		MWIDTH  = inst->dim.matrix_width;
 		shrd_rating = 0.;
 		matrix_form = 1e9;
+		pso_init_mem(inst, &res_mem);
 	}
 
-	__syncthreads();
-	prepare_tmp_matrix(inst, s, cur);
-	__syncthreads();
 
+	__syncthreads();
 	uint8_t cur_rule = 0;
 
 	do {
 		eval_set_res_matrix_to_identity();
 
 		rules++;
-		rules = eval_interpret_rule(inst , rules);
+		rules = eval_interpret_rule(inst , mem, rules);
 
-		__syncthreads();
-		TRES(ty, tx) = RES(ty, tx);
-		__syncthreads();
+                __syncthreads();
+                R_ROW(ty)[mem->r_zero + tx] = res[ty][tx];
 		eval_set_res_matrix_to_identity();
-		__syncthreads();
+                __syncthreads();
 
 		rules++;
-		rules = eval_interpret_rule(inst , rules);
-		__syncthreads();
+		rules = eval_interpret_rule(inst , mem, rules);
+                __syncthreads();
 
-		pso_result_rating(inst);
+		pso_result_rating(inst, mem);
 		__syncthreads();
 
 		cur_rule++;
@@ -242,14 +205,9 @@ __global__ void pso_calc_res(const struct pso_instance inst,
 	__syncthreads();
 
 	if(tx == 0 && ty == 0) {
-		if(inst.match == MATCH_ANY)
+		if(inst->match == MATCH_ANY)
 			shrd_rating += matrix_form;
 
-		const int s_count = inst.width_per_line / s;
-		const int idx = PARTICLE_COUNT * blockIdx.x * s_count +
-				cur * PARTICLE_COUNT +
-				blockIdx.y;
-		inst.prat[idx] = shrd_rating;
+		res_mem.p_rat[blockIdx.y] = shrd_rating;
 	}
 }
-

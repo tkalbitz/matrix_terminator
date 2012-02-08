@@ -25,14 +25,14 @@ extern "C"
 #include <cuda.h>
 #include <curand_kernel.h>
 
-#include "evo.h"
-#include "evo_rating.h"
-#include "evo_setup.h"
+#include "evo/evo.h"
+#include "evo/evo_rating.h"
+#include "evo/evo_setup.h"
 
-#include "matrix_print.h"
-#include "matrix_copy.h"
+#include "evo/matrix_print.h"
+#include "evo/matrix_copy.h"
 #include "ya_malloc.h"
-#include "plot_log.h"
+#include "evo/plot_log.h"
 
 static void copy_result_to_buffer(struct instance* inst,
 				  int block, int parent,

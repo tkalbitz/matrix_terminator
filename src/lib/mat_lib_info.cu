@@ -6,8 +6,8 @@
  */
 
 #include <stdlib.h>
-#include "instance.h"
-#include "pso_instance.h"
+#include "evo/instance.h"
+#include "ccpso2/pso_instance.h"
 #include "ya_malloc.h"
 
 #include "mat_lib_info.h"

@@ -25,10 +25,10 @@ extern "C"
 #include <cuda.h>
 #include <curand_kernel.h>
 
-#include "pso.h"
-#include "pso_rating.h"
-#include "pso_setup.h"
-#include "pso_param_s.h"
+#include "ccpso2/pso.h"
+#include "ccpso2/pso_rating.h"
+#include "ccpso2/pso_setup.h"
+#include "ccpso2/pso_param_s.h"
 
 #include "ya_malloc.h"
 

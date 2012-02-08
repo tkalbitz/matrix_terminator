@@ -2,27 +2,26 @@
 CUDA_INCLUDE_DIRECTORIES(
   ${CMAKE_CURRENT_SOURCE_DIR}
   ${CMAKE_CURRENT_SOURCE_DIR}/..
-  ${CMAKE_CURRENT_SOURCE_DIR}/../evo
-  )
+)
 
 CUDA_ADD_LIBRARY( evo_matrix_generator
   evo_matrix_generator.cu
-  pso_matrix_generator.cu
+  ccpso2_matrix_generator.cu
   matrix_generator.h
   mat_lib_info.cu
   mat_lib_info.h
   evo_lib_instance.cu
-  pso_lib_instance.cu
-  ../pso/pso_instance.cu
-  ../pso/pso_instance.h
-  ../pso/pso.cu
-  ../pso/pso.h
-  ../pso/pso_rating.cu
-  ../pso/pso_rating.h
-  ../pso/pso_setup.cu
-  ../pso/pso_setup.h
-  ../pso/pso_param_s.h
-  ../pso/pso_param_s.cu
+  ccpso2_lib_instance.cu
+  ../ccpso2/pso_instance.cu
+  ../ccpso2/pso_instance.h
+  ../ccpso2/pso.cu
+  ../ccpso2/pso.h
+  ../ccpso2/pso_rating.cu
+  ../ccpso2/pso_rating.h
+  ../ccpso2/pso_setup.cu
+  ../ccpso2/pso_setup.h
+  ../ccpso2/pso_param_s.h
+  ../ccpso2/pso_param_s.cu
   ../evo/instance.cu
   ../evo/instance.h
   ../evo/evo.cu

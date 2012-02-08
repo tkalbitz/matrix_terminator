@@ -8,8 +8,6 @@
 # The cuda_include_directories adds paths to only cuda compilation.
 CUDA_INCLUDE_DIRECTORIES(
   ${CMAKE_CURRENT_SOURCE_DIR}
-  ${CMAKE_CURRENT_SOURCE_DIR}/evo
-  ${CMAKE_CURRENT_SOURCE_DIR}/pso
   )
 
 # The include_directories adds paths to both C/C++ compilation in the native
@@ -47,9 +45,22 @@ CUDA_ADD_EXECUTABLE( matrix_generator
   DEBUG   -G3 -g -DDEBUG --maxrregcount=60
 ) 
 
+CUDA_ADD_EXECUTABLE( ccpso2_matrix_generator
+  ccpso2_matrix_generator.cu
+  ccpso2/pso_param_s.cu
+  ccpso2/pso_instance.cu
+  ccpso2/pso_setup.cu
+  ccpso2/pso_rating.cu
+  ccpso2/pso_copy.cu
+  ccpso2/pso_print.cu
+  ccpso2/pso.cu
+  OPTIONS -arch=sm_13 -use_fast_math --ptxas-options=-v -ccbin ${CMAKE_CURRENT_SOURCE_DIR}/../ccdir
+  RELEASE -O2 --compiler-options -Wall
+  DEBUG   -G3 -g -DDEBUG --maxrregcount=60
+) 
+
 CUDA_ADD_EXECUTABLE( pso_matrix_generator
   pso_matrix_generator.cu
-  pso/pso_param_s.cu
   pso/pso_instance.cu
   pso/pso_setup.cu
   pso/pso_rating.cu
@@ -59,7 +70,7 @@ CUDA_ADD_EXECUTABLE( pso_matrix_generator
   OPTIONS -arch=sm_13 -use_fast_math --ptxas-options=-v -ccbin ${CMAKE_CURRENT_SOURCE_DIR}/../ccdir
   RELEASE -O2 --compiler-options -Wall
   DEBUG   -G3 -g -DDEBUG --maxrregcount=60
-) 
+)
 
 # Or compile the cuda code into a shared library.
 
