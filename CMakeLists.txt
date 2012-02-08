@@ -5,6 +5,8 @@ cmake_minimum_required(VERSION 2.8.0)
 project(MatrixTerminator)
 
 set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/CMake/cuda" ${CMAKE_MODULE_PATH})
+SET(CUDA_REMOVE_GLOBAL_MEMORY_SPACE_WARNING ON)
+
 
 # find_package(CUDA)
 find_package(CUDA QUIET REQUIRED)
