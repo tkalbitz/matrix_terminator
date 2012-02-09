@@ -98,3 +98,10 @@ setup_instances_kernel(struct c_instance inst)
 	}
 	inst.rnd_states[id] = rnd;
 }
+
+
+__global__ void setup_best_kernel(struct c_instance inst)
+{
+	inst.best[tx] = FLT_MAX;
+}
+

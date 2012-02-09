@@ -9,6 +9,10 @@ __global__ void mutate_kernel(struct c_instance inst);
 __global__ void rate_mutated_kernel(struct c_instance inst);
 __global__ void reduce_rating_kernel(struct c_instance inst);
 __global__ void copy_to_child_kernel(struct c_instance inst);
-
+__global__ void path_mutate_kernel_p1(struct c_instance inst,
+		                      int3* stack, unsigned int* top);
+__global__ void path_mutate_kernel_p2(struct c_instance inst,
+		                      int3* stack, unsigned int* top);
+__global__ void calc_res(struct c_instance inst, double* ind, double* dest);
 
 #endif /* C_RATING_H_ */

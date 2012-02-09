@@ -22,6 +22,7 @@
 #include "custom/c_instance.h"
 #include "custom/c_setup.h"
 #include "custom/c_rating.h"
+#include "custom/c_print.h"
 
 #include "ya_malloc.h"
 //#include "plot_log.h"
@@ -290,6 +291,13 @@ int main(int argc, char** argv)
 	c_inst_init(inst, mopt.matrix_dim);
 	host_inst = inst;
 	dev_inst = c_inst_create_dev_inst(inst, &dev_rules);
+
+	int3* stack;
+	unsigned int* top;
+	const size_t slen = BLOCKS * inst.rules_count * inst.width_per_matrix;
+	CUDA_CALL(cudaMalloc(&stack, slen * sizeof(*stack)));
+	CUDA_CALL(cudaMalloc(&top, BLOCKS * sizeof(*top)));
+
 	dim3 blocks(BLOCKS, inst.scount);
 	dim3 threads(inst.mdim, inst.mdim);
 
@@ -301,37 +309,27 @@ int main(int argc, char** argv)
 	setup_instances_kernel<<<1, 320>>>(inst);
 	CUDA_CALL(cudaGetLastError());
 
+	setup_best_kernel<<<1, BLOCKS>>>(inst);
+	CUDA_CALL(cudaGetLastError());
+
 	setup_rating(inst);
-
-	copy_parent_kernel<<<BLOCKS, 128>>>(inst);
-	CUDA_CALL(cudaGetLastError());
-
-	mutate_kernel<<<blocks, 128>>>(inst);
-	CUDA_CALL(cudaGetLastError());
-
-	rate_mutated_kernel<<<blocks, threads>>>(inst);
-	CUDA_CALL(cudaGetLastError());
-
-	reduce_rating_kernel<<<BLOCKS, 512>>>(inst);
-	CUDA_CALL(cudaGetLastError());
-
-	copy_to_child_kernel<<<BLOCKS, 192>>>(inst);
-	CUDA_CALL(cudaGetLastError());
-
-	c_inst_cleanup(inst, dev_inst);
-	exit(0);
 
 	// Prepare
 	cudaEvent_t start, stop;
 	float elapsedTime;
 	float elapsedTimeTotal = 0.f;
 
-	double *rating = (double*)ya_malloc(BLOCKS * sizeof(double));
-////	struct plot_log* pl = init_plot_log(mopt.plot_log_enable,
-////					    mopt.plot_log_best);
-//
+	double* rating   = (double*)ya_malloc(BLOCKS * sizeof(double));
+	int* best_idx = (int*)ya_malloc(BLOCKS * sizeof(best_idx));
+
 	int rounds = -1;
-	int block = 0; int thread = 0;
+	int block = 0; int pos = 0;
+
+	CUDA_CALL(cudaMemcpy(rating, inst.best, BLOCKS * sizeof(*rating), cudaMemcpyDeviceToHost));
+	for(int i = 0; i < BLOCKS; i++) {
+		printf("%.2e ", rating[i]);
+	}
+	printf("\n");
 
 	for(unsigned long i = 0; i < mopt.rounds; i++) {
 		cudaEventCreate(&start);
@@ -340,7 +338,25 @@ int main(int argc, char** argv)
 		cudaEventRecord(start, 0);
 
 		copy_parent_kernel<<<BLOCKS, 128>>>(inst);
+		CUDA_CALL(cudaGetLastError());
+
+		path_mutate_kernel_p1<<<BLOCKS, threads>>>(inst, stack, top);
+		CUDA_CALL(cudaGetLastError());
+
+		path_mutate_kernel_p2<<<BLOCKS, 1>>>(inst, stack, top);
+		CUDA_CALL(cudaGetLastError());
+
 		mutate_kernel<<<blocks, 128>>>(inst);
+		CUDA_CALL(cudaGetLastError());
+
+		rate_mutated_kernel<<<blocks, threads>>>(inst);
+		CUDA_CALL(cudaGetLastError());
+
+		reduce_rating_kernel<<<BLOCKS, 512>>>(inst);
+		CUDA_CALL(cudaGetLastError());
+
+		copy_to_child_kernel<<<BLOCKS, 192>>>(inst);
+		CUDA_CALL(cudaGetLastError());
 
 		cudaEventRecord(stop, 0);
 		cudaEventSynchronize(stop);
@@ -351,28 +367,37 @@ int main(int argc, char** argv)
 		cudaEventDestroy(start);
 		cudaEventDestroy(stop);
 
-//		if(i % 200 == 0)
-//			print_gbest_particle_ratings(inst);
-//		CUDA_CALL(cudaMemcpy(rating, inst.gbrat, width * sizeof(double),
-//						cudaMemcpyDeviceToHost));
-//
-//		if(rating[0] == 0.) {
-//			rounds = i;
-//			block = i;
-//			i = mopt.rounds;
-//		}
+		if(i % 1000 == 0) {
+			CUDA_CALL(cudaMemcpy(rating, inst.best, BLOCKS * sizeof(*rating), cudaMemcpyDeviceToHost));
+			for(int j = 0; j < BLOCKS; j++) {
+				printf("%.2e ", rating[j]);
+
+				if(rating[j] == 0.) {
+					printf("drin!\n");
+					rounds = i;
+					block = j;
+					i = mopt.rounds;
+					CUDA_CALL(cudaMemcpy(best_idx, inst.best_idx,
+							BLOCKS * sizeof(*best_idx),
+							cudaMemcpyDeviceToHost));
+					pos = best_idx[j];
+					break;
+				}
+			}
+			printf("\n");
+		}
 	}
 
 	free(rating);
+	free(best_idx);
 ////	clean_plot_log(pl);
 
 	printf("Time needed: %f\n", elapsedTimeTotal);
 	printf("Needed rounds: %d\n", rounds);
-	printf("Result is block: %d, parent: %d\n", block, thread);
+	printf("Result is block: %d, pos: %d\n", block, pos);
 
-//	print_gbest_particle_ratings(inst);
-//	print_global_matrix_pretty(stdout, &inst, block);
-//	print_rules(stdout, &host_inst);
+	print_matrix_pretty(stdout, inst, block, pos);
+	print_rules(stdout, host_inst);
 
 	printf("Clean up and exit.\n");
 	c_inst_cleanup(inst, dev_inst);

@@ -57,6 +57,7 @@ struct c_instance
 
 	double* sinstances;       /* search space instances */
 	double* srating;          /* rating of search space instances */
+	int*    srat_idx;         /* where is the rating comming from */
 
 	double* tmp;              /* copy of the current element */
 
