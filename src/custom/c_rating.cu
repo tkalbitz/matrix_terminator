@@ -265,3 +265,63 @@ __global__ void rate_mutated_kernel(struct c_instance inst)
 	inst.srating[pos] = c_calc_res(inst, ind);
 }
 
+#define PRED_STEP(s) if(tid < (s)) { \
+			if(rat[tid] > rat[tid + (s)]) { \
+				rat[tid] = rat[tid + (s)]; \
+				rat[tid + (s)] = tid + (s); \
+			} else rat[tid + (s)] = tid; }
+
+__global__ void reduce_rating_kernel(struct c_instance inst)
+{
+	const int tid = tx;
+	double* const rat = inst.srating + bx * inst.scount;
+
+	/* only the thread.x dim is used */
+	if (inst.scount >= 1024) { PRED_STEP(512);  __syncthreads(); }
+	if (inst.scount >= 512)  { PRED_STEP(256);  __syncthreads(); }
+	if (inst.scount >= 256)  { PRED_STEP(128);  __syncthreads(); }
+	if (inst.scount >= 128)  { PRED_STEP(64);   __syncthreads(); }
+	if (inst.scount >=  64)  { PRED_STEP(32);   __syncthreads(); }
+	if (inst.scount >=  32)  { PRED_STEP(16);   __syncthreads(); }
+	if (inst.scount >=  16)  { PRED_STEP( 8);   __syncthreads(); }
+	if (inst.scount >=   8)  { PRED_STEP( 4);   __syncthreads(); }
+	if (inst.scount >=   4)  { PRED_STEP( 2);   __syncthreads(); }
+	if (inst.scount >=   2)  { PRED_STEP( 1);   __syncthreads(); }
+}
+
+__global__ void copy_to_child_kernel(struct c_instance inst)
+{
+	__shared__ int child;
+	const int bbx = bx;
+	double* const srat = inst.srating + bbx * inst.scount;
+	double* const rat  = inst.rating  + bbx * inst.icount;
+
+	if(tx == 0 && ty == 0) {
+		child = curand(&(inst.rnd_states[blockIdx.x])) % inst.icount;
+
+		if(srat[0] < rat[child]) {
+			if(srat[0] < inst.best[bbx]) {
+				inst.best[bbx] = srat[0];
+				inst.best_idx[bbx] = child;
+			}
+
+			rat[child] = srat[0];
+			child = (blockIdx.x * inst.icount + child) *
+				inst.width_per_inst;
+		} else {
+			child = -1;
+		}
+	}
+	__syncthreads();
+
+	if(child == -1)
+		return;
+
+	const int idx = (bbx * inst.scount + (int)srat[1]);
+	double* src  = inst.sinstances + idx * inst.width_per_inst;
+	double* dest = inst.instances + child;
+
+	for(int i = tx; i < inst.width_per_inst; i += blockDim.x) {
+		dest[i] = src[i];
+	}
+}

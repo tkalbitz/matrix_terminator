@@ -50,6 +50,7 @@ void alloc_instance_mem(struct c_instance& inst)
 	CUDA_CALL(cudaMalloc(&(inst.instances),  ilen));
 	CUDA_CALL(cudaMalloc(&(inst.sinstances), slen));
 	CUDA_CALL(cudaMalloc(&(inst.best), BLOCKS * sizeof(*inst.best)));
+	CUDA_CALL(cudaMalloc(&(inst.best_idx), BLOCKS * sizeof(*inst.best_idx)));
 
 	const size_t ratlen = BLOCKS * inst.icount * sizeof(*inst.rating);
 	CUDA_CALL(cudaMalloc(&(inst.rating), ratlen));
@@ -88,6 +89,7 @@ void c_inst_cleanup(struct c_instance& inst,
 	cudaFree(inst.rating);
 	cudaFree(inst.srating);
 	cudaFree(inst.best);
+	cudaFree(inst.best_idx);
 	cudaFree(inst.tmp);
 }
 

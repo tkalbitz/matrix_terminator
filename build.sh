@@ -2,7 +2,7 @@
 
 TARGET_DIR=build
 BLOCKS=8
-MATRIX_WIDTH=15
+MATRIX_WIDTH=16
 
 if [ ! -f "$TARGET_DIR"/Makefile ] ; then
 	#create build folder

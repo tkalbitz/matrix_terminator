@@ -62,6 +62,7 @@ struct c_instance
 
 	double* res;              /* tmp space for the rating function */
 	double* best;             /* best rating of the different blocks */
+	int*    best_idx;         /* where is the best located */
 
 	curandState *rnd_states;  /* random number generator states */
 

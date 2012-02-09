@@ -310,14 +310,12 @@ int main(int argc, char** argv)
 	CUDA_CALL(cudaGetLastError());
 
 	rate_mutated_kernel<<<blocks, threads>>>(inst);
-	rate_mutated_kernel<<<blocks, threads>>>(inst);
-	rate_mutated_kernel<<<blocks, threads>>>(inst);
-	rate_mutated_kernel<<<blocks, threads>>>(inst);
-	rate_mutated_kernel<<<blocks, threads>>>(inst);
-	rate_mutated_kernel<<<blocks, threads>>>(inst);
-	rate_mutated_kernel<<<blocks, threads>>>(inst);
-	rate_mutated_kernel<<<blocks, threads>>>(inst);
-	rate_mutated_kernel<<<blocks, threads>>>(inst);
+	CUDA_CALL(cudaGetLastError());
+
+	reduce_rating_kernel<<<BLOCKS, 512>>>(inst);
+	CUDA_CALL(cudaGetLastError());
+
+	copy_to_child_kernel<<<BLOCKS, 192>>>(inst);
 	CUDA_CALL(cudaGetLastError());
 
 	c_inst_cleanup(inst, dev_inst);
