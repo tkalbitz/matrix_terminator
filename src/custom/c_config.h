@@ -33,6 +33,9 @@
 	#define __dmul_rn(a, b) (a)
 	#define __dadd_rn(a, b) (b)
 	#define __double2uint_rn(a) (a)
+	#define atomicAdd(x, y) 1
+	#define atomicExch(x, y) 1
+
 	#define no_argument		0
 	#define required_argument	1
 	#define optional_argument	2

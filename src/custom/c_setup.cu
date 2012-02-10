@@ -68,7 +68,7 @@ setup_instances_kernel(struct c_instance inst)
 
 
 	for(x = id; x < inst.itotal; x += max_id) {
-		tmp = curand(&rnd) % max1;
+		tmp = curand(&rnd) % 2;
 		tmp = __dmul_rn(__double2uint_rn(tmp / delta), delta);
 		inst.instances[x] = tmp;
 	}

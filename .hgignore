@@ -1,3 +1,5 @@
 build
 src/tags
 tags
+release
+debug

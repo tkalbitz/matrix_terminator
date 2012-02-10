@@ -105,8 +105,8 @@ static void parse_configuration(struct c_instance&    inst,
 	inst.cond_right  = COND_UPPER_RIGHT;
 	inst.delta       = 0.1;
 	inst.parent_max  = PARENT_MAX;
-	inst.icount      = 1000;
-	inst.scount      = 128;
+	inst.icount      = 100;
+	inst.scount      = 100;
 
 	mopt.rounds          = 500;
 	mopt.enable_maxima   = 0;
@@ -295,7 +295,7 @@ int main(int argc, char** argv)
 	int3* stack;
 	unsigned int* top;
 	const size_t slen = BLOCKS * inst.rules_count * inst.width_per_matrix;
-	CUDA_CALL(cudaMalloc(&stack, slen * sizeof(*stack)));
+	CUDA_CALL(cudaMalloc(&stack, 2 * slen * sizeof(*stack)));
 	CUDA_CALL(cudaMalloc(&top, BLOCKS * sizeof(*top)));
 
 	dim3 blocks(BLOCKS, inst.scount);
@@ -368,6 +368,7 @@ int main(int argc, char** argv)
 		cudaEventDestroy(stop);
 
 		if(i % 1000 == 0) {
+			printf("%6d: ", i / 1000);
 			CUDA_CALL(cudaMemcpy(rating, inst.best, BLOCKS * sizeof(*rating), cudaMemcpyDeviceToHost));
 			for(int j = 0; j < BLOCKS; j++) {
 				printf("%.2e ", rating[j]);
