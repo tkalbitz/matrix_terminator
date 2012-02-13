@@ -49,9 +49,24 @@ __device__ static double new_value(struct c_instance& inst,
 __global__ void setup_c_rnd_kernel(struct c_instance inst,
 				   const int seed)
 {
-	const int end = inst.scount * BLOCKS;
+	const int end = 320 * BLOCKS;
 	for(int i = tx; i < end; i+= blockDim.x)
 		curand_init(seed + i, i, 0, &(inst.rnd_states[i]));
+}
+
+__global__ void patch_matrix_kernel(struct c_instance inst)
+{
+	double* ind = inst.instances + bx * inst.width_per_inst * inst.icount;
+	const int count = inst.num_matrices * inst.icount;
+
+	for(int i = 0; i < count; i++) {
+		double* matrix = ind + i * inst.width_per_matrix;
+		matrix[tx * inst.mdim] = 0;
+		matrix[(inst.mdim - 1) * inst.mdim + tx] = 0;
+		matrix[0] = 1;
+		matrix[(inst.mdim - 1) * inst.mdim + (inst.mdim - 1)] = 1;
+	}
+
 }
 
 __global__ void

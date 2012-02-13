@@ -16,6 +16,7 @@
 #define RES(cy, cx)  res[RIDX(cy, cx)]
 
 __shared__ double res[MATRIX_WIDTH * MATRIX_WIDTH];
+__shared__ double tmpmat[MATRIX_WIDTH * MATRIX_WIDTH];
 __shared__ double shrd_rating;
 __shared__ double matrix_form;
 
@@ -30,13 +31,14 @@ eval_set_res_matrix_to_identity(const struct c_instance& inst)
 }
 
 __device__ inline void eval_copy_matrix_to_res(const struct c_instance& inst,
-		    	    	    	       const double           * matrix)
+		    	    	    	       const double *  const    matrix,
+		    	    	    	       double * const r)
 {
-	RES(ty, tx) = matrix[RIDX(ty, tx)];
+	const int tid = RIDX(ty, tx);
+	r[tid] = matrix[tid];
 }
 
-__device__ void eval_mul_inplace(const struct c_instance& inst,
-				 const double* matrix)
+__device__ void eval_mul_inplace(const struct c_instance& inst)
 {
 	double y, t;
 	double c = 0;
@@ -44,7 +46,7 @@ __device__ void eval_mul_inplace(const struct c_instance& inst,
 
 	/* result rows */
 	for(int i = 0; i < inst.mdim; i++) {
-		y = __dmul_rn(RES(ty, i), matrix[RIDX(i, tx)]) - c;
+		y = __dmul_rn(RES(ty, i), tmpmat[RIDX(i, tx)]) - c;
 		t = __dadd_rn(sum, y);
 		c = (t - sum) - y;
 		sum = t;
@@ -67,14 +69,15 @@ __device__ const int* eval_interpret_rule(const struct c_instance& inst,
 	 * so we copy the first matrix to our result
 	 */
 	const double* matrix = ind + (*rule) * inst.width_per_matrix;
-	eval_copy_matrix_to_res(inst, matrix);
+	eval_copy_matrix_to_res(inst, matrix, res);
 	rule++;
 
 	__syncthreads();
 
 	for(; *rule != MUL_SEP; rule++) {
 		matrix = ind + (*rule) * inst.width_per_matrix;
-		eval_mul_inplace(inst, matrix);
+		eval_copy_matrix_to_res(inst, matrix, tmpmat);
+		eval_mul_inplace(inst);
 	}
 
 	return rule;
@@ -85,7 +88,7 @@ __device__ void c_result_rating(const struct c_instance& inst)
 	double rating = 0.;
 
         if(ty == 0 && tx == 0) {
-        	const double penalty = 1e12;
+        	const double penalty = 1e6;
         	const int rows = inst.mdim - 1;
 
                 switch(inst.cond_right) {
@@ -127,7 +130,7 @@ __device__ void c_result_rating(const struct c_instance& inst)
 	const double b = TRES(ty, tx);
 
 	RES(ty, tx) = a > b ? (a * a - b * b) : 0.;
-//	RES(ty, tx) = fabs(min(TRES(ty, tx) - RES(ty, tx), 0.));
+//	RES(ty, tx) = fabs(min(b - a, 0.));
 //	RES(ty, tx) = __dmul_rn(RES(ty, tx), RES(ty, tx));
 
 	__syncthreads();
@@ -217,17 +220,32 @@ __global__ void calc_res(struct c_instance inst, double* ind, double* dest)
 		*dest = shrd_rating;
 }
 
+__global__ void calc_tmp_res(struct c_instance inst)
+{
+	double* ind = inst.tmp + bx * inst.width_per_inst;
+	double res = c_calc_res(inst, ind);
+
+	if(tx == 0 && ty == 0)
+		inst.tmprat[bx] = shrd_rating;
+}
+
 __global__ void setup_rating(struct c_instance inst, int yoff)
 {
 	const int idx = (blockIdx.x) * inst.icount + (blockIdx.y + yoff);
 	const double* indv = inst.instances + idx * inst.width_per_inst;
-	inst.rating[idx] = c_calc_res(inst, indv);
+	double rat = c_calc_res(inst, indv);
+
+	if(tx == 0 && ty == 0)
+		inst.rating[idx] = rat;
 }
 
 __global__ void copy_parent_kernel(struct c_instance inst)
 {
+
 	__shared__ int parent;
 	if(tx == 0 && ty == 0) {
+		double* const rat = inst.rating + bx * inst.icount;
+
 		parent = curand(&(inst.rnd_states[blockIdx.x])) % inst.icount;
 		parent = (blockIdx.x * inst.icount + parent) *
 				inst.width_per_inst;
@@ -241,53 +259,10 @@ __global__ void copy_parent_kernel(struct c_instance inst)
 	}
 }
 
-__device__ void c_ensure_constraints(const struct c_instance & inst,
-				     double* const elems)
-{
-	const int matrices = inst.num_matrices;
-	int x;
-
-	if(inst.cond_left == COND_UPPER_LEFT) {
-		for(x = 0; x < matrices; x++) {
-			const int matrix = x * inst.width_per_matrix;
-
-			if(elems[matrix] < 1.0)
-				elems[matrix] = 1.;
-		}
-	} else if(inst.cond_left == COND_UPPER_RIGHT) {
-		for(x = 0; x < matrices; x++) {
-			const int matrix = x * inst.width_per_matrix;
-			if(elems[matrix] < 1.0)
-				elems[matrix] = 1.;
-		}
-	} else if(inst.cond_left == COND_UPPER_LEFT_LOWER_RIGHT) {
-		for(x = 0; x < matrices; x++) {
-			const int matrix1 = x * inst.width_per_matrix;
-			const int matrix2 = (x + 1) * inst.width_per_matrix - 1;
-
-			if(elems[matrix1] < 1.0)
-				elems[matrix1] = 1.;
-
-			if(elems[matrix2] < 1.0)
-				elems[matrix2] = 1;
-		}
-	} else {
-		/*
-		 * This should be recognized ;) It's only a 1.3 card
-		 *  so there is no printf :/
-		 */
-		for(int i = 0; i < inst.width_per_matrix; i++) {
-			elems[i] = 1337;
-		}
-	}
-}
-
 __global__ void mutate_kernel(struct c_instance inst)
 {
-	const int pos = bx * inst.scount + by;
-
 	double* src = inst.tmp + bx * inst.width_per_inst;
-	double* dest = inst.sinstances + pos * inst.width_per_inst;
+	double* dest = inst.sinstances + bx * inst.width_per_inst;
 
 	for(int i = tx; i < inst.width_per_inst; i += blockDim.x) {
 		dest[i] = src[i];
@@ -296,87 +271,40 @@ __global__ void mutate_kernel(struct c_instance inst)
 	__syncthreads();
 
 	if(tx == 0 && ty == 0) {
-		const int mpos = curand(&(inst.rnd_states[pos])) %
-				inst.width_per_inst;
+		const int mat = curand(&(inst.rnd_states[bx])) % inst.num_matrices;
+		const int row = curand(&(inst.rnd_states[bx])) % (inst.mdim -1);
+		const int col = 1 + curand(&(inst.rnd_states[bx])) % (inst.mdim -1);
+		const int mpos = mat*inst.mdim*inst.mdim + row*inst.mdim + col;
 		dest[mpos] = max(dest[mpos] - inst.delta, 0.);
-		c_ensure_constraints(inst, dest);
 	}
 }
 
 __global__ void rate_mutated_kernel(struct c_instance inst)
 {
-	const int pos = bx * inst.scount + by;
-	const double* ind = inst.sinstances + pos * inst.width_per_inst;
-
-	shrd_rating = 42;
-	c_calc_res(inst, ind);
-
-	__syncthreads();
-	if(shrd_rating == 0.) {
-		c_calc_res(inst, ind);
-		__syncthreads();
-
-		if(shrd_rating == 0.) {
-			c_calc_res(inst, ind);
-			__syncthreads();
-
-			if(shrd_rating == 0.){
-				c_calc_res(inst, ind);
-			}
-		}
-	}
+	const double* ind = inst.sinstances + bx * inst.width_per_inst;
+	const double rat = c_calc_res(inst, ind);
 
 	if(tx == 0 && ty == 0)
-		inst.srating[pos] = shrd_rating;
-}
-
-#define PRED_STEP(s) if(tid < (s)) { \
-			if(rat[tid] > rat[tid + (s)]) { \
-				rat[tid]  = rat[tid + (s)]; \
-				sidx[tid] = sidx[tid + (s)]; \
-			}}
-
-__global__ void reduce_rating_kernel(struct c_instance inst)
-{
-	const int tid = tx;
-	double* const rat  = inst.srating  + bx * inst.scount;
-	int*    const sidx = inst.srat_idx + bx * inst.scount;
-
-	for(int i = tid; i < inst.scount; i += blockDim.x) {
-		sidx[i] = i;
-	}
-
-	/* only the thread.x dim is used */
-	if (inst.scount >= 1024) { PRED_STEP(512); __syncthreads(); }
-	if (inst.scount >=  512) { PRED_STEP(256); __syncthreads(); }
-	if (inst.scount >=  256) { PRED_STEP(128); __syncthreads(); }
-	if (inst.scount >=  128) { PRED_STEP( 64); __syncthreads(); }
-	if (inst.scount >=   64) { PRED_STEP( 32); __syncthreads(); }
-	if (inst.scount >=   32) { PRED_STEP( 16); __syncthreads(); }
-	if (inst.scount >=   16) { PRED_STEP(  8); __syncthreads(); }
-	if (inst.scount >=    8) { PRED_STEP(  4); __syncthreads(); }
-	if (inst.scount >=    4) { PRED_STEP(  2); __syncthreads(); }
-	if (inst.scount >=    2) { PRED_STEP(  1); __syncthreads(); }
+		inst.srating[bx] = shrd_rating;
 }
 
 __global__ void copy_to_child_kernel(struct c_instance inst)
 {
 	__shared__ int child;
 	const int bbx = bx;
-	double* const srat    = inst.srating  + bbx * inst.scount;
-	int*    const sratidx = inst.srat_idx + bbx * inst.scount;
-	double* const rat     = inst.rating   + bbx * inst.icount;
+	double* const rat = inst.rating + bbx * inst.icount;
 
 	if(tx == 0 && ty == 0) {
 		child = curand(&(inst.rnd_states[bbx])) % inst.icount;
 
-		if(srat[0] < rat[child]) {
-			if(srat[0] < inst.best[bbx]) {
-				inst.best[bbx] = srat[0];
+		double trat = inst.tmprat[bbx];
+		if(trat < rat[child]) {
+			if(trat < inst.best[bbx]) {
+				inst.best[bbx] = trat;
 				inst.best_idx[bbx] = child;
 			}
 
-			rat[child] = srat[0];
+			rat[child] = trat;
 			child = (bbx * inst.icount + child) *
 				inst.width_per_inst;
 		} else {
@@ -388,9 +316,30 @@ __global__ void copy_to_child_kernel(struct c_instance inst)
 	if(child == -1)
 		return;
 
-	const int sidx = bbx * inst.scount + sratidx[0];
-	double* src  = inst.sinstances + sidx * inst.width_per_inst;
-	double* dest = inst.instances  + child;
+	double* src  = inst.tmp + bbx * inst.width_per_inst;
+	double* dest = inst.instances + child;
+
+	for(int i = tx; i < inst.width_per_inst; i += blockDim.x) {
+		dest[i] = src[i];
+	}
+	__syncthreads();
+}
+
+__global__ void copy_to_tmp_kernel(struct c_instance inst, int lucky)
+{
+	const int bbx = bx;
+	__shared__ int luck;
+
+	if(tx == 0 && ty == 0)
+		luck = curand(&inst.rnd_states[bbx]) % lucky;
+
+	if(inst.srating[bbx] > inst.tmprat[bbx] && luck)
+		return;
+
+	inst.tmprat[bbx] = inst.srating[bbx];
+
+	double* src  = inst.sinstances + bbx * inst.width_per_inst;
+	double* dest = inst.tmp + bbx * inst.width_per_inst;
 
 	for(int i = tx; i < inst.width_per_inst; i += blockDim.x) {
 		dest[i] = src[i];
@@ -423,6 +372,17 @@ __global__ void path_mutate_kernel_p1(struct c_instance inst,
 
 	__syncthreads();
 
+	const int rows = inst.mdim - 1;
+	int special = 0;
+
+	if(inst.cond_right == COND_UPPER_LEFT && ty == 0 && tx == 0)
+		special = 1;
+	if(inst.cond_right == COND_UPPER_RIGHT && ty == 0 && tx == rows)
+		special = 1;
+	if(inst.cond_right == COND_UPPER_LEFT_LOWER_RIGHT &&
+		((ty == 0 && tx == 0) || (ty == rows && tx == rows)))
+		special = 1;
+
 	do {
 		eval_set_res_matrix_to_identity(inst);
 
@@ -445,54 +405,11 @@ __global__ void path_mutate_kernel_p1(struct c_instance inst,
 		const double lhs = TRES(ty, tx);
 		const double rhs = RES(ty, tx);
 
-		if(min(lhs - rhs, 0.) != 0.) {
+		const int ok = special ? ((lhs - rhs) >= 1.) : lhs >= rhs;
+		if(!ok) {
 			pos = atomicAdd(top, 1);
 			stack[pos] = entry;
 		}
-
-	        if(ty == 0 && tx == 0) {
-	        	const int rows = inst.mdim - 1;
-
-	                switch(inst.cond_right) {
-	                case COND_UPPER_LEFT:
-	                        if((TRES(0, 0) - RES(0, 0)) < 1.f)
-	                		entry.x = 0;
-	                		entry.y = 0;
-	                		entry.z = cur_rule;
-
-	        			pos = atomicAdd(top, 1);
-	        			stack[pos] = entry;
-	                        break;
-	                case COND_UPPER_RIGHT:
-	                        if((TRES(0, rows) - RES(0, rows)) < 1.f)
-	                		entry.x = rows;
-	                		entry.y = 0;
-	                		entry.z = cur_rule;
-
-	        			pos = atomicAdd(top, 1);
-	        			stack[pos] = entry;
-	                        break;
-	                case COND_UPPER_LEFT_LOWER_RIGHT:
-	                        if((TRES(0, 0) - RES(0, 0)) < 1.f) {
-	                		entry.x = 0;
-	                		entry.y = 0;
-	                		entry.z = cur_rule;
-
-	        			pos = atomicAdd(top, 1);
-	        			stack[pos] = entry;
-	                        }
-
-	                        if((TRES(rows, rows) - RES(rows, rows)) < 1.f) {
-	                		entry.x = rows;
-	                		entry.y = rows;
-	                		entry.z = cur_rule;
-
-	        			pos = atomicAdd(top, 1);
-	        			stack[pos] = entry;
-	                        }
-	                        break;
-	                }
-	        }
 
 		cur_rule++;
 		__syncthreads();
@@ -538,7 +455,7 @@ __global__ void path_mutate_kernel_p2(struct c_instance inst, int3* stack,
 
 	/* put new weights on the path */
 	for(; *rules != MUL_SEP; rules++) {
-		goal = *(rules+1) < 0 ? r : curand(&rnd) % inst.mdim;
+		goal = *(rules+1) < 0 ? r : 1 + curand(&rnd) % (inst.mdim - 2);
 		double* pos = ind + (*rules) * inst.width_per_matrix +
 				 l * inst.mdim + goal;
 		*pos = max(*pos + inst.delta, 1.);

@@ -16,15 +16,15 @@ void init_rnd_generator(struct c_instance& inst, int seed)
 {
 	curandState *rnd_states;
 
-	CUDA_CALL(cudaMalloc(&rnd_states, inst.scount * BLOCKS *
+	int count = 320;
+
+	CUDA_CALL(cudaMalloc(&rnd_states, count * BLOCKS *
 			sizeof(curandState)));
 
 	inst.rnd_states = rnd_states;
 
-	const int threads = min(inst.scount, 512);
-	setup_c_rnd_kernel<<<1, threads>>>(inst, seed);
+	setup_c_rnd_kernel<<<1, count>>>(inst, seed);
 	CUDA_CALL(cudaGetLastError());
-	cudaThreadSynchronize();
 }
 
 void set_num_matrices(struct c_instance& inst)
@@ -43,10 +43,11 @@ void alloc_instance_mem(struct c_instance& inst)
 	const size_t ilen = inst.itotal * sizeof(double);
 	const size_t slen = inst.stotal * sizeof(double);
 	const size_t tlen = BLOCKS * inst.width_per_inst * sizeof(double);
-	const size_t reslen = inst.scount * inst.mdim * inst.mdim * BLOCKS *
-			      sizeof(double);
+	const size_t reslen = inst.icount * inst.mdim * inst.mdim * BLOCKS *
+				sizeof(double);
 
 	CUDA_CALL(cudaMalloc(&(inst.tmp),        tlen));
+	CUDA_CALL(cudaMalloc(&(inst.tmprat),     BLOCKS * sizeof(double)));
 	CUDA_CALL(cudaMalloc(&(inst.instances),  ilen));
 	CUDA_CALL(cudaMalloc(&(inst.sinstances), slen));
 	CUDA_CALL(cudaMalloc(&(inst.best), BLOCKS * sizeof(*inst.best)));
@@ -54,10 +55,7 @@ void alloc_instance_mem(struct c_instance& inst)
 
 	const size_t ratlen = BLOCKS * inst.icount * sizeof(*inst.rating);
 	CUDA_CALL(cudaMalloc(&(inst.rating), ratlen));
-
-	const size_t sratlen = BLOCKS * inst.scount;
-	CUDA_CALL(cudaMalloc(&(inst.srating), sratlen * sizeof(*inst.srating)));
-	CUDA_CALL(cudaMalloc(&(inst.srat_idx), sratlen * sizeof(int)));
+	CUDA_CALL(cudaMalloc(&(inst.srating), BLOCKS * sizeof(*inst.srating)));
 
 	CUDA_CALL(cudaMalloc(&(inst.res), reslen));
 }
@@ -71,7 +69,7 @@ void c_inst_init(struct c_instance& inst, int matrix_width)
 	inst.width_per_inst = inst.num_matrices * inst.mdim * inst.mdim;
 
 	inst.itotal = inst.width_per_inst * inst.icount * BLOCKS;
-	inst.stotal = inst.width_per_inst * inst.scount * BLOCKS;
+	inst.stotal = inst.width_per_inst * BLOCKS;
 
 	alloc_instance_mem(inst);
 	init_rnd_generator(inst, (int)time(0));
@@ -91,8 +89,8 @@ void c_inst_cleanup(struct c_instance& inst,
 	cudaFree(inst.srating);
 	cudaFree(inst.best);
 	cudaFree(inst.best_idx);
-	cudaFree(inst.srat_idx);
 	cudaFree(inst.tmp);
+	cudaFree(inst.tmprat);
 }
 
 struct c_instance* c_inst_create_dev_inst(struct c_instance& inst,

@@ -236,7 +236,7 @@ int anneal (int total,
     mutate (mcount, mwidth, candidate);
     int p = penalty (lhs, rhs, mwidth, candidate);
     int luck = 0 == random () % total;
-    if (p < best || luck) {
+    if (p <= best || luck) {
       memcpy (individuum, candidate, s);
       best = p;
     } 

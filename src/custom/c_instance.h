@@ -44,7 +44,6 @@ struct c_instance
 	double parent_max;        /* maximum of a matrix position */
 
 	int icount;               /* number of instances */
-	int scount;               /* number of instances in the search */
 
 	int itotal;               /* number of bytes for all instances */
 	int stotal;               /* number of bytes for all search instances */
@@ -57,9 +56,9 @@ struct c_instance
 
 	double* sinstances;       /* search space instances */
 	double* srating;          /* rating of search space instances */
-	int*    srat_idx;         /* where is the rating comming from */
 
 	double* tmp;              /* copy of the current element */
+	double* tmprat;           /* copy of the current element */
 
 	double* res;              /* tmp space for the rating function */
 	double* best;             /* best rating of the different blocks */
