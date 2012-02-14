@@ -16,4 +16,6 @@ __global__ void calc_res(struct c_instance inst, double* ind, double* dest);
 __global__ void copy_to_tmp_kernel(struct c_instance inst, int lucky);
 __global__ void calc_tmp_res(struct c_instance inst);
 
+//__global__ void all_in_one_kernel(struct c_instance inst, const int lucky);
+
 #endif /* C_RATING_H_ */

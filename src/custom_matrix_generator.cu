@@ -24,7 +24,10 @@
 #include "custom/c_rating.h"
 #include "custom/c_print.h"
 
+#include "custom/c_rating2.cu"
+
 #include "ya_malloc.h"
+
 
 struct matrix_option {
 	int      matrix_dim;
@@ -347,17 +350,20 @@ int main(int argc, char** argv)
 		CUDA_CALL(cudaGetLastError());
 
 		calc_tmp_res<<<BLOCKS, threads>>>(inst);
+		CUDA_CALL(cudaGetLastError());
 
-		for(int asteps = 0; asteps < mopt.asteps; asteps++) {
-			mutate_kernel<<<BLOCKS, 128>>>(inst);
+//		for(int asteps = 0; asteps < mopt.asteps; asteps++) {
+			all_in_one_kernel<2, 5><<<BLOCKS, threads>>>(inst, mopt.asteps);
 			CUDA_CALL(cudaGetLastError());
-
-			rate_mutated_kernel<<<BLOCKS, threads>>>(inst);
-			CUDA_CALL(cudaGetLastError());
-
-			copy_to_tmp_kernel<<<BLOCKS, 128>>>(inst, mopt.asteps);
-			CUDA_CALL(cudaGetLastError());
-		}
+//			mutate_kernel<<<BLOCKS, 128>>>(inst);
+//			CUDA_CALL(cudaGetLastError());
+//
+//			rate_mutated_kernel<<<BLOCKS, threads>>>(inst);
+//			CUDA_CALL(cudaGetLastError());
+//
+//			copy_to_tmp_kernel<<<BLOCKS, 128>>>(inst, mopt.asteps);
+//			CUDA_CALL(cudaGetLastError());
+//		}
 
 		copy_to_child_kernel<<<BLOCKS, 192>>>(inst);
 		CUDA_CALL(cudaGetLastError());

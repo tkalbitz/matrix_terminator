@@ -259,6 +259,50 @@ __global__ void copy_parent_kernel(struct c_instance inst)
 	}
 }
 
+//__global__ void all_in_one_kernel(struct c_instance inst, const int lucky)
+//{
+//	const int bbx = blockIdx.x;
+//
+//	/* mutation */
+//	double* const indv = inst.tmp + bbx * inst.width_per_inst;
+//
+//	double old_rat = inst.tmprat[bbx];
+//	double old_val;
+//	int    mut_pos;
+//
+//	for(int steps = 0; steps < lucky; steps++) {
+//
+//		if(tx == 0 && ty == 0) {
+//			const int mat = curand(&(inst.rnd_states[bbx])) % inst.num_matrices;
+//			const int row = curand(&(inst.rnd_states[bbx])) % (inst.mdim -1);
+//			const int col = 1 + curand(&(inst.rnd_states[bbx])) % (inst.mdim -1);
+//			mut_pos = mat*inst.mdim*inst.mdim + row * inst.mdim + col;
+//			old_val = indv[mut_pos];
+//			indv[mut_pos] = max(old_val - inst.delta, 0.);
+//		}
+//		__syncthreads();
+//
+//		/* rating of mutated kernel */
+//		c_calc_res(inst, indv);
+//		__syncthreads();
+//
+//		/* copy back */
+//		if(tx == 0 && ty == 0) {
+//			const int luck = curand(&inst.rnd_states[bbx]) % lucky;
+//
+//			if(shrd_rating > old_rat && luck) {
+//				indv[mut_pos] = old_val;
+//			} else {
+//				old_rat = shrd_rating;
+//			}
+//		}
+//		__syncthreads();
+//	}
+//
+//	if(tx == 0 && ty == 0)
+//		inst.tmprat[bbx] = old_rat;
+//}
+
 __global__ void mutate_kernel(struct c_instance inst)
 {
 	double* src = inst.tmp + bx * inst.width_per_inst;
@@ -430,7 +474,7 @@ __global__ void path_mutate_kernel_p2(struct c_instance inst, int3* stack,
 
 	curandState rnd = inst.rnd_states[tid];
 
-	const int chosen = (*top == 0 ? 0 : curand(&rnd) % *top);
+	const int chosen = (*top < 2 ? 0 : curand(&rnd) % *top);
 	int3 entry = stack[chosen];
 	int l = entry.y;
 	int r = entry.x;
