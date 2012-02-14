@@ -12,9 +12,13 @@
 #define RES(cy, cx)  res[RIDX(cy, cx)]
 #define TRES(cy, cx) slhs[RIDX(cy, cx)]
 
+/* cached individuum */
 __shared__ double sind[2 * MATRIX_WIDTH * MATRIX_WIDTH];
 
+/* cached lhs of the result */
 __shared__ double slhs[MATRIX_WIDTH * MATRIX_WIDTH];
+
+/* accu and cached rhs */
 __shared__ double res[MATRIX_WIDTH * MATRIX_WIDTH];
 
 __shared__ volatile double shrd_rating;
@@ -23,7 +27,8 @@ __shared__ double matrix_form;
 __shared__ double old_rat;
 __shared__ curandState rnd;
 
-__shared__ int irules[100];
+/* cached rules */
+__shared__ int srules[100];
 __shared__ int* rend;
 
 template<int mdim>
@@ -179,7 +184,7 @@ __device__ void c_result_rating(const struct c_instance& inst)
 template<int mdim>
 __device__ void c_calc_res(const struct c_instance& inst)
 {
-	const int* rules = irules;
+	const int* rules = srules;
 
 	if(tx == 0 && ty == 0) {
 		shrd_rating = 0.;
@@ -272,7 +277,7 @@ template<int mnum, int mdim>
 __device__  void path_mutate_p1(struct c_instance& inst,
 		                int3* stack, unsigned int* top)
 {
-	const int* rules = irules;
+	const int* rules = srules;
 	const int iwidth = mnum*mdim*mdim;
 
 	int pos;
@@ -344,7 +349,7 @@ __device__ void path_mutate_p2(struct c_instance& inst, int3* stack,
 	const int iwidth = mnum*mdim*mdim;
 
 	const int tid = bx;
-	const int* rules = irules;
+	const int* rules = srules;
 
 	int cur_rule = 0;
 
@@ -395,13 +400,13 @@ __global__ void all_in_one_kernel(struct c_instance inst, int3* stack,
 
 	if(tx == 0 && ty == 0) {
 		rnd = inst.rnd_states[bbx];
-		rend = irules + inst.rules_len - 1;
+		rend = srules + inst.rules_len - 1;
 
 	}
 
-	/* cahing of rules to speed up access */
+	/* caching of rules to speed up access */
 	for(int i = RIDX(ty, tx); i < inst.rules_len; i += mdim*mdim)
-		irules[i] = inst.rules[i];
+		srules[i] = inst.rules[i];
 
 	copy_parent<mnum, mdim>(inst);
 	__syncthreads();
@@ -434,7 +439,7 @@ __global__ void all_in_one_kernel(struct c_instance inst, int3* stack,
 		c_calc_res<mdim>(inst);
 		__syncthreads();
 
-		/* copy back */
+		/* restore old version when it's worse */
 		if(tx == 0 && ty == 0) {
 			const int luck = curand(&rnd) % lucky;
 
@@ -445,9 +450,6 @@ __global__ void all_in_one_kernel(struct c_instance inst, int3* stack,
 			}
 		}
 	}
-
-	if(old_rat == inst.tmprat[bbx])
-		return;
 
 	copy_to_child<mnum, mdim>(inst);
 	inst.rnd_states[bbx] = rnd;
