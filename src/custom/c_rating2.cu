@@ -20,6 +20,9 @@ __shared__ double res[MATRIX_WIDTH * MATRIX_WIDTH];
 __shared__ volatile double shrd_rating;
 __shared__ double matrix_form;
 
+__shared__ double old_rat;
+__shared__ curandState rnd;
+
 template<int mdim>
 __device__ void eval_set_res_matrix_to_identity(const struct c_instance& inst)
 {
@@ -212,6 +215,41 @@ __device__ void c_calc_res(const struct c_instance& inst)
 }
 
 template<int mnum, int mdim>
+__device__ void copy_to_child(struct c_instance& inst)
+{
+	__shared__ int child;
+	const int bbx = bx;
+	double* const rat = inst.rating + bbx * inst.icount;
+	const int iwidth = mnum*mdim*mdim;
+
+	if(tx == 0 && ty == 0) {
+		child = curand(&rnd) % inst.icount;
+
+		if(old_rat < rat[child]) {
+			if(old_rat < inst.best[bbx]) {
+				inst.best[bbx] = old_rat;
+				inst.best_idx[bbx] = child;
+			}
+
+			rat[child] = old_rat;
+			child = (bbx * inst.icount + child) * iwidth;
+		} else {
+			child = -1;
+		}
+	}
+	__syncthreads();
+
+	if(child == -1)
+		return;
+
+	double* dest = inst.instances + child;
+	for(int i = RIDX(ty, tx); i < iwidth; i += mdim*mdim) {
+		dest[i] = sind[i];
+	}
+}
+
+
+template<int mnum, int mdim>
 __global__ void all_in_one_kernel(struct c_instance inst, const int lucky)
 {
 	const int bbx = blockIdx.x;
@@ -219,11 +257,13 @@ __global__ void all_in_one_kernel(struct c_instance inst, const int lucky)
 	/* mutation */
 	double* const indv = inst.tmp + bbx * inst.width_per_inst;
 
-	__shared__ double old_rat;
 	double old_val;
 	int    mut_pos;
 
-	old_rat = inst.tmprat[bbx];
+	if(tx == 0 && ty == 0) {
+		rnd = inst.rnd_states[bbx];
+		old_rat = inst.tmprat[bbx];
+	}
 
 	/* copy data to cache the ind */
 	for(int i = ty * mdim + tx; i < mnum*mdim*mdim; i += mdim*mdim)
@@ -234,9 +274,9 @@ __global__ void all_in_one_kernel(struct c_instance inst, const int lucky)
 	for(int steps = 0; steps < lucky; steps++) {
 
 		if(tx == 0 && ty == 0) {
-			const int mat = curand(&(inst.rnd_states[bbx])) % mnum;
-			const int row = curand(&(inst.rnd_states[bbx])) % (mdim -1);
-			const int col = 1 + curand(&(inst.rnd_states[bbx])) % (mdim -1);
+			const int mat = curand(&rnd) % mnum;
+			const int row = curand(&rnd) % (mdim -1);
+			const int col = 1 + curand(&rnd) % (mdim -1);
 			mut_pos = mat*mdim*mdim + row * mdim + col;
 			old_val = sind[mut_pos];
 			sind[mut_pos] = max(old_val - inst.delta, 0.);
@@ -249,7 +289,7 @@ __global__ void all_in_one_kernel(struct c_instance inst, const int lucky)
 
 		/* copy back */
 		if(tx == 0 && ty == 0) {
-			const int luck = curand(&inst.rnd_states[bbx]) % lucky;
+			const int luck = curand(&rnd) % lucky;
 
 			if(shrd_rating > old_rat && luck) {
 				sind[mut_pos] = old_val;
@@ -262,10 +302,5 @@ __global__ void all_in_one_kernel(struct c_instance inst, const int lucky)
 	if(old_rat == inst.tmprat[bbx])
 		return;
 
-	/* copy cache back */
-	for(int i = ty * mdim + tx; i < mnum*mdim*mdim; i += mdim*mdim)
-		indv[i] = sind[i];
-
-	if(tx == 0 && ty == 0)
-		inst.tmprat[bbx] = old_rat;
+	copy_to_child<mnum, mdim>(inst);
 }

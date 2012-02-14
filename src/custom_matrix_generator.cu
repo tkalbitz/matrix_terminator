@@ -365,8 +365,8 @@ int main(int argc, char** argv)
 //			CUDA_CALL(cudaGetLastError());
 //		}
 
-		copy_to_child_kernel<<<BLOCKS, 192>>>(inst);
-		CUDA_CALL(cudaGetLastError());
+//		copy_to_child_kernel<<<BLOCKS, 192>>>(inst);
+//		CUDA_CALL(cudaGetLastError());
 
 		cudaEventRecord(stop, 0);
 		cudaEventSynchronize(stop);
