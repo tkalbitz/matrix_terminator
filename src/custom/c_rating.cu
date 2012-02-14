@@ -430,7 +430,7 @@ __global__ void path_mutate_kernel_p2(struct c_instance inst, int3* stack,
 
 	curandState rnd = inst.rnd_states[tid];
 
-	const int chosen = curand(&rnd) % *top;
+	const int chosen = (*top == 0 ? 0 : curand(&rnd) % *top);
 	int3 entry = stack[chosen];
 	int l = entry.y;
 	int r = entry.x;
