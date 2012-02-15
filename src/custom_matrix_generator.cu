@@ -24,7 +24,7 @@
 #include "custom/c_rating.h"
 #include "custom/c_print.h"
 
-#include "custom/c_rating2.cu"
+#include "custom/c_rating2.h"
 
 #include "ya_malloc.h"
 
@@ -305,6 +305,7 @@ int main(int argc, char** argv)
 	CUDA_CALL(cudaMalloc(&top, BLOCKS * sizeof(*top)));
 
 	dim3 threads(inst.mdim, inst.mdim);
+	dim3 blocks(BLOCKS);
 
 	CUDA_CALL(cudaMemGetInfo(&freeAfter, &total));
 	printf("Allocated %.2f MiB from %.2f MiB\n",
@@ -334,14 +335,17 @@ int main(int argc, char** argv)
 	int rounds = -1;
 	int block = 0; int pos = 0;
 
+	size_t space =(inst.num_matrices * inst.mdim * inst.mdim +
+			inst.mdim * inst.mdim +
+			inst.mdim * inst.mdim) * sizeof(double);
+
 	for(unsigned long i = 0; i < mopt.rounds; i++) {
 		cudaEventCreate(&start);
 		cudaEventCreate(&stop);
 		// Start record
 		cudaEventRecord(start, 0);
 
-		all_in_one_kernel<2, 5><<<BLOCKS, threads>>>(inst, stack, top, mopt.asteps);
-		CUDA_CALL(cudaGetLastError());
+		start_astep(inst, stack, top, mopt.asteps);
 
 		cudaEventRecord(stop, 0);
 		cudaEventSynchronize(stop);

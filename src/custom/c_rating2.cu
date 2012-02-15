@@ -4,22 +4,21 @@
 #include <cuda.h>
 #include <curand_kernel.h>
 
-#include "c_rating.h"
+#include "c_rating2.h"
 #include "c_instance.h"
-
 
 #define RIDX(cy, cx) ((cy) * mdim + (cx))
 #define RES(cy, cx)  res[RIDX(cy, cx)]
 #define TRES(cy, cx) slhs[RIDX(cy, cx)]
 
 /* cached individuum */
-__shared__ double sind[2 * MATRIX_WIDTH * MATRIX_WIDTH];
+extern __shared__ double sind[];
 
 /* cached lhs of the result */
-__shared__ double slhs[MATRIX_WIDTH * MATRIX_WIDTH];
+__shared__ double* slhs;
 
 /* accu and cached rhs */
-__shared__ double res[MATRIX_WIDTH * MATRIX_WIDTH];
+__shared__ double* res;
 
 __shared__ volatile double shrd_rating;
 __shared__ double matrix_form;
@@ -74,7 +73,7 @@ __device__ void  eval_mul_inplace(const struct c_instance& inst, const int matri
 
 template<int mdim>
 __device__ const int* eval_interpret_rule(const struct c_instance& inst,
-				    	  const int              * rule)
+				    	  const int* rule)
 {
 	if(*rule == MUL_SEP)
 		return rule;
@@ -142,9 +141,9 @@ __device__ void c_result_rating(const struct c_instance& inst)
 	const double a =  RES(ty, tx);
 	const double b = TRES(ty, tx);
 
-	RES(ty, tx) = a > b ? (a * a - b * b) : 0.;
-//	RES(ty, tx) = fabs(min(b - a, 0.));
-//	RES(ty, tx) = __dmul_rn(RES(ty, tx), RES(ty, tx));
+//	RES(ty, tx) = a > b ? (a * a - b * b) : 0.;
+	RES(ty, tx) = fabs(min(b - a, 0.));
+	RES(ty, tx) = __dmul_rn(RES(ty, tx), RES(ty, tx));
 
 	__syncthreads();
 
@@ -275,7 +274,8 @@ __device__ void copy_parent(struct c_instance& inst)
 
 template<int mnum, int mdim>
 __device__  void path_mutate_p1(struct c_instance& inst,
-		                int3* stack, unsigned int* top)
+		                int3*          __restrict__ stack,
+		                unsigned int*  __restrict__ top)
 {
 	const int* rules = srules;
 	const int iwidth = mnum*mdim*mdim;
@@ -343,8 +343,9 @@ __device__  void path_mutate_p1(struct c_instance& inst,
 }
 
 template<int mnum, int mdim>
-__device__ void path_mutate_p2(struct c_instance& inst, int3* stack,
-		                      unsigned int* top)
+__device__ void path_mutate_p2(struct c_instance& inst,
+		               int3*         __restrict__ stack,
+		               unsigned int* __restrict__ top)
 {
 	const int iwidth = mnum*mdim*mdim;
 
@@ -389,8 +390,10 @@ __device__ void path_mutate_p2(struct c_instance& inst, int3* stack,
 }
 
 template<int mnum, int mdim>
-__global__ void all_in_one_kernel(struct c_instance inst, int3* stack,
-                		  unsigned int* top, const int lucky)
+__global__ void all_in_one_kernel(struct c_instance inst,
+				  int3*          __restrict__ stack,
+                		  unsigned int*  __restrict__ top,
+                		  const int lucky)
 {
 	const int bbx = blockIdx.x;
 
@@ -401,7 +404,8 @@ __global__ void all_in_one_kernel(struct c_instance inst, int3* stack,
 	if(tx == 0 && ty == 0) {
 		rnd = inst.rnd_states[bbx];
 		rend = srules + inst.rules_len - 1;
-
+		res = sind + mnum * mdim * mdim;
+		slhs = res + mdim * mdim;
 	}
 
 	/* caching of rules to speed up access */
@@ -453,4 +457,70 @@ __global__ void all_in_one_kernel(struct c_instance inst, int3* stack,
 
 	copy_to_child<mnum, mdim>(inst);
 	inst.rnd_states[bbx] = rnd;
+}
+
+void start_astep(struct c_instance& inst,
+		int3*          __restrict__ stack,
+		unsigned int*  __restrict__ top,
+		unsigned int asteps)
+{
+	size_t space =(inst.num_matrices * inst.mdim * inst.mdim +
+			inst.mdim * inst.mdim +
+			inst.mdim * inst.mdim) * sizeof(double);
+
+	dim3 blocks(BLOCKS);
+	dim3 threads(inst.mdim, inst.mdim);
+
+	if(inst.num_matrices == 2) {
+		switch(inst.mdim) {
+		case 5:
+			all_in_one_kernel<2, 5><<<blocks, threads, space>>>(inst, stack, top, asteps);
+			CUDA_CALL(cudaGetLastError());
+			break;
+		case 6:
+			all_in_one_kernel<2, 6><<<blocks, threads, space>>>(inst, stack, top, asteps);
+			CUDA_CALL(cudaGetLastError());
+			break;
+		case 7:
+			all_in_one_kernel<2, 7><<<blocks, threads, space>>>(inst, stack, top, asteps);
+			CUDA_CALL(cudaGetLastError());
+			break;
+		case 8:
+			all_in_one_kernel<2, 8><<<blocks, threads, space>>>(inst, stack, top, asteps);
+			CUDA_CALL(cudaGetLastError());
+			break;
+		case 9:
+			all_in_one_kernel<2, 9><<<blocks, threads, space>>>(inst, stack, top, asteps);
+			CUDA_CALL(cudaGetLastError());
+			break;
+		case 10:
+			all_in_one_kernel<2, 10><<<blocks, threads, space>>>(inst, stack, top, asteps);
+			CUDA_CALL(cudaGetLastError());
+			break;
+		case 11:
+			all_in_one_kernel<2, 11><<<blocks, threads, space>>>(inst, stack, top, asteps);
+			CUDA_CALL(cudaGetLastError());
+			break;
+		case 12:
+			all_in_one_kernel<2, 12><<<blocks, threads, space>>>(inst, stack, top, asteps);
+			CUDA_CALL(cudaGetLastError());
+			break;
+		case 13:
+			all_in_one_kernel<2, 13><<<blocks, threads, space>>>(inst, stack, top, asteps);
+			CUDA_CALL(cudaGetLastError());
+			break;
+		case 14:
+			all_in_one_kernel<2, 14><<<blocks, threads, space>>>(inst, stack, top, asteps);
+			CUDA_CALL(cudaGetLastError());
+			break;
+		case 15:
+			all_in_one_kernel<2, 15><<<blocks, threads, space>>>(inst, stack, top, asteps);
+			CUDA_CALL(cudaGetLastError());
+			break;
+		case 16:
+			all_in_one_kernel<2, 16><<<blocks, threads, space>>>(inst, stack, top, asteps);
+			CUDA_CALL(cudaGetLastError());
+			break;
+		}
+	}
 }

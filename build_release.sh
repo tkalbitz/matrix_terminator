@@ -1,8 +1,8 @@
 #!/bin/bash
 
 TARGET_DIR=release
-BLOCKS=4
-MATRIX_WIDTH=5
+BLOCKS=1
+MATRIX_WIDTH=16
 
 if [ ! -f "$TARGET_DIR"/Makefile ] ; then
 	#create build folder
