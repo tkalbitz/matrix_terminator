@@ -1,7 +1,7 @@
 #!/bin/bash
 
 TARGET_DIR=release
-BLOCKS=1
+BLOCKS=4
 MATRIX_WIDTH=5
 
 if [ ! -f "$TARGET_DIR"/Makefile ] ; then

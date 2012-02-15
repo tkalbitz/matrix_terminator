@@ -114,6 +114,7 @@ ADD_EXECUTABLE( matrix
   matrix.c
 )
 
+target_link_libraries(matrix rt)
 # Add a special target to clean nvcc generated files.
 CUDA_BUILD_CLEAN_TARGET()
 
