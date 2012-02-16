@@ -120,7 +120,7 @@ __device__  void path_mutate_p1(struct c_instance& inst,
 		const float lhs = TRES(ty, tx);
 		const float rhs = RES(ty, tx);
 
-		const int ok = special ? ((lhs - rhs) >= 1.) : lhs >= rhs;
+		const int ok = special ? ((lhs - rhs) >= 1.f) : lhs >= rhs;
 		if(!ok) {
 			pos = atomicAdd(top, 1);
 			stack[pos] = entry;
@@ -219,12 +219,13 @@ __global__ void all_in_one_kernel(struct c_instance inst,
 	for(int steps = 0; steps < lucky; steps++) {
 
 		if(tx == 0 && ty == 0) {
-			const int mat = curand(&rnd) % mnum;
-			const int row = curand(&rnd) % (mdim -1);
+			const int mat = curand(&rnd)     % mnum;
+			const int row = curand(&rnd)     % (mdim -1);
 			const int col = 1 + curand(&rnd) % (mdim -1);
-			mut_pos = mat*mdim*mdim + row * mdim + col;
+			const int diff = 2 * (curand(&rnd) % 2) - 1 ;
+			mut_pos = mat * mdim*mdim + row * mdim + col;
 			old_val = sind[mut_pos];
-			sind[mut_pos] = max(old_val - inst.delta, 0.);
+			sind[mut_pos] = max(old_val + diff * inst.delta, 0.);
 		}
 		__syncthreads();
 

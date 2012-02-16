@@ -37,9 +37,9 @@ template<int mdim>
 __device__ void eval_set_res_matrix_to_identity()
 {
 	if(tx != ty) {
-		RES(ty, tx) = 0.;
+		RES(ty, tx) = 0.f;
 	} else {
-		RES(ty, tx) = 1.;
+		RES(ty, tx) = 1.f;
 	}
 }
 
@@ -58,7 +58,7 @@ __device__ void  eval_mul_inplace(const int matrix)
 		float y, t;
 		float c = 0;
 	#endif
-	float sum = 0;
+	float sum = 0.f;
 
 	const int mat = matrix * mdim * mdim;
 
@@ -70,7 +70,7 @@ __device__ void  eval_mul_inplace(const int matrix)
 			c = (t - sum) - y;
 			sum = t;
 		#else
-			sum += __fmul_rn(RES(ty, i), sind[mat + RIDX(i, tx)]);
+			sum = sum + (RES(ty, i) * sind[mat + RIDX(i, tx)]);
 		#endif
 	}
 
@@ -109,7 +109,7 @@ __device__ void c_result_rating(int match)
 	float rating = 0.;
 
         if(ty == 0 && tx == 0) {
-        	const float penalty = 1e6;
+        	const float penalty = 1e6f;
         	const int rows = mdim - 1;
 
                 switch(mcond) {
@@ -134,25 +134,23 @@ __device__ void c_result_rating(int match)
                 }
 
                 if(match == MATCH_ANY) {
-                        if(rating == 0.)
-                                matrix_form = 0.;
+                        if(rating == 0.f)
+                                matrix_form = 0.f;
 
-                        rating = 0.;
+                        rating = 0.f;
                 }
         }
 	__syncthreads();
-	// keep only negative numbers
-//	if(min(TRES(ty, tx) - (RES(ty, tx)), 0.) == 0.)
-//		RES(ty, tx) = 0;
-//	else
-//		RES(ty, tx) = (RES(ty, tx) + 1) / (TRES(ty, tx) + 1);
 
 	const float a =  RES(ty, tx);
 	const float b = TRES(ty, tx);
 
-//	RES(ty, tx) = a > b ? (a * a - b * b) : 0.;
-	RES(ty, tx) = fabs(min(b - a, 0.));
-	RES(ty, tx) = __fmul_rn(RES(ty, tx), RES(ty, tx));
+	const float r = a - b;
+	const float f = (b == 0.f ? 1000.f : 1.f );
+
+	RES(ty, tx) = a > b ? (f * (r * r)) : 0.f;
+//	RES(ty, tx) = fabs(min(b - a, 0.));
+//	RES(ty, tx) = __fmul_rn(RES(ty, tx), RES(ty, tx));
 
 	__syncthreads();
 
@@ -204,8 +202,8 @@ __device__ void c_calc_res(int match)
 	const int* rules = srules;
 
 	if(tx == 0 && ty == 0) {
-		shrd_rating = 0.;
-		matrix_form = 1e9;
+		shrd_rating = 0.f;
+		matrix_form = 1e9f;
 	}
 
 	__syncthreads();
