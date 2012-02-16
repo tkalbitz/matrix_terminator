@@ -335,10 +335,6 @@ int main(int argc, char** argv)
 	int rounds = -1;
 	int block = 0; int pos = 0;
 
-	size_t space =(inst.num_matrices * inst.mdim * inst.mdim +
-			inst.mdim * inst.mdim +
-			inst.mdim * inst.mdim) * sizeof(float);
-
 	for(unsigned long i = 0; i < mopt.rounds; i++) {
 		cudaEventCreate(&start);
 		cudaEventCreate(&stop);
@@ -358,7 +354,7 @@ int main(int argc, char** argv)
 
 		if(i % 1000 == 0) {
 			printf("Time: %10.2f ", elapsedTimeTotal);
-			printf("%6d: ", i / 1000);
+			printf("%6ld: ", i / 1000);
 			CUDA_CALL(cudaMemcpy(rating, inst.best, BLOCKS * sizeof(*rating), cudaMemcpyDeviceToHost));
 			CUDA_CALL(cudaMemcpy(best_idx, inst.best_idx, BLOCKS * sizeof(*best_idx), cudaMemcpyDeviceToHost));
 			pos   = best_idx[0];

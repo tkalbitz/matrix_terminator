@@ -54,18 +54,24 @@ __device__ inline void eval_copy_matrix_to_res(const int matrix)
 template<int mdim>
 __device__ void  eval_mul_inplace(const int matrix)
 {
-	float y, t;
-	float c = 0;
+	#ifdef KAHAN
+		float y, t;
+		float c = 0;
+	#endif
 	float sum = 0;
 
 	const int mat = matrix * mdim * mdim;
 
 	/* result rows */
 	for(int i = 0; i < mdim; i++) {
-		y = __fmul_rn(RES(ty, i), sind[mat + RIDX(i, tx)]) - c;
-		t = __fadd_rn(sum, y);
-		c = (t - sum) - y;
-		sum = t;
+		#ifdef KAHAN
+			y = __fmul_rn(RES(ty, i), sind[mat + RIDX(i, tx)]) - c;
+			t = __fadd_rn(sum, y);
+			c = (t - sum) - y;
+			sum = t;
+		#else
+			sum += __fmul_rn(RES(ty, i), sind[mat + RIDX(i, tx)]);
+		#endif
 	}
 
 	__syncthreads();
@@ -148,32 +154,41 @@ __device__ void c_result_rating(int match)
 
 	__syncthreads();
 
-	float c = 0.0;
-	float y, t;
+	#ifdef KAHAN
+		float c = 0.f;
+		float y, t;
+	#endif
 	float sum;
+
 
 	//only lines are processed
 	if(tx == 0) {
-		sum = 0.;
-
+		sum = 0.f;
 		for(int i = 0; i < mdim; i++) {
-			y = RES(ty, i) - c;
-			t = sum + y;
-			c = (t - sum) - y;
-			sum = t;
+			#ifdef KAHAN
+				y = RES(ty, i) - c;
+				t = sum + y;
+				c = (t - sum) - y;
+				sum = t;
+			#else
+				sum += RES(ty, i);
+			#endif
 		}
 
 		RES(ty, 0) = sum;
 	}
 	__syncthreads();
 
-	c = 0.0;
 	if(tx == 0 && ty == 0) {
 		for(int i = 0; i < mdim; i++) {
-			y = RES(i, 0) - c;
-			t = rating + y;
-			c = (t - rating) - y;
-			rating = t;
+			#ifdef KAHAN
+				y = RES(i, 0) - c;
+				t = rating + y;
+				c = (t - rating) - y;
+				rating = t;
+			#else
+				rating += RES(i, 0);
+			#endif
 		}
 
 		shrd_rating += rating;
