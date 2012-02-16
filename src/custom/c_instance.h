@@ -16,25 +16,6 @@
 
 #include "c_config.h"
 
-#define CUDA_CALL(x) do { cudaError_t xxs = (x); \
-	if((xxs) != cudaSuccess) { \
-		fprintf(stderr, "Error '%s' at %s:%d\n", cudaGetErrorString(xxs),__FILE__,__LINE__); \
-		exit(EXIT_FAILURE);}} while(0)
-
-#define tx (threadIdx.x)
-#define ty (threadIdx.y)
-#define bx (blockIdx.x)
-#define by (blockIdx.y)
-
-#define MATCH_ALL 0
-#define MATCH_ANY 1
-
-#define COND_UPPER_LEFT  0
-#define COND_UPPER_RIGHT 1
-#define COND_UPPER_LEFT_LOWER_RIGHT 2
-
-#define MUL_SEP       -1
-
 #define PARAM_COUNT    3
 
 struct c_instance
