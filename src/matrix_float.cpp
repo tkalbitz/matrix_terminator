@@ -16,346 +16,6 @@
 #include <time.h>
 #include <sys/time.h>
 
-#include <limits.h>
-#include <float.h>
-
-#include <cuda.h>
-#include <curand_kernel.h>
-#include "custom/c_config.h"
-
-#define CUDA_CALL(x) do { cudaError_t xxs = (x); \
-	if((xxs) != cudaSuccess) { \
-		fprintf(stderr, "Error '%s' at %s:%d\n", cudaGetErrorString(xxs),__FILE__,__LINE__); \
-		exit(EXIT_FAILURE);}} while(0)
-
-#define tx (threadIdx.x)
-#define ty (threadIdx.y)
-#define bx (blockIdx.x)
-#define by (blockIdx.y)
-
-#define MATCH_ALL 0
-#define MATCH_ANY 1
-
-#define COND_UPPER_LEFT  0
-#define COND_UPPER_RIGHT 1
-#define COND_UPPER_LEFT_LOWER_RIGHT 2
-
-#define MUL_SEP       -1
-
-#define RIDX(cy, cx) ((cy) * mdim + (cx))
-#define RES(cy, cx)  res[RIDX(cy, cx)]
-#define TRES(cy, cx) slhs[RIDX(cy, cx)]
-
-/* cached individuum */
-extern __shared__ float sind[];
-
-/* cached lhs of the result */
-__shared__ float* slhs;
-
-/* accu and cached rhs */
-__shared__ float* res;
-
-__shared__ volatile float shrd_rating;
-__shared__ float matrix_form;
-
-__shared__ float old_rat;
-__shared__ curandState rnd;
-
-/* cached rules */
-__shared__ int srules[100];
-__shared__ int* rend;
-
-template<int mdim>
-__device__ void eval_set_res_matrix_to_identity()
-{
-	if(tx != ty) {
-		RES(ty, tx) = 0.;
-	} else {
-		RES(ty, tx) = 1.;
-	}
-}
-
-template<int mdim>
-__device__ inline void eval_copy_matrix_to_res(const int matrix)
-{
-	const int tid = RIDX(ty, tx);
-	const int mat = matrix * mdim * mdim;
-	res[tid] = sind[mat + tid];
-}
-
-template<int mdim>
-__device__ void  eval_mul_inplace(const int matrix)
-{
-	float y, t;
-	float c = 0;
-	float sum = 0;
-
-	const int mat = matrix * mdim * mdim;
-
-	/* result rows */
-	for(int i = 0; i < mdim; i++) {
-		y = __fmul_rn(RES(ty, i), sind[mat + RIDX(i, tx)]) - c;
-		t = __fadd_rn(sum, y);
-		c = (t - sum) - y;
-		sum = t;
-	}
-
-	__syncthreads();
-	RES(ty, tx) = sum;
-	__syncthreads();
-}
-
-template<int mdim>
-__device__ const int* eval_interpret_rule(const int* rule)
-{
-	if(*rule == MUL_SEP)
-		return rule;
-
-	/*
-	 * all multiplications are inplace,
-	 * so we copy the first matrix to our result
-	 */
-	eval_copy_matrix_to_res<mdim>(*rule);
-	rule++;
-
-	__syncthreads();
-
-	for(; *rule != MUL_SEP; rule++) {
-		eval_mul_inplace<mdim>(*rule);
-	}
-
-	return rule;
-}
-
-template<int mdim, int mcond>
-__device__ void c_result_rating(int match)
-{
-	float rating = 0.;
-
-        if(ty == 0 && tx == 0) {
-        	const float penalty = 1e6;
-        	const int rows = mdim - 1;
-
-                switch(mcond) {
-                case COND_UPPER_LEFT:
-                        if((TRES(0, 0) - RES(0, 0)) < 1.f)
-                                rating += penalty;
-                        break;
-                case COND_UPPER_RIGHT:
-                        if((TRES(0, rows) - RES(0, rows)) < 1.f)
-                                rating += penalty;
-                        break;
-                case COND_UPPER_LEFT_LOWER_RIGHT:
-                        if((TRES(0, 0) - RES(0, 0)) < 1.f)
-                                rating += penalty;
-
-                        if((TRES(rows, rows) - RES(rows, rows)) < 1.f)
-                                rating += penalty;
-                        break;
-                default:
-                        rating += 2*penalty;
-                        break;
-                }
-
-                if(match == MATCH_ANY) {
-                        if(rating == 0.)
-                                matrix_form = 0.;
-
-                        rating = 0.;
-                }
-        }
-	__syncthreads();
-	// keep only negative numbers
-//	if(min(TRES(ty, tx) - (RES(ty, tx)), 0.) == 0.)
-//		RES(ty, tx) = 0;
-//	else
-//		RES(ty, tx) = (RES(ty, tx) + 1) / (TRES(ty, tx) + 1);
-
-	const float a =  RES(ty, tx);
-	const float b = TRES(ty, tx);
-
-//	RES(ty, tx) = a > b ? (a * a - b * b) : 0.;
-	RES(ty, tx) = fabs(min(b - a, 0.));
-	RES(ty, tx) = __fmul_rn(RES(ty, tx), RES(ty, tx));
-
-	__syncthreads();
-
-	float c = 0.0;
-	float y, t;
-	float sum;
-
-	//only lines are processed
-	if(tx == 0) {
-		sum = 0.;
-
-		for(int i = 0; i < mdim; i++) {
-			y = RES(ty, i) - c;
-			t = sum + y;
-			c = (t - sum) - y;
-			sum = t;
-		}
-
-		RES(ty, 0) = sum;
-	}
-	__syncthreads();
-
-	c = 0.0;
-	if(tx == 0 && ty == 0) {
-		for(int i = 0; i < mdim; i++) {
-			y = RES(i, 0) - c;
-			t = rating + y;
-			c = (t - rating) - y;
-			rating = t;
-		}
-
-		shrd_rating += rating;
-	}
-	__syncthreads();
-}
-
-template<int mdim, int mcond>
-__device__ void c_calc_res(int match)
-{
-	const int* rules = srules;
-
-	if(tx == 0 && ty == 0) {
-		shrd_rating = 0.;
-		matrix_form = 1e9;
-	}
-
-	__syncthreads();
-
-	do {
-		eval_set_res_matrix_to_identity<mdim>();
-
-		rules++;
-		rules = eval_interpret_rule<mdim>(rules);
-
-		__syncthreads();
-		TRES(ty, tx) = RES(ty, tx);
-		__syncthreads();
-		eval_set_res_matrix_to_identity<mdim>();
-		__syncthreads();
-
-		rules++;
-		rules = eval_interpret_rule<mdim>(rules);
-		__syncthreads();
-
-		c_result_rating<mdim, mcond>(match);
-		__syncthreads();
-	} while(rules != rend);
-
-	__syncthreads();
-
-	if(tx == 0 && ty == 0) {
-		if(match == MATCH_ANY)
-			shrd_rating += matrix_form;
-	}
-}
-
-struct cinstance {
-	int match;
-	int mdim;
-	int* rules;
-	int rules_len;
-	float* indv;
-	float* rat;
-};
-
-template<int mnum, int mdim, int mcond>
-__global__ void rating_kernel(struct cinstance inst)
-{
-	const int rlen = inst.rules_len;
-	const int* const rrules = inst.rules;
-
-	/* mutation */
-	if(tx == 0 && ty == 0) {
-		rend = srules + rlen - 1;
-		res = sind + mnum * mdim * mdim;
-		slhs = res + mdim * mdim;
-	}
-
-	/* caching of rules to speed up access */
-	for(int i = RIDX(ty, tx); i < rlen; i += mdim*mdim)
-		srules[i] = rrules[i];
-
-	const float* const indv = inst.indv;
-	const int iwidth = mnum*mdim*mdim;
-	for(int i = RIDX(ty, tx); i < iwidth; i += mdim*mdim) {
-		sind[i] = indv[i];
-	}
-	__syncthreads();
-
-	c_calc_res<mdim, mcond>(inst.match);
-	if(tx == 0 && ty == 0)
-		*inst.rat = shrd_rating + 1;
-}
-
-float penalty(struct cinstance& i, float* indv)
-{
-	const size_t space =(2 * i.mdim * i.mdim + i.mdim * i.mdim + i.mdim * i.mdim) * sizeof(*indv);
-	const dim3 blocks(BLOCKS);
-	const dim3 threads(i.mdim, i.mdim);
-
-	CUDA_CALL(cudaMemcpy(i.indv, indv, 2 * i.mdim * i.mdim * sizeof(*indv), cudaMemcpyHostToDevice));
-
-	switch(i.mdim) {
-	case 5:
-		rating_kernel<2, 5, COND_UPPER_RIGHT><<<blocks, threads, space>>>(i);
-		CUDA_CALL(cudaGetLastError());
-		break;
-	case 6:
-		rating_kernel<2, 6, COND_UPPER_RIGHT><<<blocks, threads, space>>>(i);
-		CUDA_CALL(cudaGetLastError());
-		break;
-	case 7:
-		rating_kernel<2, 7, COND_UPPER_RIGHT><<<blocks, threads, space>>>(i);
-		CUDA_CALL(cudaGetLastError());
-		break;
-	case 8:
-		rating_kernel<2, 8, COND_UPPER_RIGHT><<<blocks, threads, space>>>(i);
-		CUDA_CALL(cudaGetLastError());
-		break;
-	case 9:
-		rating_kernel<2, 9, COND_UPPER_RIGHT><<<blocks, threads, space>>>(i);
-		CUDA_CALL(cudaGetLastError());
-		break;
-	case 10:
-		rating_kernel<2, 10, COND_UPPER_RIGHT><<<blocks, threads, space>>>(i);
-		CUDA_CALL(cudaGetLastError());
-		break;
-	case 11:
-		rating_kernel<2, 11, COND_UPPER_RIGHT><<<blocks, threads, space>>>(i);
-		CUDA_CALL(cudaGetLastError());
-		break;
-	case 12:
-		rating_kernel<2, 12, COND_UPPER_RIGHT><<<blocks, threads, space>>>(i);
-		CUDA_CALL(cudaGetLastError());
-		break;
-	case 13:
-		rating_kernel<2, 13, COND_UPPER_RIGHT><<<blocks, threads, space>>>(i);
-		CUDA_CALL(cudaGetLastError());
-		break;
-	case 14:
-		rating_kernel<2, 14, COND_UPPER_RIGHT><<<blocks, threads, space>>>(i);
-		CUDA_CALL(cudaGetLastError());
-		break;
-	case 15:
-		rating_kernel<2, 15, COND_UPPER_RIGHT><<<blocks, threads, space>>>(i);
-		CUDA_CALL(cudaGetLastError());
-		break;
-	case 16:
-		rating_kernel<2, 16, COND_UPPER_RIGHT><<<blocks, threads, space>>>(i);
-		CUDA_CALL(cudaGetLastError());
-		break;
-	}
-
-	float rat;
-	CUDA_CALL(cudaMemcpy(&rat, i.rat, sizeof(rat), cudaMemcpyDeviceToHost));
-	return rat;
-}
-
-
 float *
 make(int rows, int cols)
 {
@@ -576,11 +236,10 @@ path_mutate(int * lhs, int * rhs, int mcount, int mwidth, float * individuum)
 
 // try to overwrite this individuum with a better one
 int
-anneal(cinstance& inst, int total, int * lhs, int * rhs, int mcount, int mwidth,
+anneal(int total, int * lhs, int * rhs, int mcount, int mwidth,
 		float * individuum)
 {
-//	int best = penalty(lhs, rhs, mwidth, individuum);
-	float best = penalty(inst, individuum);
+	float best = penalty(lhs, rhs, mwidth, individuum);
 	if (0 == best)
 		return 0;
 	// fprintf (stdout, "anneal start %d\n", best);
@@ -591,8 +250,7 @@ anneal(cinstance& inst, int total, int * lhs, int * rhs, int mcount, int mwidth,
 	for (int steps = 0; steps < total; steps++) {
 		memcpy(candidate, individuum, s);
 		mutate(mcount, mwidth, candidate);
-//		int p = penalty(lhs, rhs, mwidth, candidate);
-		float p = penalty(inst, individuum);
+		float p = penalty(lhs, rhs, mwidth, candidate);
 		int luck = 0 == random() % total;
 		if (p <= best || luck) {
 			memcpy(individuum, candidate, s);
@@ -677,7 +335,7 @@ static inline int timespec_subtract(struct timespec *result,
 }
 
 void
-evolution(cinstance& inst, int size, int asteps, int * lhs, int * rhs, int mcount, int mwidth)
+evolution(int size, int asteps, int * lhs, int * rhs, int mcount, int mwidth)
 {
 	int s = mcount * mwidth * mwidth;
 	float * pop = (float*)malloc(size * s * sizeof(float));
@@ -691,8 +349,7 @@ evolution(cinstance& inst, int size, int asteps, int * lhs, int * rhs, int mcoun
 			fill(mwidth, individuum + c * mwidth * mwidth);
 		}
 
-//		pen[p] = penalty(lhs, rhs, mwidth, individuum);
-		pen[p] = penalty(inst, individuum);
+		pen[p] = penalty(lhs, rhs, mwidth, individuum);
 		age[p] = 0;
 	}
 
@@ -707,7 +364,7 @@ evolution(cinstance& inst, int size, int asteps, int * lhs, int * rhs, int mcoun
 		memcpy(individuum, pop + parent * s, s * sizeof(int));
 
 		path_mutate(lhs, rhs, mcount, mwidth, individuum);
-		int best = anneal(inst, asteps, lhs, rhs, mcount, mwidth, individuum);
+		int best = anneal(asteps, lhs, rhs, mcount, mwidth, individuum);
 
 		int child = random() % size;
 
@@ -728,7 +385,7 @@ evolution(cinstance& inst, int size, int asteps, int * lhs, int * rhs, int mcoun
 
 		if (0 == best) {
 			show(stdout, mcount, mwidth, individuum);
-			break;
+			exit(0);
 		}
 
 		if (0 == step % 1000) {
@@ -777,25 +434,10 @@ main(int argc, char ** argv)
 	int lhs[] = { 0, 0, 1, 1, -1 };
 	int rhs[] = { 1, 1, 1, 0, 0, 0, -1 };
 
-	const int rlen = 13;
-	int rules[] = {-1, 0, 0, 1, 1, -1, 1, 1, 1, 0, 0, 0, -1};
-
-	struct cinstance inst;
-	inst.mdim  = mwidth;
-	inst.match = MATCH_ALL;
-	inst.rules_len = rlen;
-	CUDA_CALL(cudaMalloc(&(inst.rat), sizeof(*inst.rat)));
-	CUDA_CALL(cudaMalloc(&(inst.rules), rlen * sizeof(*rules)));
-	CUDA_CALL(cudaMalloc(&(inst.indv), 2*mwidth*mwidth*sizeof(*inst.indv)));
-	CUDA_CALL(cudaMemcpy(inst.rules, rules, rlen * sizeof(*rules), cudaMemcpyHostToDevice));
-
 	// int lhs [] = { 0,0, -1};
 	// int rhs [] = { 0,1,0, -1};
 
 	init_random_generator();
-	evolution(inst, pop, ann, lhs, rhs, mcount, mwidth);
 
-	cudaFree(inst.rat);
-	cudaFree(inst.rules);
-	cudaFree(inst.indv);
+	evolution(pop, ann, lhs, rhs, mcount, mwidth);
 }
