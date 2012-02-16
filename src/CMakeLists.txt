@@ -115,7 +115,19 @@ ADD_EXECUTABLE( matrix
   matrix.c
 )
 
+ADD_EXECUTABLE( matrix_float
+  matrix_float.cpp
+)
+
+CUDA_ADD_EXECUTABLE( matrix_cuda
+  matrix_cuda.cu
+  OPTIONS -arch=sm_13 -use_fast_math --ptxas-options=-v -ccbin ${CMAKE_CURRENT_SOURCE_DIR}/../ccdir
+  RELEASE -O3 --compiler-options -Wall
+  DEBUG   -G3 -g -DDEBUG --maxrregcount=60
+)
+
 target_link_libraries(matrix rt)
+target_link_libraries(matrix_float rt)
 # Add a special target to clean nvcc generated files.
 CUDA_BUILD_CLEAN_TARGET()
 
