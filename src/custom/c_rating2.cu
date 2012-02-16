@@ -12,18 +12,18 @@
 #define TRES(cy, cx) slhs[RIDX(cy, cx)]
 
 /* cached individuum */
-extern __shared__ double sind[];
+extern __shared__ float sind[];
 
 /* cached lhs of the result */
-__shared__ double* slhs;
+__shared__ float* slhs;
 
 /* accu and cached rhs */
-__shared__ double* res;
+__shared__ float* res;
 
-__shared__ volatile double shrd_rating;
-__shared__ double matrix_form;
+__shared__ volatile float shrd_rating;
+__shared__ float matrix_form;
 
-__shared__ double old_rat;
+__shared__ float old_rat;
 __shared__ curandState rnd;
 
 /* cached rules */
@@ -52,16 +52,16 @@ __device__ inline void eval_copy_matrix_to_res(const struct c_instance& inst,
 template<int mdim>
 __device__ void  eval_mul_inplace(const struct c_instance& inst, const int matrix)
 {
-	double y, t;
-	double c = 0;
-	double sum = 0;
+	float y, t;
+	float c = 0;
+	float sum = 0;
 
 	const int mat = matrix * mdim * mdim;
 
 	/* result rows */
 	for(int i = 0; i < mdim; i++) {
-		y = __dmul_rn(RES(ty, i), sind[mat + RIDX(i, tx)]) - c;
-		t = __dadd_rn(sum, y);
+		y = __fmul_rn(RES(ty, i), sind[mat + RIDX(i, tx)]) - c;
+		t = __fadd_rn(sum, y);
 		c = (t - sum) - y;
 		sum = t;
 	}
@@ -97,10 +97,10 @@ __device__ const int* eval_interpret_rule(const struct c_instance& inst,
 template<int mdim>
 __device__ void c_result_rating(const struct c_instance& inst)
 {
-	double rating = 0.;
+	float rating = 0.;
 
         if(ty == 0 && tx == 0) {
-        	const double penalty = 1e6;
+        	const float penalty = 1e6;
         	const int rows = mdim - 1;
 
                 switch(inst.cond_right) {
@@ -138,18 +138,18 @@ __device__ void c_result_rating(const struct c_instance& inst)
 //	else
 //		RES(ty, tx) = (RES(ty, tx) + 1) / (TRES(ty, tx) + 1);
 
-	const double a =  RES(ty, tx);
-	const double b = TRES(ty, tx);
+	const float a =  RES(ty, tx);
+	const float b = TRES(ty, tx);
 
 //	RES(ty, tx) = a > b ? (a * a - b * b) : 0.;
 	RES(ty, tx) = fabs(min(b - a, 0.));
-	RES(ty, tx) = __dmul_rn(RES(ty, tx), RES(ty, tx));
+	RES(ty, tx) = __fmul_rn(RES(ty, tx), RES(ty, tx));
 
 	__syncthreads();
 
-	double c = 0.0;
-	double y, t;
-	double sum;
+	float c = 0.0;
+	float y, t;
+	float sum;
 
 	//only lines are processed
 	if(tx == 0) {
@@ -225,7 +225,7 @@ __device__ void copy_to_child(struct c_instance& inst)
 {
 	__shared__ int child;
 	const int bbx = bx;
-	double* const rat = inst.rating + bbx * inst.icount;
+	float* const rat = inst.rating + bbx * inst.icount;
 	const int iwidth = mnum*mdim*mdim;
 
 	if(tx == 0 && ty == 0) {
@@ -248,7 +248,7 @@ __device__ void copy_to_child(struct c_instance& inst)
 	if(child == -1)
 		return;
 
-	double* dest = inst.instances + child;
+	float* dest = inst.instances + child;
 	for(int i = RIDX(ty, tx); i < iwidth; i += mdim*mdim) {
 		dest[i] = sind[i];
 	}
@@ -265,7 +265,7 @@ __device__ void copy_parent(struct c_instance& inst)
 		parent = (blockIdx.x * inst.icount + parent) * iwidth;
 	}
 	__syncthreads();
-	double* src = inst.instances + parent;
+	float* src = inst.instances + parent;
 
 	for(int i = RIDX(ty, tx); i < iwidth; i += mdim*mdim) {
 		sind[i] = src[i];
@@ -328,8 +328,8 @@ __device__  void path_mutate_p1(struct c_instance& inst,
 		entry.x = tx;
 		entry.y = ty;
 		entry.z = cur_rule;
-		const double lhs = TRES(ty, tx);
-		const double rhs = RES(ty, tx);
+		const float lhs = TRES(ty, tx);
+		const float rhs = RES(ty, tx);
 
 		const int ok = special ? ((lhs - rhs) >= 1.) : lhs >= rhs;
 		if(!ok) {
@@ -383,7 +383,7 @@ __device__ void path_mutate_p2(struct c_instance& inst,
 	/* put new weights on the path */
 	for(; *rules != MUL_SEP; rules++) {
 		goal = *(rules+1) < 0 ? r : 1 + curand(&rnd) % (mdim - 2);
-		double* pos = sind + (*rules) * iwidth + l * mdim + goal;
+		float* pos = sind + (*rules) * iwidth + l * mdim + goal;
 		*pos = max(*pos + inst.delta, 1.);
 		l = goal;
 	}
@@ -398,7 +398,7 @@ __global__ void all_in_one_kernel(struct c_instance inst,
 	const int bbx = blockIdx.x;
 
 	/* mutation */
-	double old_val;
+	float old_val;
 	int    mut_pos;
 
 	if(tx == 0 && ty == 0) {
@@ -466,7 +466,7 @@ void start_astep(struct c_instance& inst,
 {
 	size_t space =(inst.num_matrices * inst.mdim * inst.mdim +
 			inst.mdim * inst.mdim +
-			inst.mdim * inst.mdim) * sizeof(double);
+			inst.mdim * inst.mdim) * sizeof(float);
 
 	dim3 blocks(BLOCKS);
 	dim3 threads(inst.mdim, inst.mdim);

@@ -15,10 +15,10 @@
 #define RIDX(cy, cx) ((cy) * inst.mdim + (cx))
 #define RES(cy, cx)  res[RIDX(cy, cx)]
 
-__shared__ double res[MATRIX_WIDTH * MATRIX_WIDTH];
-__shared__ double tmpmat[MATRIX_WIDTH * MATRIX_WIDTH];
-__shared__ double shrd_rating;
-__shared__ double matrix_form;
+__shared__ float res[MATRIX_WIDTH * MATRIX_WIDTH];
+__shared__ float tmpmat[MATRIX_WIDTH * MATRIX_WIDTH];
+__shared__ float shrd_rating;
+__shared__ float matrix_form;
 
 __device__ inline void
 eval_set_res_matrix_to_identity(const struct c_instance& inst)
@@ -31,8 +31,8 @@ eval_set_res_matrix_to_identity(const struct c_instance& inst)
 }
 
 __device__ inline void eval_copy_matrix_to_res(const struct c_instance& inst,
-		    	    	    	       const double *  const    matrix,
-		    	    	    	       double * const r)
+		    	    	    	       const float *  const    matrix,
+		    	    	    	       float * const r)
 {
 	const int tid = RIDX(ty, tx);
 	r[tid] = matrix[tid];
@@ -40,14 +40,14 @@ __device__ inline void eval_copy_matrix_to_res(const struct c_instance& inst,
 
 __device__ void eval_mul_inplace(const struct c_instance& inst)
 {
-	double y, t;
-	double c = 0;
-	double sum = 0;
+	float y, t;
+	float c = 0;
+	float sum = 0;
 
 	/* result rows */
 	for(int i = 0; i < inst.mdim; i++) {
-		y = __dmul_rn(RES(ty, i), tmpmat[RIDX(i, tx)]) - c;
-		t = __dadd_rn(sum, y);
+		y = __fmul_rn(RES(ty, i), tmpmat[RIDX(i, tx)]) - c;
+		t = __fadd_rn(sum, y);
 		c = (t - sum) - y;
 		sum = t;
 	}
@@ -59,7 +59,7 @@ __device__ void eval_mul_inplace(const struct c_instance& inst)
 
 __device__ const int* eval_interpret_rule(const struct c_instance& inst,
 				    	  const int              * rule,
-				    	  const double		 * ind)
+				    	  const float		 * ind)
 {
 	if(*rule == MUL_SEP)
 		return rule;
@@ -68,7 +68,7 @@ __device__ const int* eval_interpret_rule(const struct c_instance& inst,
 	 * all multiplications are inplace,
 	 * so we copy the first matrix to our result
 	 */
-	const double* matrix = ind + (*rule) * inst.width_per_matrix;
+	const float* matrix = ind + (*rule) * inst.width_per_matrix;
 	eval_copy_matrix_to_res(inst, matrix, res);
 	rule++;
 
@@ -85,10 +85,10 @@ __device__ const int* eval_interpret_rule(const struct c_instance& inst,
 
 __device__ void c_result_rating(const struct c_instance& inst)
 {
-	double rating = 0.;
+	float rating = 0.;
 
         if(ty == 0 && tx == 0) {
-        	const double penalty = 1e6;
+        	const float penalty = 1e6;
         	const int rows = inst.mdim - 1;
 
                 switch(inst.cond_right) {
@@ -126,18 +126,18 @@ __device__ void c_result_rating(const struct c_instance& inst)
 //	else
 //		RES(ty, tx) = (RES(ty, tx) + 1) / (TRES(ty, tx) + 1);
 
-	const double a =  RES(ty, tx);
-	const double b = TRES(ty, tx);
+	const float a =  RES(ty, tx);
+	const float b = TRES(ty, tx);
 
 	RES(ty, tx) = a > b ? (a * a - b * b) : 0.;
 //	RES(ty, tx) = fabs(min(b - a, 0.));
-//	RES(ty, tx) = __dmul_rn(RES(ty, tx), RES(ty, tx));
+//	RES(ty, tx) = __fmul_rn(RES(ty, tx), RES(ty, tx));
 
 	__syncthreads();
 
-	double c = 0.0;
-	double y, t;
-	double sum;
+	float c = 0.0;
+	float y, t;
+	float sum;
 
 	//only lines are processed
 	if(tx == 0) {
@@ -168,8 +168,8 @@ __device__ void c_result_rating(const struct c_instance& inst)
 	__syncthreads();
 }
 
-__device__ double c_calc_res(const struct c_instance& inst,
-		             const double* const ind)
+__device__ float c_calc_res(const struct c_instance& inst,
+		             const float* const ind)
 {
 	const int* end = inst.rules + inst.rules_len - 1;
 	const int* rules = inst.rules;
@@ -212,9 +212,9 @@ __device__ double c_calc_res(const struct c_instance& inst,
 	return shrd_rating;
 }
 
-__global__ void calc_res(struct c_instance inst, double* ind, double* dest)
+__global__ void calc_res(struct c_instance inst, float* ind, float* dest)
 {
-	double res = c_calc_res(inst, ind);
+	float res = c_calc_res(inst, ind);
 
 	if(tx == 0 && ty == 0)
 		*dest = shrd_rating;
@@ -222,8 +222,8 @@ __global__ void calc_res(struct c_instance inst, double* ind, double* dest)
 
 __global__ void calc_tmp_res(struct c_instance inst)
 {
-	double* ind = inst.tmp + bx * inst.width_per_inst;
-	double res = c_calc_res(inst, ind);
+	float* ind = inst.tmp + bx * inst.width_per_inst;
+	float res = c_calc_res(inst, ind);
 
 	if(tx == 0 && ty == 0)
 		inst.tmprat[bx] = shrd_rating;
@@ -232,8 +232,8 @@ __global__ void calc_tmp_res(struct c_instance inst)
 __global__ void setup_rating(struct c_instance inst, int yoff)
 {
 	const int idx = (blockIdx.x) * inst.icount + (blockIdx.y + yoff);
-	const double* indv = inst.instances + idx * inst.width_per_inst;
-	double rat = c_calc_res(inst, indv);
+	const float* indv = inst.instances + idx * inst.width_per_inst;
+	float rat = c_calc_res(inst, indv);
 
 	if(tx == 0 && ty == 0)
 		inst.rating[idx] = rat;
@@ -244,15 +244,15 @@ __global__ void copy_parent_kernel(struct c_instance inst)
 
 	__shared__ int parent;
 	if(tx == 0 && ty == 0) {
-		double* const rat = inst.rating + bx * inst.icount;
+		float* const rat = inst.rating + bx * inst.icount;
 
 		parent = curand(&(inst.rnd_states[blockIdx.x])) % inst.icount;
 		parent = (blockIdx.x * inst.icount + parent) *
 				inst.width_per_inst;
 	}
 	__syncthreads();
-	double* src = inst.instances + parent;
-	double* dest = inst.tmp + blockIdx.x * inst.width_per_inst;
+	float* src = inst.instances + parent;
+	float* dest = inst.tmp + blockIdx.x * inst.width_per_inst;
 
 	for(int i = tx; i < inst.width_per_inst; i += blockDim.x) {
 		dest[i] = src[i];
@@ -264,10 +264,10 @@ __global__ void copy_parent_kernel(struct c_instance inst)
 //	const int bbx = blockIdx.x;
 //
 //	/* mutation */
-//	double* const indv = inst.tmp + bbx * inst.width_per_inst;
+//	float* const indv = inst.tmp + bbx * inst.width_per_inst;
 //
-//	double old_rat = inst.tmprat[bbx];
-//	double old_val;
+//	float old_rat = inst.tmprat[bbx];
+//	float old_val;
 //	int    mut_pos;
 //
 //	for(int steps = 0; steps < lucky; steps++) {
@@ -305,8 +305,8 @@ __global__ void copy_parent_kernel(struct c_instance inst)
 
 __global__ void mutate_kernel(struct c_instance inst)
 {
-	double* src = inst.tmp + bx * inst.width_per_inst;
-	double* dest = inst.sinstances + bx * inst.width_per_inst;
+	float* src = inst.tmp + bx * inst.width_per_inst;
+	float* dest = inst.sinstances + bx * inst.width_per_inst;
 
 	for(int i = tx; i < inst.width_per_inst; i += blockDim.x) {
 		dest[i] = src[i];
@@ -325,8 +325,8 @@ __global__ void mutate_kernel(struct c_instance inst)
 
 __global__ void rate_mutated_kernel(struct c_instance inst)
 {
-	const double* ind = inst.sinstances + bx * inst.width_per_inst;
-	const double rat = c_calc_res(inst, ind);
+	const float* ind = inst.sinstances + bx * inst.width_per_inst;
+	const float rat = c_calc_res(inst, ind);
 
 	if(tx == 0 && ty == 0)
 		inst.srating[bx] = shrd_rating;
@@ -336,12 +336,12 @@ __global__ void copy_to_child_kernel(struct c_instance inst)
 {
 	__shared__ int child;
 	const int bbx = bx;
-	double* const rat = inst.rating + bbx * inst.icount;
+	float* const rat = inst.rating + bbx * inst.icount;
 
 	if(tx == 0 && ty == 0) {
 		child = curand(&(inst.rnd_states[bbx])) % inst.icount;
 
-		double trat = inst.tmprat[bbx];
+		float trat = inst.tmprat[bbx];
 		if(trat < rat[child]) {
 			if(trat < inst.best[bbx]) {
 				inst.best[bbx] = trat;
@@ -360,8 +360,8 @@ __global__ void copy_to_child_kernel(struct c_instance inst)
 	if(child == -1)
 		return;
 
-	double* src  = inst.tmp + bbx * inst.width_per_inst;
-	double* dest = inst.instances + child;
+	float* src  = inst.tmp + bbx * inst.width_per_inst;
+	float* dest = inst.instances + child;
 
 	for(int i = tx; i < inst.width_per_inst; i += blockDim.x) {
 		dest[i] = src[i];
@@ -382,8 +382,8 @@ __global__ void copy_to_tmp_kernel(struct c_instance inst, int lucky)
 
 	inst.tmprat[bbx] = inst.srating[bbx];
 
-	double* src  = inst.sinstances + bbx * inst.width_per_inst;
-	double* dest = inst.tmp + bbx * inst.width_per_inst;
+	float* src  = inst.sinstances + bbx * inst.width_per_inst;
+	float* dest = inst.tmp + bbx * inst.width_per_inst;
 
 	for(int i = tx; i < inst.width_per_inst; i += blockDim.x) {
 		dest[i] = src[i];
@@ -396,7 +396,7 @@ __global__ void path_mutate_kernel_p1(struct c_instance inst,
 {
 	const int* end = inst.rules + inst.rules_len - 1;
 	const int* rules = inst.rules;
-	const double* ind = inst.tmp + bx * inst.width_per_inst;
+	const float* ind = inst.tmp + bx * inst.width_per_inst;
 
 	int pos;
 	int cur_rule = 0;
@@ -446,8 +446,8 @@ __global__ void path_mutate_kernel_p1(struct c_instance inst,
 		entry.x = tx;
 		entry.y = ty;
 		entry.z = cur_rule;
-		const double lhs = TRES(ty, tx);
-		const double rhs = RES(ty, tx);
+		const float lhs = TRES(ty, tx);
+		const float rhs = RES(ty, tx);
 
 		const int ok = special ? ((lhs - rhs) >= 1.) : lhs >= rhs;
 		if(!ok) {
@@ -465,7 +465,7 @@ __global__ void path_mutate_kernel_p2(struct c_instance inst, int3* stack,
 {
 	const int tid = bx;
 	const int* rules = inst.rules;
-	double* ind = inst.tmp + tid * inst.width_per_inst;
+	float* ind = inst.tmp + tid * inst.width_per_inst;
 
 	int cur_rule = 0;
 
@@ -500,7 +500,7 @@ __global__ void path_mutate_kernel_p2(struct c_instance inst, int3* stack,
 	/* put new weights on the path */
 	for(; *rules != MUL_SEP; rules++) {
 		goal = *(rules+1) < 0 ? r : 1 + curand(&rnd) % (inst.mdim - 2);
-		double* pos = ind + (*rules) * inst.width_per_matrix +
+		float* pos = ind + (*rules) * inst.width_per_matrix +
 				 l * inst.mdim + goal;
 		*pos = max(*pos + inst.delta, 1.);
 		l = goal;

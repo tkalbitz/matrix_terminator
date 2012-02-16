@@ -3,21 +3,15 @@
 
 void print_matrix_pretty(FILE* f, struct c_instance& inst, int block, int bpos)
 {
-	int width = inst.itotal * sizeof(double);
-	double* global_cpy = (double*)ya_malloc(width);
+	int width = inst.itotal * sizeof(float);
+	float* global_cpy = (float*)ya_malloc(width);
 	memset(global_cpy, 1, width);
 
 	CUDA_CALL(cudaMemcpy(global_cpy, inst.instances, width,
 			cudaMemcpyDeviceToHost));
 
 	int block_offset = inst.width_per_inst * inst.icount * block;
-	double* ptr = global_cpy + block_offset + bpos * inst.width_per_inst;
-
-//	printf("{");
-//	for(int i = 0; i < inst.width_per_inst; i++)
-//		printf("%.2e, ", ptr[i]);
-//
-//	printf("}\n");
+	float* ptr = global_cpy + block_offset + bpos * inst.width_per_inst;
 
 	for(int m = 0; m < inst.num_matrices; m++) {
 		char matrix = 'A' + m;

@@ -12,7 +12,7 @@ __global__ void path_mutate_kernel_p1(struct c_instance inst,
 		                      int3* stack, unsigned int* top);
 __global__ void path_mutate_kernel_p2(struct c_instance inst,
 		                      int3* stack, unsigned int* top);
-__global__ void calc_res(struct c_instance inst, double* ind, double* dest);
+__global__ void calc_res(struct c_instance inst, float* ind, float* dest);
 __global__ void copy_to_tmp_kernel(struct c_instance inst, int lucky);
 __global__ void calc_tmp_res(struct c_instance inst);
 

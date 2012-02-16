@@ -29,7 +29,7 @@ __device__ inline int get_max_thread_id() {
 	return uniqueThreadIndex;
 }
 
-__device__ static double new_value(struct c_instance& inst,
+__device__ static float new_value(struct c_instance& inst,
 					   curandState* const rnd_state)
 {
 	/* we want to begin with small numbers */
@@ -39,7 +39,7 @@ __device__ static double new_value(struct c_instance& inst,
 	if((factor * inst.delta) < 1.0)
 		factor++;
 
-	const double val = factor * inst.delta;
+	const float val = factor * inst.delta;
 	if(val < 1.0)
 		return 1.0;
 
@@ -56,11 +56,11 @@ __global__ void setup_c_rnd_kernel(struct c_instance inst,
 
 __global__ void patch_matrix_kernel(struct c_instance inst)
 {
-	double* ind = inst.instances + bx * inst.width_per_inst * inst.icount;
+	float* ind = inst.instances + bx * inst.width_per_inst * inst.icount;
 	const int count = inst.num_matrices * inst.icount;
 
 	for(int i = 0; i < count; i++) {
-		double* matrix = ind + i * inst.width_per_matrix;
+		float* matrix = ind + i * inst.width_per_matrix;
 		matrix[tx * inst.mdim] = 0;
 		matrix[(inst.mdim - 1) * inst.mdim + tx] = 0;
 		matrix[0] = 1;
@@ -77,14 +77,14 @@ setup_instances_kernel(struct c_instance inst)
 	curandState rnd = inst.rnd_states[id];
 
 	const int max1 = (int)inst.parent_max;
-	const double delta = inst.delta;
+	const float delta = inst.delta;
 	int x;
-	double tmp;
+	float tmp;
 
 
 	for(x = id; x < inst.itotal; x += max_id) {
 		tmp = curand(&rnd) % 2;
-		tmp = __dmul_rn(__double2uint_rn(tmp / delta), delta);
+		tmp = __fmul_rn(__float2uint_rn(tmp / delta), delta);
 		inst.instances[x] = tmp;
 	}
 

@@ -31,8 +31,11 @@
 	#define max(a, b) (a)
 	#define min(a, b) (b)
 	#define __dmul_rn(a, b) (a)
+	#define __fmul_rn(a, b) (a)
 	#define __dadd_rn(a, b) (b)
+	#define __fadd_rn(a, b) (b)
 	#define __double2uint_rn(a) (a)
+	#define __float2uint_rn(a) (a)
 	#define atomicAdd(x, y) 1
 	#define atomicExch(x, y) 1
 

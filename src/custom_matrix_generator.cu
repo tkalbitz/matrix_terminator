@@ -329,7 +329,7 @@ int main(int argc, char** argv)
 	float elapsedTime;
 	float elapsedTimeTotal = 0.f;
 
-	double* rating   = (double*)ya_malloc(inst.icount * sizeof(double));
+	float* rating   = (float*)ya_malloc(inst.icount * sizeof(float));
 	int* best_idx = (int*)ya_malloc(BLOCKS * sizeof(best_idx));
 
 	int rounds = -1;
@@ -337,7 +337,7 @@ int main(int argc, char** argv)
 
 	size_t space =(inst.num_matrices * inst.mdim * inst.mdim +
 			inst.mdim * inst.mdim +
-			inst.mdim * inst.mdim) * sizeof(double);
+			inst.mdim * inst.mdim) * sizeof(float);
 
 	for(unsigned long i = 0; i < mopt.rounds; i++) {
 		cudaEventCreate(&start);

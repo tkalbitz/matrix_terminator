@@ -1,11 +1,11 @@
-// this program searches a matrix individuumpretation
+// this program searches a matrix impretation
 // over the naturals that is compatible with
 // z001 = ( RULES a a b b -> b b b a a a) .
 
 // compile: gcc -O6 -std=gnu9x -o matrix matrix.c
 // run (example): ./matrix 5 1000 100
 // should give a result within 10 seconds 
-// (but it depends on the RNG initializiation).
+// (but it depends on the RNG initialization).
 // see end of file for description of cmd line args
 
 #include <string.h>
@@ -288,7 +288,7 @@ __global__ void rating_kernel(struct cinstance inst)
 
 	c_calc_res<mdim, mcond>(inst.match);
 	if(tx == 0 && ty == 0)
-		*inst.rat = shrd_rating + 1;
+		*inst.rat = shrd_rating;
 }
 
 float penalty(struct cinstance& i, float* indv)

@@ -41,7 +41,7 @@ struct c_instance
 {
 	int num_matrices;         /* number of matrices of the problem */
 	int mdim;                 /* dimension of the matrix */
-	double parent_max;        /* maximum of a matrix position */
+	float parent_max;        /* maximum of a matrix position */
 
 	int icount;               /* number of instances */
 
@@ -51,22 +51,22 @@ struct c_instance
 	int width_per_inst;       /* number elements for one instance */
 	int width_per_matrix;     /* number elements for one matrix */
 
-	double* instances;        /* all instances */
-	double* rating;           /* rating of the instances */
+	float* instances;        /* all instances */
+	float* rating;           /* rating of the instances */
 
-	double* sinstances;       /* search space instances */
-	double* srating;          /* rating of search space instances */
+	float* sinstances;       /* search space instances */
+	float* srating;          /* rating of search space instances */
 
-	double* tmp;              /* copy of the current element */
-	double* tmprat;           /* copy of the current element */
+	float* tmp;              /* copy of the current element */
+	float* tmprat;           /* copy of the current element */
 
-	double* res;              /* tmp space for the rating function */
-	double* best;             /* best rating of the different blocks */
+	float* res;              /* tmp space for the rating function */
+	float* best;             /* best rating of the different blocks */
 	int*    best_idx;         /* where is the best located */
 
 	curandState *rnd_states;  /* random number generator states */
 
-	double delta;             /* numbers in the matrices are multiple the amount */
+	float delta;             /* numbers in the matrices are multiple the amount */
 	int*   rules;             /* rules that must be matched */
 	size_t rules_len;         /* number of elements in rules */
 	size_t rules_count;       /* number of rules */

@@ -40,14 +40,14 @@ void alloc_instance_mem(struct c_instance& inst)
 {
 	assert(inst.num_matrices != 0);
 
-	const size_t ilen = inst.itotal * sizeof(double);
-	const size_t slen = inst.stotal * sizeof(double);
-	const size_t tlen = BLOCKS * inst.width_per_inst * sizeof(double);
+	const size_t ilen = inst.itotal * sizeof(float);
+	const size_t slen = inst.stotal * sizeof(float);
+	const size_t tlen = BLOCKS * inst.width_per_inst * sizeof(float);
 	const size_t reslen = inst.icount * inst.mdim * inst.mdim * BLOCKS *
-				sizeof(double);
+				sizeof(float);
 
 	CUDA_CALL(cudaMalloc(&(inst.tmp),        tlen));
-	CUDA_CALL(cudaMalloc(&(inst.tmprat),     BLOCKS * sizeof(double)));
+	CUDA_CALL(cudaMalloc(&(inst.tmprat),     BLOCKS * sizeof(float)));
 	CUDA_CALL(cudaMalloc(&(inst.instances),  ilen));
 	CUDA_CALL(cudaMalloc(&(inst.sinstances), slen));
 	CUDA_CALL(cudaMalloc(&(inst.best), BLOCKS * sizeof(*inst.best)));
