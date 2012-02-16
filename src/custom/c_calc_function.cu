@@ -82,8 +82,10 @@ __device__ void  eval_mul_inplace(const int matrix)
 template<int mdim>
 __device__ const int* eval_interpret_rule(const int* rule)
 {
-	if(*rule == MUL_SEP)
+	if(*rule == MUL_SEP) {
+		eval_set_res_matrix_to_identity<mdim>();
 		return rule;
+	}
 
 	/*
 	 * all multiplications are inplace,
@@ -209,15 +211,11 @@ __device__ void c_calc_res(int match)
 	__syncthreads();
 
 	do {
-		eval_set_res_matrix_to_identity<mdim>();
-
 		rules++;
 		rules = eval_interpret_rule<mdim>(rules);
 
 		__syncthreads();
 		TRES(ty, tx) = RES(ty, tx);
-		__syncthreads();
-		eval_set_res_matrix_to_identity<mdim>();
 		__syncthreads();
 
 		rules++;
