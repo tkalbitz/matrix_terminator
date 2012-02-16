@@ -26,9 +26,6 @@ __shared__ float* res;
 __shared__ volatile float shrd_rating;
 __shared__ float matrix_form;
 
-__shared__ float old_rat;
-__shared__ curandState rnd;
-
 /* cached rules */
 __shared__ int srules[100];
 __shared__ int* rend;

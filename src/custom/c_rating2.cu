@@ -9,8 +9,11 @@
 
 #include "c_calc_function.cu"
 
+__shared__ float old_rat;
+__shared__ curandState rnd;
+
 template<int mnum, int mdim>
-__device__ void copy_to_child(struct c_instance& inst)
+__device__ void copy_to_child(struct c_instance& inst, unsigned int crnd)
 {
 	__shared__ int child;
 	const int bbx = bx;
@@ -18,7 +21,7 @@ __device__ void copy_to_child(struct c_instance& inst)
 	const int iwidth = mnum*mdim*mdim;
 
 	if(tx == 0 && ty == 0) {
-		child = curand(&rnd) % inst.icount;
+		child = crnd % inst.icount;
 
 		if(old_rat < rat[child]) {
 			if(old_rat < inst.best[bbx]) {
@@ -44,13 +47,13 @@ __device__ void copy_to_child(struct c_instance& inst)
 }
 
 template<int mnum, int mdim>
-__device__ void copy_parent(struct c_instance& inst)
+__device__ void copy_parent(struct c_instance& inst, unsigned int p)
 {
 	const int iwidth = mnum*mdim*mdim;
 
 	__shared__ int parent;
 	if(tx == 0 && ty == 0) {
-		parent = curand(&rnd) % inst.icount;
+		parent = p % inst.icount;
 		parent = (blockIdx.x * inst.icount + parent) * iwidth;
 	}
 	__syncthreads();
@@ -134,7 +137,8 @@ __device__  void path_mutate_p1(struct c_instance& inst,
 template<int mnum, int mdim>
 __device__ void path_mutate_p2(struct c_instance& inst,
 		               int3*         __restrict__ stack,
-		               unsigned int* __restrict__ top)
+		               unsigned int* __restrict__ top,
+		               int rchosen)
 {
 	const int iwidth = mnum*mdim*mdim;
 
@@ -146,7 +150,7 @@ __device__ void path_mutate_p2(struct c_instance& inst,
 	stack += tid * inst.rules_count * iwidth;
 	top += tid;
 
-	const int chosen = (*top < 2 ? 0 : curand(&rnd) % *top);
+	const int chosen = (*top < 2 ? 0 : rchosen % *top);
 	int3 entry = stack[chosen];
 	int l = entry.y;
 	int r = entry.x;
@@ -178,6 +182,8 @@ __device__ void path_mutate_p2(struct c_instance& inst,
 	}
 }
 
+#define MAX_RND 5
+
 template<int mnum, int mdim, int mcond>
 __global__ void all_in_one_kernel(struct c_instance inst,
 				  int3*          __restrict__ stack,
@@ -190,6 +196,9 @@ __global__ void all_in_one_kernel(struct c_instance inst,
 	float old_val;
 	int    mut_pos;
 
+	__shared__ curandState srnd[MAX_RND];
+	__shared__ unsigned int r[MAX_RND];
+
 	if(tx == 0 && ty == 0) {
 		rnd = inst.rnd_states[bbx];
 		rend = srules + inst.rules_len - 1;
@@ -197,18 +206,23 @@ __global__ void all_in_one_kernel(struct c_instance inst,
 		slhs = res + mdim * mdim;
 	}
 
+	if(ty == 0 && tx < MAX_RND) {
+		srnd[tx] = inst.rnd_states[tx];
+		r[tx] = curand(&srnd[tx]);
+	}
+
 	/* caching of rules to speed up access */
 	for(int i = RIDX(ty, tx); i < inst.rules_len; i += mdim*mdim)
 		srules[i] = inst.rules[i];
 
-	copy_parent<mnum, mdim>(inst);
+	copy_parent<mnum, mdim>(inst, r[0]);
 	__syncthreads();
 
 	path_mutate_p1<mnum, mdim>(inst, stack, top);
 	__syncthreads();
 
 	if(tx == 0 && ty == 0)
-		path_mutate_p2<mnum, mdim>(inst, stack, top);
+		path_mutate_p2<mnum, mdim>(inst, stack, top, r[1]);
 	__syncthreads();
 
 	c_calc_res<mdim, mcond>(inst.match);
@@ -217,12 +231,17 @@ __global__ void all_in_one_kernel(struct c_instance inst,
 	__syncthreads();
 
 	for(int steps = 0; steps < lucky; steps++) {
+		/* rnd numbers for this iteration */
+		if(ty == 0 && tx < MAX_RND)
+			r[tx] = curand(&srnd[tx]);
+
+		__syncthreads();
 
 		if(tx == 0 && ty == 0) {
-			const int mat = curand(&rnd)     % mnum;
-			const int row = curand(&rnd)     % (mdim -1);
-			const int col = 1 + curand(&rnd) % (mdim -1);
-			const int diff = 2 * (curand(&rnd) % 2) - 1 ;
+			const int mat  =      r[0] % mnum;
+			const int row  =      r[1] % (mdim -1);
+			const int col  = 1 +  r[2] % (mdim -1);
+			const int diff = 2 * (r[3] % 2) - 1 ;
 			mut_pos = mat * mdim*mdim + row * mdim + col;
 			old_val = sind[mut_pos];
 			sind[mut_pos] = max(old_val + diff * inst.delta, 0.);
@@ -235,7 +254,7 @@ __global__ void all_in_one_kernel(struct c_instance inst,
 
 		/* restore old version when it's worse */
 		if(tx == 0 && ty == 0) {
-			const int luck = curand(&rnd) % lucky;
+			const int luck = r[4] % lucky;
 
 			if(shrd_rating > old_rat && luck) {
 				sind[mut_pos] = old_val;
@@ -245,8 +264,12 @@ __global__ void all_in_one_kernel(struct c_instance inst,
 		}
 	}
 
-	copy_to_child<mnum, mdim>(inst);
+	copy_to_child<mnum, mdim>(inst, r[0]);
 	inst.rnd_states[bbx] = rnd;
+
+	if(ty == 0 && tx < MAX_RND)
+		inst.rnd_states[tx] = srnd[tx];
+
 }
 
 void start_astep(struct c_instance& inst,
