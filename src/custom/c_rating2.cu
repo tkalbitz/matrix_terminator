@@ -102,15 +102,11 @@ __device__  void path_mutate_p1(struct c_instance& inst,
 		special = 1;
 
 	do {
-		eval_set_res_matrix_to_identity<mdim>();
-
 		rules++;
 		rules = eval_interpret_rule<mdim>(rules);
 
 		__syncthreads();
 		TRES(ty, tx) = RES(ty, tx);
-		__syncthreads();
-		eval_set_res_matrix_to_identity<mdim>();
 		__syncthreads();
 
 		rules++;
