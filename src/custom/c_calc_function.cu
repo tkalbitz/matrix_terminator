@@ -23,6 +23,8 @@ __shared__ float* slhs;
 /* accu and cached rhs */
 __shared__ float* res;
 
+//__shared__ float* rdest;
+
 __shared__ volatile float shrd_rating;
 __shared__ float matrix_form;
 
@@ -31,70 +33,37 @@ __shared__ int srules[100];
 __shared__ int* rend;
 
 template<int mdim>
-__device__ void eval_set_res_matrix_to_identity()
-{
-	if(tx != ty) {
-		RES(ty, tx) = 0.f;
-	} else {
-		RES(ty, tx) = 1.f;
-	}
-}
-
-template<int mdim>
-__device__ inline void eval_copy_matrix_to_res(const int matrix)
-{
-	const int tid = RIDX(ty, tx);
-	const int mat = matrix * mdim * mdim;
-	res[tid] = sind[mat + tid];
-}
-
-template<int mdim>
-__device__ void  eval_mul_inplace(const int matrix)
-{
-	#ifdef KAHAN
-		float y, t;
-		float c = 0;
-	#endif
-	float sum = 0.f;
-
-	const int mat = matrix * mdim * mdim;
-
-	/* result rows */
-	for(int i = 0; i < mdim; i++) {
-		#ifdef KAHAN
-			y = __fmul_rn(RES(ty, i), sind[mat + RIDX(i, tx)]) - c;
-			t = __fadd_rn(sum, y);
-			c = (t - sum) - y;
-			sum = t;
-		#else
-			sum = sum + (RES(ty, i) * sind[mat + RIDX(i, tx)]);
-		#endif
-	}
-
-	__syncthreads();
-	RES(ty, tx) = sum;
-	__syncthreads();
-}
-
-template<int mdim>
-__device__ const int* eval_interpret_rule(const int* rule)
+__device__ const int* eval_interpret_rule(const int* rule, float* rdest)
 {
 	if(*rule == MUL_SEP) {
-		eval_set_res_matrix_to_identity<mdim>();
+		//set matrix to identity matrix
+		rdest[RIDX(ty, tx)] = (tx != ty) ? 0.f : 1.f;
 		return rule;
 	}
 
 	/*
-	 * all multiplications are inplace,
 	 * so we copy the first matrix to our result
 	 */
-	eval_copy_matrix_to_res<mdim>(*rule);
+	const int tid = RIDX(ty, tx);
+	int mat = *rule * mdim * mdim;
+	rdest[tid] = sind[mat + tid];
 	rule++;
 
 	__syncthreads();
 
+	/* multiply the matrix inplace */
 	for(; *rule != MUL_SEP; rule++) {
-		eval_mul_inplace<mdim>(*rule);
+		float sum = 0.f;
+		mat = *rule * mdim * mdim;
+
+		/* result rows */
+		for(int i = 0; i < mdim; i++) {
+			sum = sum + (rdest[RIDX(ty, i)] * sind[mat + RIDX(i, tx)]);
+		}
+
+		__syncthreads();
+		rdest[RIDX(ty, tx)] = sum;
+		__syncthreads();
 	}
 
 	return rule;
@@ -151,25 +120,11 @@ __device__ void c_result_rating(int match)
 
 	__syncthreads();
 
-	#ifdef KAHAN
-		float c = 0.f;
-		float y, t;
-	#endif
-	float sum;
-
-
 	//only lines are processed
 	if(tx == 0) {
-		sum = 0.f;
-		for(int i = 0; i < mdim; i++) {
-			#ifdef KAHAN
-				y = RES(ty, i) - c;
-				t = sum + y;
-				c = (t - sum) - y;
-				sum = t;
-			#else
-				sum += RES(ty, i);
-			#endif
+		float sum = RES(ty, 0);
+		for(int i = 1; i < mdim; i++) {
+			sum += RES(ty, i);
 		}
 
 		RES(ty, 0) = sum;
@@ -178,19 +133,11 @@ __device__ void c_result_rating(int match)
 
 	if(tx == 0 && ty == 0) {
 		for(int i = 0; i < mdim; i++) {
-			#ifdef KAHAN
-				y = RES(i, 0) - c;
-				t = rating + y;
-				c = (t - rating) - y;
-				rating = t;
-			#else
-				rating += RES(i, 0);
-			#endif
+			rating += RES(i, 0);
 		}
 
 		shrd_rating += rating;
 	}
-	__syncthreads();
 }
 
 template<int mdim, int mcond>
@@ -207,14 +154,10 @@ __device__ void c_calc_res(int match)
 
 	do {
 		rules++;
-		rules = eval_interpret_rule<mdim>(rules);
-
-		__syncthreads();
-		TRES(ty, tx) = RES(ty, tx);
-		__syncthreads();
+		rules = eval_interpret_rule<mdim>(rules, slhs);
 
 		rules++;
-		rules = eval_interpret_rule<mdim>(rules);
+		rules = eval_interpret_rule<mdim>(rules, res);
 		__syncthreads();
 
 		c_result_rating<mdim, mcond>(match);
@@ -226,5 +169,7 @@ __device__ void c_calc_res(int match)
 	if(tx == 0 && ty == 0) {
 		if(match == MATCH_ANY)
 			shrd_rating += matrix_form;
+		if(shrd_rating < 0.f)
+			shrd_rating = FLT_MAX;
 	}
 }

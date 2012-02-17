@@ -103,14 +103,10 @@ __device__  void path_mutate_p1(struct c_instance& inst,
 
 	do {
 		rules++;
-		rules = eval_interpret_rule<mdim>(rules);
-
-		__syncthreads();
-		TRES(ty, tx) = RES(ty, tx);
-		__syncthreads();
+		rules = eval_interpret_rule<mdim>(rules, slhs);
 
 		rules++;
-		rules = eval_interpret_rule<mdim>(rules);
+		rules = eval_interpret_rule<mdim>(rules, res);
 		__syncthreads();
 
 		entry.x = tx;
@@ -260,12 +256,14 @@ __global__ void all_in_one_kernel(struct c_instance inst,
 		}
 	}
 
+	if(shrd_rating < 0.f)
+		shrd_rating = FLT_MAX;
+
 	copy_to_child<mnum, mdim>(inst, r[0]);
 	inst.rnd_states[bbx * mdim + MAX_RND] = rnd;
 
 	if(ty == 0 && tx < MAX_RND)
 		inst.rnd_states[bbx * mdim + tx] = srnd[tx];
-
 }
 
 void start_astep(struct c_instance& inst,
