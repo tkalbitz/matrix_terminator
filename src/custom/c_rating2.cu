@@ -196,14 +196,14 @@ __global__ void all_in_one_kernel(struct c_instance inst,
 	__shared__ unsigned int r[MAX_RND];
 
 	if(tx == 0 && ty == 0) {
-		rnd = inst.rnd_states[bbx];
+		rnd = inst.rnd_states[bbx * mdim + MAX_RND];
 		rend = srules + inst.rules_len - 1;
 		res = sind + mnum * mdim * mdim;
 		slhs = res + mdim * mdim;
 	}
 
 	if(ty == 0 && tx < MAX_RND) {
-		srnd[tx] = inst.rnd_states[tx];
+		srnd[tx] = inst.rnd_states[bbx * mdim + tx];
 		r[tx] = curand(&srnd[tx]);
 	}
 
@@ -261,10 +261,10 @@ __global__ void all_in_one_kernel(struct c_instance inst,
 	}
 
 	copy_to_child<mnum, mdim>(inst, r[0]);
-	inst.rnd_states[bbx] = rnd;
+	inst.rnd_states[bbx * mdim + MAX_RND] = rnd;
 
 	if(ty == 0 && tx < MAX_RND)
-		inst.rnd_states[tx] = srnd[tx];
+		inst.rnd_states[bbx * mdim + tx] = srnd[tx];
 
 }
 
