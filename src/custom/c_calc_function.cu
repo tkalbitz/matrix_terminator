@@ -169,7 +169,5 @@ __device__ void c_calc_res(int match)
 	if(tx == 0 && ty == 0) {
 		if(match == MATCH_ANY)
 			shrd_rating += matrix_form;
-		if(shrd_rating < 0.f)
-			shrd_rating = FLT_MAX;
 	}
 }
