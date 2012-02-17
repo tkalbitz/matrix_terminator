@@ -48,7 +48,7 @@ __device__ const int* eval_interpret_rule(const int* rule, float* rdest)
 	if(*rule == MUL_SEP) {
 		const int tid = RIDX(ty, tx);
 		rdest[tid] = sind[mat + tid];
-		return;
+		return rule;
 	}
 
 	/*
