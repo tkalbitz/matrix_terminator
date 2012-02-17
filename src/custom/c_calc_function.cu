@@ -41,19 +41,35 @@ __device__ const int* eval_interpret_rule(const int* rule, float* rdest)
 		return rule;
 	}
 
-	/*
-	 * so we copy the first matrix to our result
-	 */
-	const int tid = RIDX(ty, tx);
 	int mat = *rule * mdim * mdim;
-	rdest[tid] = sind[mat + tid];
 	rule++;
 
-	__syncthreads();
+	/* there is only one matrix? this is our result */
+	if(*rule == MUL_SEP) {
+		const int tid = RIDX(ty, tx);
+		rdest[tid] = sind[mat + tid];
+		return;
+	}
 
-	/* multiply the matrix inplace */
+	/*
+	 * store in rdest the first result, so there we save one store
+	 * per matrix element
+	 */
+	float sum = 0.f;
+	const int mat2 = *rule * mdim * mdim;
+
+	for(int i = 0; i < mdim; i++) {
+		sum = sum + (sind[mat + RIDX(ty, i)] * sind[mat2 + RIDX(i, tx)]);
+	}
+
+	__syncthreads();
+	rdest[RIDX(ty, tx)] = sum;
+	__syncthreads();
+	rule++;
+
+	/* multiply rest of the rule */
 	for(; *rule != MUL_SEP; rule++) {
-		float sum = 0.f;
+		sum = 0.f;
 		mat = *rule * mdim * mdim;
 
 		/* result rows */
