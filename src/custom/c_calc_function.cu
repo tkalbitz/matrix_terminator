@@ -50,10 +50,10 @@ __device__ const int* eval_interpret_rule(const int* rule, float* rres)
 	/*
 	 * calculate the first result
 	 */
-	*rres = 0.f;
 	const int mat2 = *rule * mdim * mdim;
 
-	for(int i = 0; i < mdim; i++) {
+	*rres = sind[mat + RIDX(ty, 0)] * sind[mat2 + RIDX(0, tx)];
+	for(int i = 1; i < mdim; i++) {
 		*rres += sind[mat + RIDX(ty, i)] * sind[mat2 + RIDX(i, tx)];
 	}
 	rule++;
@@ -70,11 +70,11 @@ __device__ const int* eval_interpret_rule(const int* rule, float* rres)
 
 	/* multiply rest of the rule */
 	for(; *arule != MUL_SEP; arule++, rule++) {
-		*rres = 0.f;
 		mat = *rule * mdim * mdim;
 
 		/* result rows */
-		for(int i = 0; i < mdim; i++) {
+		*rres = res[RIDX(ty, 0)] * sind[mat + RIDX(0, tx)];
+		for(int i = 1; i < mdim; i++) {
 			*rres += res[RIDX(ty, i)] * sind[mat + RIDX(i, tx)];
 		}
 
@@ -83,11 +83,11 @@ __device__ const int* eval_interpret_rule(const int* rule, float* rres)
 		__syncthreads();
 	}
 
-	*rres = 0.f;
 	mat = *rule * mdim * mdim;
 
 	/* result rows */
-	for(int i = 0; i < mdim; i++) {
+	*rres = res[RIDX(ty, 0)] * sind[mat + RIDX(0, tx)];
+	for(int i = 1; i < mdim; i++) {
 		*rres += res[RIDX(ty, i)] * sind[mat + RIDX(i, tx)];
 	}
 
