@@ -12,13 +12,9 @@
 
 #define RIDX(cy, cx) ((cy) * mdim + (cx))
 #define RES(cy, cx)  res[RIDX(cy, cx)]
-#define TRES(cy, cx) slhs[RIDX(cy, cx)]
 
 /* cached individuum */
 extern __shared__ float sind[];
-
-/* cached lhs of the result */
-__shared__ float* slhs;
 
 /* accu and cached rhs */
 __shared__ float* res;
@@ -33,11 +29,11 @@ __shared__ int srules[100];
 __shared__ int* rend;
 
 template<int mdim>
-__device__ const int* eval_interpret_rule(const int* rule, float* rdest)
+__device__ const int* eval_interpret_rule(const int* rule, float* rres)
 {
 	if(*rule == MUL_SEP) {
 		//set matrix to identity matrix
-		rdest[RIDX(ty, tx)] = (tx != ty) ? 0.f : 1.f;
+		*rres = (tx != ty) ? 0.f : 1.f;
 		return rule;
 	}
 
@@ -47,93 +43,113 @@ __device__ const int* eval_interpret_rule(const int* rule, float* rdest)
 	/* there is only one matrix? this is our result */
 	if(*rule == MUL_SEP) {
 		const int tid = RIDX(ty, tx);
-		rdest[tid] = sind[mat + tid];
+		*rres = sind[mat + tid];
 		return rule;
 	}
 
 	/*
-	 * store in rdest the first result, so there we save one store
-	 * per matrix element
+	 * calculate the first result
 	 */
-	float sum = 0.f;
+	*rres = 0.f;
 	const int mat2 = *rule * mdim * mdim;
 
 	for(int i = 0; i < mdim; i++) {
-		sum = sum + (sind[mat + RIDX(ty, i)] * sind[mat2 + RIDX(i, tx)]);
+		*rres += sind[mat + RIDX(ty, i)] * sind[mat2 + RIDX(i, tx)];
 	}
-
-	__syncthreads();
-	rdest[RIDX(ty, tx)] = sum;
-	__syncthreads();
 	rule++;
 
+	/* no further rule */
+	if(*rule == MUL_SEP) {
+		return rule;
+	}
+
+	res[RIDX(ty, tx)] = *rres;
+	__syncthreads();
+
+	const int* arule = rule + 1;
+
 	/* multiply rest of the rule */
-	for(; *rule != MUL_SEP; rule++) {
-		sum = 0.f;
+	for(; *arule != MUL_SEP; arule++, rule++) {
+		*rres = 0.f;
 		mat = *rule * mdim * mdim;
 
 		/* result rows */
 		for(int i = 0; i < mdim; i++) {
-			sum = sum + (rdest[RIDX(ty, i)] * sind[mat + RIDX(i, tx)]);
+			*rres += res[RIDX(ty, i)] * sind[mat + RIDX(i, tx)];
 		}
 
 		__syncthreads();
-		rdest[RIDX(ty, tx)] = sum;
+		res[RIDX(ty, tx)] = *rres;
 		__syncthreads();
 	}
 
-	return rule;
+	*rres = 0.f;
+	mat = *rule * mdim * mdim;
+
+	/* result rows */
+	for(int i = 0; i < mdim; i++) {
+		*rres += res[RIDX(ty, i)] * sind[mat + RIDX(i, tx)];
+	}
+
+	return (rule + 1);
 }
 
 template<int mdim, int mcond>
-__device__ void c_result_rating(int match)
+__device__ void c_result_rating(int match, const float lhs, const float rhs)
 {
-	float rating = 0.;
+	float rating = 0.f;
+	const float penalty = 1e6f;
+	const int rows = mdim - 1;
 
-        if(ty == 0 && tx == 0) {
-        	const float penalty = 1e6f;
-        	const int rows = mdim - 1;
+	if(mcond == COND_UPPER_LEFT) {
+		if(tx == 0 && ty == 0) {
+			if((lhs - rhs) < 1.f)
+				rating = penalty;
 
-                switch(mcond) {
-                case COND_UPPER_LEFT:
-                        if((TRES(0, 0) - RES(0, 0)) < 1.f)
-                                rating += penalty;
-                        break;
-                case COND_UPPER_RIGHT:
-                        if((TRES(0, rows) - RES(0, rows)) < 1.f)
-                                rating += penalty;
-                        break;
-                case COND_UPPER_LEFT_LOWER_RIGHT:
-                        if((TRES(0, 0) - RES(0, 0)) < 1.f)
-                                rating += penalty;
+			if(match == MATCH_ANY) {
+					if(rating == 0.f)
+						matrix_form = 0.f;
 
-                        if((TRES(rows, rows) - RES(rows, rows)) < 1.f)
-                                rating += penalty;
-                        break;
-                default:
-                        rating += 2*penalty;
-                        break;
-                }
+					rating = 0.f;
+			}
+		}
+	}
 
-                if(match == MATCH_ANY) {
-                        if(rating == 0.f)
-                                matrix_form = 0.f;
+	if(mcond == COND_UPPER_RIGHT)
+		if(tx == rows && ty == 0) {
+			if((lhs - rhs) < 1.f)
+				rating = penalty;
 
-                        rating = 0.f;
-                }
-        }
-	__syncthreads();
+			if(match == MATCH_ANY) {
+					if(rating == 0.f)
+						matrix_form = 0.f;
 
-	const float a =  RES(ty, tx);
-	const float b = TRES(ty, tx);
+					rating = 0.f;
+			}
+		}
 
-	const float r = a - b;
-	const float f = (b == 0.f ? 1000.f : 1.f );
+	if(mcond == COND_UPPER_LEFT_LOWER_RIGHT) {
+		if(tx == rows && ty == rows)
+			if((lhs - rhs) < 1.f)
+				rating = penalty;
 
-	RES(ty, tx) = a > b ? (f * (r * r)) : 0.f;
-//	RES(ty, tx) = fabs(min(b - a, 0.));
-//	RES(ty, tx) = __fmul_rn(RES(ty, tx), RES(ty, tx));
+		if(tx == 0 && ty == 0)
+			if((lhs - rhs) < 1.f)
+				rating = penalty;
 
+		if(match == MATCH_ANY) {
+				if(rating == 0.f)
+					matrix_form = 0.f;
+
+				rating = 0.f;
+		}
+
+	}
+
+	const float r = lhs - rhs;
+	const float f = (lhs == 0.f ? 1000.f : 1.f );
+
+	RES(ty, tx) = (rhs > lhs ? (f * (r * r)) : 0.f) + rating;
 	__syncthreads();
 
 	//only lines are processed
@@ -148,11 +164,12 @@ __device__ void c_result_rating(int match)
 	__syncthreads();
 
 	if(tx == 0 && ty == 0) {
-		for(int i = 0; i < mdim; i++) {
-			rating += RES(i, 0);
+		float sum = RES(0, 0);
+		for(int i = 1; i < mdim; i++) {
+			sum += RES(i, 0);
 		}
 
-		shrd_rating += rating;
+		shrd_rating += sum;
 	}
 }
 
@@ -166,21 +183,21 @@ __device__ void c_calc_res(int match)
 		matrix_form = 1e9f;
 	}
 
-	__syncthreads();
+	float lhs;
+	float rhs;
 
 	do {
 		rules++;
-		rules = eval_interpret_rule<mdim>(rules, slhs);
+		rules = eval_interpret_rule<mdim>(rules, &lhs);
+		__syncthreads();
 
 		rules++;
-		rules = eval_interpret_rule<mdim>(rules, res);
+		rules = eval_interpret_rule<mdim>(rules, &rhs);
 		__syncthreads();
 
-		c_result_rating<mdim, mcond>(match);
+		c_result_rating<mdim, mcond>(match, lhs, rhs);
 		__syncthreads();
 	} while(rules != rend);
-
-	__syncthreads();
 
 	if(tx == 0 && ty == 0) {
 		if(match == MATCH_ANY)

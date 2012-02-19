@@ -101,19 +101,19 @@ __device__  void path_mutate_p1(struct c_instance& inst,
 		((ty == 0 && tx == 0) || (ty == rows && tx == rows)))
 		special = 1;
 
+	float lhs, rhs;
+
 	do {
 		rules++;
-		rules = eval_interpret_rule<mdim>(rules, slhs);
+		rules = eval_interpret_rule<mdim>(rules, &lhs);
 
 		rules++;
-		rules = eval_interpret_rule<mdim>(rules, res);
+		rules = eval_interpret_rule<mdim>(rules, &rhs);
 		__syncthreads();
 
 		entry.x = tx;
 		entry.y = ty;
 		entry.z = cur_rule;
-		const float lhs = TRES(ty, tx);
-		const float rhs = RES(ty, tx);
 
 		const int ok = special ? ((lhs - rhs) >= 1.f) : lhs >= rhs;
 		if(!ok) {
@@ -195,7 +195,6 @@ __global__ void all_in_one_kernel(struct c_instance inst,
 		rnd = inst.rnd_states[bbx * mdim + MAX_RND];
 		rend = srules + inst.rules_len - 1;
 		res = sind + mnum * mdim * mdim;
-		slhs = res + mdim * mdim;
 	}
 
 	if(ty == 0 && tx < MAX_RND) {
@@ -272,7 +271,6 @@ void start_astep(struct c_instance& inst,
 		unsigned int asteps)
 {
 	size_t space =(inst.num_matrices * inst.mdim * inst.mdim +
-			inst.mdim * inst.mdim +
 			inst.mdim * inst.mdim) * sizeof(float);
 
 	dim3 blocks(BLOCKS);

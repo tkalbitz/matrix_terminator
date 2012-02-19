@@ -79,7 +79,7 @@ CUDA_ADD_EXECUTABLE( c_matrix_generator
   custom/c_rating2.cu
   custom/c_rating.cu
   custom/c_print.cu
-  OPTIONS -arch=sm_13 -use_fast_math --ptxas-options=-v -ccbin ${CMAKE_CURRENT_SOURCE_DIR}/../ccdir
+  OPTIONS -arch=sm_13 -use_fast_math -keep --opencc-options -LIST:source=on --ptxas-options=-v -ccbin ${CMAKE_CURRENT_SOURCE_DIR}/../ccdir
   RELEASE -O2 --compiler-options -Wall
   DEBUG   -G3 -g -DDEBUG --maxrregcount=60
 )

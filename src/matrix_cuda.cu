@@ -43,7 +43,6 @@ __global__ void rating_kernel(struct cinstance inst)
 	if(tx == 0 && ty == 0) {
 		rend = srules + rlen - 1;
 		res = sind + mnum * mdim * mdim;
-		slhs = res + mdim * mdim;
 	}
 
 	/* caching of rules to speed up access */
@@ -64,7 +63,7 @@ __global__ void rating_kernel(struct cinstance inst)
 
 float penalty(struct cinstance& i, float* indv)
 {
-	const size_t space =(2 * i.mdim * i.mdim + i.mdim * i.mdim + i.mdim * i.mdim) * sizeof(*indv);
+	const size_t space =(2 * i.mdim * i.mdim + i.mdim * i.mdim) * sizeof(*indv);
 	const dim3 blocks(BLOCKS);
 	const dim3 threads(i.mdim, i.mdim);
 
