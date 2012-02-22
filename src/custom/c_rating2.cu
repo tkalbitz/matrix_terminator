@@ -216,7 +216,7 @@ __global__ void all_in_one_kernel(struct c_instance inst,
 		path_mutate_p2<mnum, mdim>(inst, stack, top, r[1]);
 	__syncthreads();
 
-	c_calc_res<mdim, mcond>(inst.match);
+	c_calc_res<mdim, mcond>(inst.match, inst.eps);
 	if(tx == 0 && ty == 0)
 		old_rat = shrd_rating;
 	__syncthreads();
@@ -240,7 +240,7 @@ __global__ void all_in_one_kernel(struct c_instance inst,
 		__syncthreads();
 
 		/* rating of mutated kernel */
-		c_calc_res<mdim, mcond>(inst.match);
+		c_calc_res<mdim, mcond>(inst.match, inst.eps);
 		__syncthreads();
 
 		/* restore old version when it's worse */

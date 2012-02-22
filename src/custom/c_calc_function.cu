@@ -95,7 +95,7 @@ __device__ const int* eval_interpret_rule(const int* rule, float* rres)
 }
 
 template<int mdim, int mcond>
-__device__ void c_result_rating(int match, const float lhs, const float rhs)
+__device__ void c_result_rating(int match, const float eps, const float lhs, const float rhs)
 {
 	float rating = 0.f;
 	const float penalty = 1e6f;
@@ -146,7 +146,11 @@ __device__ void c_result_rating(int match, const float lhs, const float rhs)
 
 	}
 
-	const float r = lhs - rhs;
+	float r = lhs - rhs;
+
+	if(fabs(r) < eps)
+		r = 0.f;
+
 	const float f = (lhs == 0.f ? 1000.f : 1.f );
 
 	RES(ty, tx) = (rhs > lhs ? (f * (r * r)) : 0.f) + rating;
@@ -174,7 +178,7 @@ __device__ void c_result_rating(int match, const float lhs, const float rhs)
 }
 
 template<int mdim, int mcond>
-__device__ void c_calc_res(int match)
+__device__ void c_calc_res(const int match, const float eps)
 {
 	const int* rules = srules;
 
@@ -195,7 +199,7 @@ __device__ void c_calc_res(int match)
 		rules = eval_interpret_rule<mdim>(rules, &rhs);
 		__syncthreads();
 
-		c_result_rating<mdim, mcond>(match, lhs, rhs);
+		c_result_rating<mdim, mcond>(match, eps, lhs, rhs);
 		__syncthreads();
 	} while(rules != rend);
 

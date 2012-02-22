@@ -48,6 +48,7 @@ struct c_instance
 	curandState *rnd_states;  /* random number generator states */
 
 	float delta;             /* numbers in the matrices are multiple the amount */
+	float eps;
 	int*   rules;             /* rules that must be matched */
 	size_t rules_len;         /* number of elements in rules */
 	size_t rules_count;       /* number of rules */

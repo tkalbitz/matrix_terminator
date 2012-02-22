@@ -56,7 +56,7 @@ __global__ void rating_kernel(struct cinstance inst)
 	}
 	__syncthreads();
 
-	c_calc_res<mdim, mcond>(inst.match);
+	c_calc_res<mdim, mcond>(inst.match, 1.f);
 	if(tx == 0 && ty == 0)
 		*inst.rat = shrd_rating;
 }
