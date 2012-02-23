@@ -1,6 +1,7 @@
-This project use different evolutionary algorithm (ES, PSO, CCPSO2) and a local 
-search implemented in CUDA to search for results in the termination competition
-[1].
+This project use different evolutionary algorithms (ES, PSO, CCPSO2) and a local 
+search implemented in CUDA to search for results for the termination competition
+[1]. For every algorithm exists a stand alone program and they are part of a C 
+library to use them from a high-level language like Haskell.   
 
 The evolutionary strategy and the particle swarm optimization is working. The
 CCPSO2 is based on the paper of Li and Yao [2]. The ccpso2 version is alpha 
@@ -13,7 +14,7 @@ aabb > bbbaaa.
 All algorithms where tested with CUDA 3.2 and 4.1 on a GTX 295 with compute
 capability 1.3 .
 
-If you have any questions contact me by mail or bitbucket.
+If you have any questions contact me by mail.
 
 The implementation is licensed under GPL 2.
 
