@@ -13,6 +13,7 @@
 #include <ctype.h>
 #include <errno.h>
 #include <float.h>
+#include <math.h>
 
 #include <sys/wait.h>
 
@@ -78,6 +79,9 @@ static void parse_rules(struct c_instance& inst, const char *rules)
 	inst.rules_count = 0;
 	inst.rules_len  = strlen(rules);
 	inst.rules = (int*)ya_malloc(sizeof(int) * inst.rules_len);
+	int max_len = 0;
+	int cur_len = 0;
+
 
 	uint8_t tmp = 0;
 	for(size_t i = 0; i < inst.rules_len; i++) {
@@ -91,8 +95,17 @@ static void parse_rules(struct c_instance& inst, const char *rules)
 			if(!tmp) {
 				inst.rules_count++;
 			}
+
+			max_len = max(max_len, cur_len);
+			cur_len = 0;
+		} else {
+			cur_len++;
 		}
 	}
+
+//	max_len++;
+	inst.eps = max(powf(inst.delta, (float)max_len), FLT_EPSILON);
+//	inst.eps = 1.e-20;
 }
 
 static void parse_configuration(struct c_instance&    inst,
@@ -352,7 +365,7 @@ int main(int argc, char** argv)
 		cudaEventDestroy(start);
 		cudaEventDestroy(stop);
 
-		if(i % 1000 == 0) {
+		if(i % 100 == 0) {
 			printf("Time: %10.2f ", elapsedTimeTotal);
 			printf("%6ld: ", i / 1000);
 			CUDA_CALL(cudaMemcpy(rating, inst.best, BLOCKS * sizeof(*rating), cudaMemcpyDeviceToHost));
