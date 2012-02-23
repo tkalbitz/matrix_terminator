@@ -1,0 +1,21 @@
+This project use different evolutionary algorithm (ES, PSO, CCPSO2) and a local 
+search implemented in CUDA to search for results in the termination competition
+[1].
+
+The evolutionary strategy and the particle swarm optimization is working. The
+CCPSO2 is based on the paper of Li and Yao [2]. The ccpso2 version is alpha 
+quality, not well parallelized and not ready for prime time. The standard 
+particle swarm optimization borrows the mutation of that paper.
+
+The custom algorithm is the only one which finds a result for z001 alias
+aabb > bbbaaa. 
+
+All algorithms where tested with CUDA 3.2 and 4.1 on a GTX 295 with compute
+capability 1.3 .
+
+If you have any questions contact me by mail or bitbucket.
+
+The implementation is licensed under GPL 2.
+
+[1] http://www.lri.fr/~marche/termination-competition/
+[2] http://ieeexplore.ieee.org/xpl/freeabs_all.jsp?arnumber=5910380&abstractAccess=no&userType=inst
