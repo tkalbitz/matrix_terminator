@@ -1,3 +1,12 @@
+/*
+ * Copyright (c) 2011, 2012 Tobias Kalbitz <tobias.kalbitz@googlemail.com>
+ *
+ * All rights reserved. This program and the accompanying materials
+ * are made available under the terms of the GNU Public License v2.0
+ * which accompanies this distribution, and is available at
+ * http://www.gnu.org/licenses/old-licenses/gpl-2.0.html
+ */
+
 #include "pso_copy.h"
 
 void copy_gb_rating_dev_to_host(struct pso_instance* inst, void* parent_rat_cpy)

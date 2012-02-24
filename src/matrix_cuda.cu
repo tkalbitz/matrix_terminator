@@ -1,3 +1,13 @@
+/*
+ * Copyright (c) 2012 Prof. Johannis Waldmann <waldmann@htwl-leipzig.de>
+ * Copyright (c) 2012 Tobias Kalbitz <tobias.kalbitz@googlemail.com>
+ *
+ * All rights reserved. This program and the accompanying materials
+ * are made available under the terms of the GNU Public License v2.0
+ * which accompanies this distribution, and is available at
+ * http://www.gnu.org/licenses/old-licenses/gpl-2.0.html
+ */
+
 // this program searches a matrix impretation
 // over the naturals that is compatible with
 // z001 = ( RULES a a b b -> b b b a a a) .
@@ -7,6 +17,8 @@
 // should give a result within 10 seconds 
 // (but it depends on the RNG initialization).
 // see end of file for description of cmd line args
+
+// float version, use a cuda kernel to rate a indv
 
 #include <string.h>
 #include <stdlib.h>
