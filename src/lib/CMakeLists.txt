@@ -34,8 +34,8 @@ CUDA_ADD_LIBRARY( evo_matrix_generator
   ../evo/matrix_copy.h
   ../custom/c_setup.cu
   ../custom/c_setup.h
-  ../custom/c_rating2.h
-  ../custom/c_rating2.cu
+  ../custom/c_rating.h
+  ../custom/c_rating.cu
   ../custom/c_instance.cu
   ../custom/c_instance.h
   ../ya_malloc.h

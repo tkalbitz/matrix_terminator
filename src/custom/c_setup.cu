@@ -11,7 +11,7 @@
 
 #include "c_config.h"
 #include "c_setup.h"
-#include "c_rating2.h"
+#include "c_rating.h"
 
 /* calculate the thread id for the current block topology */
 __device__ inline int get_thread_id() {

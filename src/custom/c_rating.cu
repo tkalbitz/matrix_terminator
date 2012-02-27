@@ -16,350 +16,30 @@
 #include "c_rating.h"
 #include "c_instance.h"
 
-#define TIDX(cy, cx) (blockIdx.x * inst.width_per_matrix * blockDim.y + \
-                      blockIdx.y * inst.width_per_matrix + \
-                      cy * inst.mdim + cx)
-#define TRES(cy, cx) inst.res[TIDX(cy, cx)]
+#include "c_calc_function.cu"
 
-#define RIDX(cy, cx) ((cy) * inst.mdim + (cx))
-#define RES(cy, cx)  res[RIDX(cy, cx)]
+__shared__ float old_rat;
+__shared__ curandState rnd;
 
-__shared__ float res[MATRIX_WIDTH * MATRIX_WIDTH];
-__shared__ float tmpmat[MATRIX_WIDTH * MATRIX_WIDTH];
-__shared__ float shrd_rating;
-__shared__ float matrix_form;
-
-__device__ inline void
-eval_set_res_matrix_to_identity(const struct c_instance& inst)
-{
-	if(tx != ty) {
-		RES(ty, tx) = 0.;
-	} else {
-		RES(ty, tx) = 1.;
-	}
-}
-
-__device__ inline void eval_copy_matrix_to_res(const struct c_instance& inst,
-		    	    	    	       const float *  const    matrix,
-		    	    	    	       float * const r)
-{
-	const int tid = RIDX(ty, tx);
-	r[tid] = matrix[tid];
-}
-
-__device__ void eval_mul_inplace(const struct c_instance& inst)
-{
-	float y, t;
-	float c = 0;
-	float sum = 0;
-
-	/* result rows */
-	for(int i = 0; i < inst.mdim; i++) {
-		y = __fmul_rn(RES(ty, i), tmpmat[RIDX(i, tx)]) - c;
-		t = __fadd_rn(sum, y);
-		c = (t - sum) - y;
-		sum = t;
-	}
-
-	__syncthreads();
-	RES(ty, tx) = sum;
-	__syncthreads();
-}
-
-__device__ const int* eval_interpret_rule(const struct c_instance& inst,
-				    	  const int              * rule,
-				    	  const float		 * ind)
-{
-	if(*rule == MUL_SEP)
-		return rule;
-
-	/*
-	 * all multiplications are inplace,
-	 * so we copy the first matrix to our result
-	 */
-	const float* matrix = ind + (*rule) * inst.width_per_matrix;
-	eval_copy_matrix_to_res(inst, matrix, res);
-	rule++;
-
-	__syncthreads();
-
-	for(; *rule != MUL_SEP; rule++) {
-		matrix = ind + (*rule) * inst.width_per_matrix;
-		eval_copy_matrix_to_res(inst, matrix, tmpmat);
-		eval_mul_inplace(inst);
-	}
-
-	return rule;
-}
-
-__device__ void c_result_rating(const struct c_instance& inst)
-{
-	float rating = 0.;
-
-        if(ty == 0 && tx == 0) {
-        	const float penalty = 1e6;
-        	const int rows = inst.mdim - 1;
-
-                switch(inst.cond_right) {
-                case COND_UPPER_LEFT:
-                        if((TRES(0, 0) - RES(0, 0)) < 1.f)
-                                rating += penalty;
-                        break;
-                case COND_UPPER_RIGHT:
-                        if((TRES(0, rows) - RES(0, rows)) < 1.f)
-                                rating += penalty;
-                        break;
-                case COND_UPPER_LEFT_LOWER_RIGHT:
-                        if((TRES(0, 0) - RES(0, 0)) < 1.f)
-                                rating += penalty;
-
-                        if((TRES(rows, rows) - RES(rows, rows)) < 1.f)
-                                rating += penalty;
-                        break;
-                default:
-                        rating += 2*penalty;
-                        break;
-                }
-
-                if(inst.match == MATCH_ANY) {
-                        if(rating == 0.)
-                                matrix_form = 0.;
-
-                        rating = 0.;
-                }
-        }
-	__syncthreads();
-	// keep only negative numbers
-//	if(min(TRES(ty, tx) - (RES(ty, tx)), 0.) == 0.)
-//		RES(ty, tx) = 0;
-//	else
-//		RES(ty, tx) = (RES(ty, tx) + 1) / (TRES(ty, tx) + 1);
-
-	const float a =  RES(ty, tx);
-	const float b = TRES(ty, tx);
-
-	RES(ty, tx) = a > b ? (a * a - b * b) : 0.;
-//	RES(ty, tx) = fabs(min(b - a, 0.));
-//	RES(ty, tx) = __fmul_rn(RES(ty, tx), RES(ty, tx));
-
-	__syncthreads();
-
-	float c = 0.0;
-	float y, t;
-	float sum;
-
-	//only lines are processed
-	if(tx == 0) {
-		sum = 0.;
-
-		for(int i = 0; i < inst.mdim; i++) {
-			y = RES(ty, i) - c;
-			t = sum + y;
-			c = (t - sum) - y;
-			sum = t;
-		}
-
-		RES(ty, 0) = sum;
-	}
-	__syncthreads();
-
-	c = 0.0;
-	if(tx == 0 && ty == 0) {
-		for(int i = 0; i < inst.mdim; i++) {
-			y = RES(i, 0) - c;
-			t = rating + y;
-			c = (t - rating) - y;
-			rating = t;
-		}
-
-		shrd_rating += rating;
-	}
-	__syncthreads();
-}
-
-__device__ float c_calc_res(const struct c_instance& inst,
-		             const float* const ind)
-{
-	const int* end = inst.rules + inst.rules_len - 1;
-	const int* rules = inst.rules;
-
-	if(tx == 0 && ty == 0) {
-		shrd_rating = 0.;
-		matrix_form = 1e9;
-	}
-
-	__syncthreads();
-
-	do {
-		eval_set_res_matrix_to_identity(inst);
-
-		rules++;
-		rules = eval_interpret_rule(inst, rules, ind);
-
-		__syncthreads();
-		TRES(ty, tx) = RES(ty, tx);
-		__syncthreads();
-		eval_set_res_matrix_to_identity(inst);
-		__syncthreads();
-
-		rules++;
-		rules = eval_interpret_rule(inst, rules, ind);
-		__syncthreads();
-
-		c_result_rating(inst);
-		__syncthreads();
-	} while(rules != end);
-
-	__syncthreads();
-
-	if(tx == 0 && ty == 0) {
-		if(inst.match == MATCH_ANY)
-			shrd_rating += matrix_form;
-	}
-
-	__syncthreads();
-	return shrd_rating;
-}
-
-__global__ void calc_res(struct c_instance inst, float* ind, float* dest)
-{
-	float res = c_calc_res(inst, ind);
-
-	if(tx == 0 && ty == 0)
-		*dest = shrd_rating;
-}
-
-__global__ void calc_tmp_res(struct c_instance inst)
-{
-	float* ind = inst.tmp + bx * inst.width_per_inst;
-	float res = c_calc_res(inst, ind);
-
-	if(tx == 0 && ty == 0)
-		inst.tmprat[bx] = shrd_rating;
-}
-
-__global__ void setup_rating(struct c_instance inst, int yoff)
-{
-	const int idx = (blockIdx.x) * inst.icount + (blockIdx.y + yoff);
-	const float* indv = inst.instances + idx * inst.width_per_inst;
-	float rat = c_calc_res(inst, indv);
-
-	if(tx == 0 && ty == 0)
-		inst.rating[idx] = rat;
-}
-
-__global__ void copy_parent_kernel(struct c_instance inst)
-{
-
-	__shared__ int parent;
-	if(tx == 0 && ty == 0) {
-		float* const rat = inst.rating + bx * inst.icount;
-
-		parent = curand(&(inst.rnd_states[blockIdx.x])) % inst.icount;
-		parent = (blockIdx.x * inst.icount + parent) *
-				inst.width_per_inst;
-	}
-	__syncthreads();
-	float* src = inst.instances + parent;
-	float* dest = inst.tmp + blockIdx.x * inst.width_per_inst;
-
-	for(int i = tx; i < inst.width_per_inst; i += blockDim.x) {
-		dest[i] = src[i];
-	}
-}
-
-//__global__ void all_in_one_kernel(struct c_instance inst, const int lucky)
-//{
-//	const int bbx = blockIdx.x;
-//
-//	/* mutation */
-//	float* const indv = inst.tmp + bbx * inst.width_per_inst;
-//
-//	float old_rat = inst.tmprat[bbx];
-//	float old_val;
-//	int    mut_pos;
-//
-//	for(int steps = 0; steps < lucky; steps++) {
-//
-//		if(tx == 0 && ty == 0) {
-//			const int mat = curand(&(inst.rnd_states[bbx])) % inst.num_matrices;
-//			const int row = curand(&(inst.rnd_states[bbx])) % (inst.mdim -1);
-//			const int col = 1 + curand(&(inst.rnd_states[bbx])) % (inst.mdim -1);
-//			mut_pos = mat*inst.mdim*inst.mdim + row * inst.mdim + col;
-//			old_val = indv[mut_pos];
-//			indv[mut_pos] = max(old_val - inst.delta, 0.);
-//		}
-//		__syncthreads();
-//
-//		/* rating of mutated kernel */
-//		c_calc_res(inst, indv);
-//		__syncthreads();
-//
-//		/* copy back */
-//		if(tx == 0 && ty == 0) {
-//			const int luck = curand(&inst.rnd_states[bbx]) % lucky;
-//
-//			if(shrd_rating > old_rat && luck) {
-//				indv[mut_pos] = old_val;
-//			} else {
-//				old_rat = shrd_rating;
-//			}
-//		}
-//		__syncthreads();
-//	}
-//
-//	if(tx == 0 && ty == 0)
-//		inst.tmprat[bbx] = old_rat;
-//}
-
-__global__ void mutate_kernel(struct c_instance inst)
-{
-	float* src = inst.tmp + bx * inst.width_per_inst;
-	float* dest = inst.sinstances + bx * inst.width_per_inst;
-
-	for(int i = tx; i < inst.width_per_inst; i += blockDim.x) {
-		dest[i] = src[i];
-	}
-
-	__syncthreads();
-
-	if(tx == 0 && ty == 0) {
-		const int mat = curand(&(inst.rnd_states[bx])) % inst.num_matrices;
-		const int row = curand(&(inst.rnd_states[bx])) % (inst.mdim -1);
-		const int col = 1 + curand(&(inst.rnd_states[bx])) % (inst.mdim -1);
-		const int mpos = mat*inst.mdim*inst.mdim + row*inst.mdim + col;
-		dest[mpos] = max(dest[mpos] - inst.delta, 0.);
-	}
-}
-
-__global__ void rate_mutated_kernel(struct c_instance inst)
-{
-	const float* ind = inst.sinstances + bx * inst.width_per_inst;
-	const float rat = c_calc_res(inst, ind);
-
-	if(tx == 0 && ty == 0)
-		inst.srating[bx] = shrd_rating;
-}
-
-__global__ void copy_to_child_kernel(struct c_instance inst)
+template<int mnum, int mdim>
+__device__ void copy_to_child(struct c_instance& inst, unsigned int crnd)
 {
 	__shared__ int child;
 	const int bbx = bx;
 	float* const rat = inst.rating + bbx * inst.icount;
+	const int iwidth = mnum*mdim*mdim;
 
 	if(tx == 0 && ty == 0) {
-		child = curand(&(inst.rnd_states[bbx])) % inst.icount;
+		child = crnd % inst.icount;
 
-		float trat = inst.tmprat[bbx];
-		if(trat < rat[child]) {
-			if(trat < inst.best[bbx]) {
-				inst.best[bbx] = trat;
+		if(old_rat < rat[child]) {
+			if(old_rat < inst.best[bbx]) {
+				inst.best[bbx] = old_rat;
 				inst.best_idx[bbx] = child;
 			}
 
-			rat[child] = trat;
-			child = (bbx * inst.icount + child) *
-				inst.width_per_inst;
+			rat[child] = old_rat;
+			child = (bbx * inst.icount + child) * iwidth;
 		} else {
 			child = -1;
 		}
@@ -369,49 +49,43 @@ __global__ void copy_to_child_kernel(struct c_instance inst)
 	if(child == -1)
 		return;
 
-	float* src  = inst.tmp + bbx * inst.width_per_inst;
 	float* dest = inst.instances + child;
+	for(int i = RIDX(ty, tx); i < iwidth; i += mdim*mdim) {
+		dest[i] = sind[i];
+	}
+}
 
-	for(int i = tx; i < inst.width_per_inst; i += blockDim.x) {
-		dest[i] = src[i];
+template<int mnum, int mdim>
+__device__ void copy_parent(struct c_instance& inst, unsigned int p)
+{
+	const int iwidth = mnum*mdim*mdim;
+
+	__shared__ int parent;
+	if(tx == 0 && ty == 0) {
+		parent = p % inst.icount;
+		parent = (blockIdx.x * inst.icount + parent) * iwidth;
 	}
 	__syncthreads();
-}
+	float* src = inst.instances + parent;
 
-__global__ void copy_to_tmp_kernel(struct c_instance inst, int lucky)
-{
-	const int bbx = bx;
-	__shared__ int luck;
-
-	if(tx == 0 && ty == 0)
-		luck = curand(&inst.rnd_states[bbx]) % lucky;
-
-	if(inst.srating[bbx] > inst.tmprat[bbx] && luck)
-		return;
-
-	inst.tmprat[bbx] = inst.srating[bbx];
-
-	float* src  = inst.sinstances + bbx * inst.width_per_inst;
-	float* dest = inst.tmp + bbx * inst.width_per_inst;
-
-	for(int i = tx; i < inst.width_per_inst; i += blockDim.x) {
-		dest[i] = src[i];
+	for(int i = RIDX(ty, tx); i < iwidth; i += mdim*mdim) {
+		sind[i] = src[i];
 	}
 }
 
-/* Here be dragons: this is not pretty but works. */
-__global__ void path_mutate_kernel_p1(struct c_instance inst,
-		                      int3* stack, unsigned int* top)
+template<int mnum, int mdim>
+__device__  void path_mutate_p1(struct c_instance& inst,
+		                int3*          __restrict__ stack,
+		                unsigned int*  __restrict__ top)
 {
-	const int* end = inst.rules + inst.rules_len - 1;
-	const int* rules = inst.rules;
-	const float* ind = inst.tmp + bx * inst.width_per_inst;
+	const int* rules = srules;
+	const int iwidth = mnum*mdim*mdim;
 
 	int pos;
 	int cur_rule = 0;
 	int3 entry;
 
-	stack += bx * inst.rules_count * inst.width_per_matrix * 2;
+	stack += bx * inst.rules_count * iwidth;
 	top += bx;
 
 	if(tx == 0 && ty == 0) {
@@ -425,7 +99,7 @@ __global__ void path_mutate_kernel_p1(struct c_instance inst,
 
 	__syncthreads();
 
-	const int rows = inst.mdim - 1;
+	const int rows = mdim - 1;
 	int special = 0;
 
 	if(inst.cond_right == COND_UPPER_LEFT && ty == 0 && tx == 0)
@@ -436,29 +110,21 @@ __global__ void path_mutate_kernel_p1(struct c_instance inst,
 		((ty == 0 && tx == 0) || (ty == rows && tx == rows)))
 		special = 1;
 
+	float lhs, rhs;
+
 	do {
-		eval_set_res_matrix_to_identity(inst);
+		rules++;
+		rules = eval_interpret_rule<mdim>(rules, &lhs);
 
 		rules++;
-		rules = eval_interpret_rule(inst , rules, ind);
-
-		__syncthreads();
-		TRES(ty, tx) = RES(ty, tx);
-		__syncthreads();
-		eval_set_res_matrix_to_identity(inst);
-		__syncthreads();
-
-		rules++;
-		rules = eval_interpret_rule(inst , rules, ind);
+		rules = eval_interpret_rule<mdim>(rules, &rhs);
 		__syncthreads();
 
 		entry.x = tx;
 		entry.y = ty;
 		entry.z = cur_rule;
-		const float lhs = TRES(ty, tx);
-		const float rhs = RES(ty, tx);
 
-		const int ok = special ? ((lhs - rhs) >= 1.) : lhs >= rhs;
+		const int ok = special ? ((lhs - rhs) >= 1.f) : lhs >= rhs;
 		if(!ok) {
 			pos = atomicAdd(top, 1);
 			stack[pos] = entry;
@@ -466,24 +132,26 @@ __global__ void path_mutate_kernel_p1(struct c_instance inst,
 
 		cur_rule++;
 		__syncthreads();
-	} while(rules != end);
+	} while(rules != rend);
 }
 
-__global__ void path_mutate_kernel_p2(struct c_instance inst, int3* stack,
-		unsigned int* top)
+template<int mnum, int mdim>
+__device__ void path_mutate_p2(struct c_instance& inst,
+		               int3*         __restrict__ stack,
+		               unsigned int* __restrict__ top,
+		               int rchosen)
 {
+	const int iwidth = mnum*mdim*mdim;
+
 	const int tid = bx;
-	const int* rules = inst.rules;
-	float* ind = inst.tmp + tid * inst.width_per_inst;
+	const int* rules = srules;
 
 	int cur_rule = 0;
 
-	stack += tid * inst.rules_count * inst.width_per_matrix * 2;
+	stack += tid * inst.rules_count * iwidth;
 	top += tid;
 
-	curandState rnd = inst.rnd_states[tid];
-
-	const int chosen = (*top < 2 ? 0 : curand(&rnd) % *top);
+	const int chosen = (*top < 2 ? 0 : rchosen % *top);
 	int3 entry = stack[chosen];
 	int l = entry.y;
 	int r = entry.x;
@@ -508,12 +176,165 @@ __global__ void path_mutate_kernel_p2(struct c_instance inst, int3* stack,
 
 	/* put new weights on the path */
 	for(; *rules != MUL_SEP; rules++) {
-		goal = *(rules+1) < 0 ? r : 1 + curand(&rnd) % (inst.mdim - 2);
-		float* pos = ind + (*rules) * inst.width_per_matrix +
-				 l * inst.mdim + goal;
+		goal = *(rules+1) < 0 ? r : 1 + curand(&rnd) % (mdim - 2);
+		float* pos = sind + (*rules) * iwidth + l * mdim + goal;
 		*pos = max(*pos + inst.delta, 1.);
 		l = goal;
 	}
+}
 
-	inst.rnd_states[tid] = rnd;
+#define MAX_RND 5
+
+template<int mnum, int mdim, int mcond>
+__global__ void all_in_one_kernel(struct c_instance inst,
+				  int3*          __restrict__ stack,
+                		  unsigned int*  __restrict__ top,
+                		  const int lucky)
+{
+	const int bbx = blockIdx.x;
+
+	/* mutation */
+	float old_val;
+	int    mut_pos;
+
+	__shared__ curandState srnd[MAX_RND];
+	__shared__ unsigned int r[MAX_RND];
+
+	if(tx == 0 && ty == 0) {
+		rnd = inst.rnd_states[bbx * mdim + MAX_RND];
+		rend = srules + inst.rules_len - 1;
+		res = sind + mnum * mdim * mdim;
+	}
+
+	if(ty == 0 && tx < MAX_RND) {
+		srnd[tx] = inst.rnd_states[bbx * mdim + tx];
+		r[tx] = curand(&srnd[tx]);
+	}
+
+	/* caching of rules to speed up access */
+	for(int i = RIDX(ty, tx); i < inst.rules_len; i += mdim*mdim)
+		srules[i] = inst.rules[i];
+
+	copy_parent<mnum, mdim>(inst, r[0]);
+	__syncthreads();
+
+	path_mutate_p1<mnum, mdim>(inst, stack, top);
+	__syncthreads();
+
+	if(tx == 0 && ty == 0)
+		path_mutate_p2<mnum, mdim>(inst, stack, top, r[1]);
+	__syncthreads();
+
+	c_calc_res<mdim, mcond>(inst.match, inst.eps);
+	if(tx == 0 && ty == 0)
+		old_rat = shrd_rating;
+	__syncthreads();
+
+	for(int steps = 0; steps < lucky; steps++) {
+		/* rnd numbers for this iteration */
+		if(ty == 0 && tx < MAX_RND)
+			r[tx] = curand(&srnd[tx]);
+
+		__syncthreads();
+
+		if(tx == 0 && ty == 0) {
+			const int mat  =      r[0] % mnum;
+			const int row  =      r[1] % (mdim -1);
+			const int col  = 1 +  r[2] % (mdim -1);
+			const int diff = 2 * (r[3] % 2) - 1 ;
+			mut_pos = mat * mdim*mdim + row * mdim + col;
+			old_val = sind[mut_pos];
+			sind[mut_pos] = max(old_val + diff * inst.delta, 0.);
+		}
+		__syncthreads();
+
+		/* rating of mutated kernel */
+		c_calc_res<mdim, mcond>(inst.match, inst.eps);
+		__syncthreads();
+
+		/* restore old version when it's worse */
+		if(tx == 0 && ty == 0) {
+			const int luck = r[4] % lucky;
+
+			if(shrd_rating > old_rat && luck) {
+				sind[mut_pos] = old_val;
+			} else {
+				old_rat = shrd_rating;
+			}
+		}
+	}
+
+	if(shrd_rating < 0.f)
+		shrd_rating = FLT_MAX;
+
+	copy_to_child<mnum, mdim>(inst, r[0]);
+	inst.rnd_states[bbx * mdim + MAX_RND] = rnd;
+
+	if(ty == 0 && tx < MAX_RND)
+		inst.rnd_states[bbx * mdim + tx] = srnd[tx];
+}
+
+void start_astep(struct c_instance& inst,
+		int3*          __restrict__ stack,
+		unsigned int*  __restrict__ top,
+		unsigned int asteps)
+{
+	size_t space =(inst.num_matrices * inst.mdim * inst.mdim +
+			inst.mdim * inst.mdim) * sizeof(float);
+
+	dim3 blocks(BLOCKS);
+	dim3 threads(inst.mdim, inst.mdim);
+
+	if(inst.cond_right == COND_UPPER_RIGHT && inst.num_matrices == 2) {
+		switch(inst.mdim) {
+		case 5:
+			all_in_one_kernel<2, 5, COND_UPPER_RIGHT><<<blocks, threads, space>>>(inst, stack, top, asteps);
+			CUDA_CALL(cudaGetLastError());
+			break;
+		case 6:
+			all_in_one_kernel<2, 6, COND_UPPER_RIGHT><<<blocks, threads, space>>>(inst, stack, top, asteps);
+			CUDA_CALL(cudaGetLastError());
+			break;
+		case 7:
+			all_in_one_kernel<2, 7, COND_UPPER_RIGHT><<<blocks, threads, space>>>(inst, stack, top, asteps);
+			CUDA_CALL(cudaGetLastError());
+			break;
+		case 8:
+			all_in_one_kernel<2, 8, COND_UPPER_RIGHT><<<blocks, threads, space>>>(inst, stack, top, asteps);
+			CUDA_CALL(cudaGetLastError());
+			break;
+		case 9:
+			all_in_one_kernel<2, 9, COND_UPPER_RIGHT><<<blocks, threads, space>>>(inst, stack, top, asteps);
+			CUDA_CALL(cudaGetLastError());
+			break;
+		case 10:
+			all_in_one_kernel<2, 10, COND_UPPER_RIGHT><<<blocks, threads, space>>>(inst, stack, top, asteps);
+			CUDA_CALL(cudaGetLastError());
+			break;
+		case 11:
+			all_in_one_kernel<2, 11, COND_UPPER_RIGHT><<<blocks, threads, space>>>(inst, stack, top, asteps);
+			CUDA_CALL(cudaGetLastError());
+			break;
+		case 12:
+			all_in_one_kernel<2, 12, COND_UPPER_RIGHT><<<blocks, threads, space>>>(inst, stack, top, asteps);
+			CUDA_CALL(cudaGetLastError());
+			break;
+		case 13:
+			all_in_one_kernel<2, 13, COND_UPPER_RIGHT><<<blocks, threads, space>>>(inst, stack, top, asteps);
+			CUDA_CALL(cudaGetLastError());
+			break;
+		case 14:
+			all_in_one_kernel<2, 14, COND_UPPER_RIGHT><<<blocks, threads, space>>>(inst, stack, top, asteps);
+			CUDA_CALL(cudaGetLastError());
+			break;
+		case 15:
+			all_in_one_kernel<2, 15, COND_UPPER_RIGHT><<<blocks, threads, space>>>(inst, stack, top, asteps);
+			CUDA_CALL(cudaGetLastError());
+			break;
+		case 16:
+			all_in_one_kernel<2, 16, COND_UPPER_RIGHT><<<blocks, threads, space>>>(inst, stack, top, asteps);
+			CUDA_CALL(cudaGetLastError());
+			break;
+		}
+	}
 }

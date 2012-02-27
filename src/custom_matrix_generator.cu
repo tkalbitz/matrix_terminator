@@ -26,7 +26,7 @@
 #include "custom/c_instance.h"
 #include "custom/c_setup.h"
 #include "custom/c_print.h"
-#include "custom/c_rating2.h"
+#include "custom/c_rating.h"
 
 #include "ya_malloc.h"
 

@@ -76,7 +76,7 @@ CUDA_ADD_EXECUTABLE( c_matrix_generator
   custom_matrix_generator.cu
   custom/c_instance.cu
   custom/c_setup.cu
-  custom/c_rating2.cu
+  custom/c_rating.cu
   custom/c_print.cu
   OPTIONS -arch=sm_13 -use_fast_math -keep --opencc-options -LIST:source=on --ptxas-options=-v -ccbin ${CMAKE_CURRENT_SOURCE_DIR}/../ccdir
   RELEASE -O2 --compiler-options -Wall
