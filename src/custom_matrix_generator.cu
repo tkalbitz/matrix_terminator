@@ -75,6 +75,7 @@ static void print_usage()
 		"result.\n\n");
 }
 
+
 static void parse_rules(struct c_instance& inst, const char *rules)
 {
 	inst.rules_count = 0;
@@ -83,15 +84,26 @@ static void parse_rules(struct c_instance& inst, const char *rules)
 	int max_len = 0;
 	int cur_len = 0;
 
-
 	uint8_t tmp = 0;
 	for(size_t i = 0; i < inst.rules_len; i++) {
-		if(rules[i] >= 'a')
-			inst.rules[i] = (rules[i] == 'X') ? MUL_SEP : rules[i] - 'a';
-		else
-			inst.rules[i] = (rules[i] == 'X') ? MUL_SEP : rules[i] - '0';
+		switch(rules[i]) {
+		case 'X': {
+			inst.rules[i] = MUL_SEP;
+			break;
+		}
+		case 'Y': {
+			inst.rules[i] = MUL_MARK;
+			break;
+		}
+		default:
+			if(rules[i] >= 'a')
+				inst.rules[i] = rules[i] - 'a';
+			else
+				inst.rules[i] = rules[i] - '0';
+			break;
+		}
 
-		if(rules[i] == 'X') {
+		if(rules[i] == 'X' || rules[i] == 'Y') {
 			tmp = (tmp + 1) % 2;
 			if(!tmp) {
 				inst.rules_count++;
@@ -104,9 +116,7 @@ static void parse_rules(struct c_instance& inst, const char *rules)
 		}
 	}
 
-//	max_len++;
 	inst.eps = max(powf(inst.delta, (float)max_len), FLT_EPSILON);
-//	inst.eps = 1.e-20;
 }
 
 static void parse_configuration(struct c_instance&    inst,

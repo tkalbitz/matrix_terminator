@@ -29,7 +29,9 @@
 #define COND_UPPER_RIGHT 1
 #define COND_UPPER_LEFT_LOWER_RIGHT 2
 
+#define MUL_SPECIAL    0
 #define MUL_SEP       -1
+#define MUL_MARK      -2
 
 #ifdef __CDT_PARSER__
 #ifndef CDT_WORKAROUND

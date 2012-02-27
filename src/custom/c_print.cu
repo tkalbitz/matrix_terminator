@@ -61,7 +61,7 @@ void print_rules(FILE* f, struct c_instance& inst)
 			old_mul_sep_count = mul_sep_count;
 		}
 
-		if(inst.rules[i] == MUL_SEP) {
+		if(inst.rules[i] == MUL_SEP || inst.rules[i] == MUL_MARK) {
 			if(mul_sep_count == false)
 				fprintf(f, "ident(%d)-", inst.mdim);
 			else

@@ -33,7 +33,7 @@ __shared__ int* rend;
 template<int mdim>
 __device__ const int* eval_interpret_rule(const int* rule, float* rres)
 {
-	if(*rule == MUL_SEP) {
+	if(*rule < MUL_SPECIAL) {
 		//set matrix to identity matrix
 		*rres = (tx != ty) ? 0.f : 1.f;
 		return rule;
@@ -43,7 +43,7 @@ __device__ const int* eval_interpret_rule(const int* rule, float* rres)
 	rule++;
 
 	/* there is only one matrix? this is our result */
-	if(*rule == MUL_SEP) {
+	if(*rule < MUL_SPECIAL) {
 		const int tid = RIDX(ty, tx);
 		*rres = sind[mat + tid];
 		return rule;
@@ -61,7 +61,7 @@ __device__ const int* eval_interpret_rule(const int* rule, float* rres)
 	rule++;
 
 	/* no further rule */
-	if(*rule == MUL_SEP) {
+	if(*rule < MUL_SPECIAL) {
 		return rule;
 	}
 
@@ -71,7 +71,7 @@ __device__ const int* eval_interpret_rule(const int* rule, float* rres)
 	const int* arule = rule + 1;
 
 	/* multiply rest of the rule */
-	for(; *arule != MUL_SEP; arule++, rule++) {
+	for(; *arule >= MUL_SPECIAL; arule++, rule++) {
 		mat = *rule * mdim * mdim;
 
 		/* result rows */
@@ -97,14 +97,18 @@ __device__ const int* eval_interpret_rule(const int* rule, float* rres)
 }
 
 template<int mdim, int mcond>
-__device__ void c_result_rating(int match, const float eps, const float lhs, const float rhs)
+__device__ void c_result_rating(int match,
+				int rule_type,
+				const float eps,
+				const float lhs,
+				const float rhs)
 {
 	float rating = 0.f;
 	const float penalty = 1e6f;
 	const int rows = mdim - 1;
 
 	if(mcond == COND_UPPER_LEFT) {
-		if(tx == 0 && ty == 0) {
+		if(rule_type != MUL_MARK && tx == 0 && ty == 0) {
 			if((lhs - rhs) < 1.f)
 				rating = penalty;
 
@@ -118,7 +122,7 @@ __device__ void c_result_rating(int match, const float eps, const float lhs, con
 	}
 
 	if(mcond == COND_UPPER_RIGHT)
-		if(tx == rows && ty == 0) {
+		if(rule_type != MUL_MARK && tx == rows && ty == 0) {
 			if((lhs - rhs) < 1.f)
 				rating = penalty;
 
@@ -131,13 +135,15 @@ __device__ void c_result_rating(int match, const float eps, const float lhs, con
 		}
 
 	if(mcond == COND_UPPER_LEFT_LOWER_RIGHT) {
-		if(tx == rows && ty == rows)
-			if((lhs - rhs) < 1.f)
-				rating = penalty;
+		if(rule_type != MUL_MARK) {
+			if(tx == rows && ty == rows)
+				if((lhs - rhs) < 1.f)
+					rating = penalty;
 
-		if(tx == 0 && ty == 0)
-			if((lhs - rhs) < 1.f)
-				rating = penalty;
+			if(tx == 0 && ty == 0)
+				if((lhs - rhs) < 1.f)
+					rating = penalty;
+		}
 
 		if(match == MATCH_ANY) {
 				if(rating == 0.f)
@@ -193,6 +199,7 @@ __device__ void c_calc_res(const int match, const float eps)
 	float rhs;
 
 	do {
+		const int rule_type = *rules;
 		rules++;
 		rules = eval_interpret_rule<mdim>(rules, &lhs);
 		__syncthreads();
@@ -201,7 +208,7 @@ __device__ void c_calc_res(const int match, const float eps)
 		rules = eval_interpret_rule<mdim>(rules, &rhs);
 		__syncthreads();
 
-		c_result_rating<mdim, mcond>(match, eps, lhs, rhs);
+		c_result_rating<mdim, mcond>(match, rule_type, eps, lhs, rhs);
 		__syncthreads();
 	} while(rules != rend);
 
