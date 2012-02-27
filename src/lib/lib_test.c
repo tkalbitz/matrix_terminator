@@ -22,8 +22,7 @@ static void print_solution(const float* const result);
 int main(int argc, char **argv)
 {
 	/* rule where a solution should be found */
-	char* crules = "XaabbXbbbaaaX";
-//	char* crules = "YaaaYbXbbXbabXbbbXabbX";
+	char* crules = "YbbaYabbbXababXbaaX";
 	int*  rules  = parse_rules(crules);
 
 	/* the solution will be stored here */
@@ -53,7 +52,7 @@ int main(int argc, char **argv)
 	 * try to find a solution for the given instance in 2000 rounds and
 	 * store a solution in the given pointer.
 	 */
-	const int rounds = 10000;
+	const int rounds = 20000;
 	const int asteps = 1000;
 	int ret  = c_run(inst, rounds, asteps, result);
 	if(ret < 0) {
