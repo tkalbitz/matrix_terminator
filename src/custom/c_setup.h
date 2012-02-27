@@ -21,5 +21,6 @@ __global__ void setup_instances_kernel(struct c_instance inst);
 __global__ void setup_global_particle_kernel(struct c_instance inst);
 __global__ void setup_best_kernel(struct c_instance inst);
 __global__ void patch_matrix_kernel(struct c_instance inst);
+void setup_rating(struct c_instance& inst);
 
 #endif /* C_SETUP_H_ */

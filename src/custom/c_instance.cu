@@ -77,12 +77,8 @@ void c_inst_init(struct c_instance& inst, int matrix_width)
 	init_rnd_generator(inst, (int)time(0));
 }
 
-void c_inst_cleanup(struct c_instance& inst,
-		    struct c_instance* dev_inst)
+void c_inst_cleanup(struct c_instance& inst)
 {
-	if(dev_inst != NULL)
-		cudaFree(dev_inst);
-
 	cudaFree(inst.rnd_states);
 	cudaFree(inst.res);
 	cudaFree(inst.instances);
@@ -95,22 +91,13 @@ void c_inst_cleanup(struct c_instance& inst,
 	cudaFree(inst.tmprat);
 }
 
-struct c_instance* c_inst_create_dev_inst(struct c_instance& inst,
-					  int** dev_rules)
+int* c_create_dev_rules(struct c_instance& inst)
 {
-	struct c_instance *dev_inst;
 	int *rules = inst.rules;
 	int *tmp_dev_rules;
 	CUDA_CALL(cudaMalloc(&tmp_dev_rules, inst.rules_len * sizeof(int)));
 	CUDA_CALL(cudaMemcpy(tmp_dev_rules,  rules, inst.rules_len * sizeof(int),
-					cudaMemcpyHostToDevice));
+			     cudaMemcpyHostToDevice));
 
-	inst.rules = tmp_dev_rules;
-	CUDA_CALL(cudaMalloc(&dev_inst, sizeof(*dev_inst)));
-	CUDA_CALL(cudaMemcpy(dev_inst,  &inst, sizeof(*dev_inst),
-					cudaMemcpyHostToDevice));
-	if(dev_rules != NULL)
-		*dev_rules = tmp_dev_rules;
-
-	return dev_inst;
+	return tmp_dev_rules;
 }

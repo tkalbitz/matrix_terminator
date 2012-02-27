@@ -11,6 +11,7 @@
 
 #include "c_config.h"
 #include "c_setup.h"
+#include "c_rating2.h"
 
 /* calculate the thread id for the current block topology */
 __device__ inline int get_thread_id() {
@@ -122,3 +123,25 @@ __global__ void setup_best_kernel(struct c_instance inst)
 	inst.best[tx] = FLT_MAX;
 }
 
+__global__ void setup_rating(struct c_instance inst, int xoff)
+{
+	const int idx = blockIdx.x * inst.icount + tx + xoff;
+	inst.rating[idx] = FLT_MAX;
+}
+
+void setup_rating(struct c_instance& inst)
+{
+	dim3 threads(min(inst.icount, 512));
+
+	int i = 0;
+	do{
+		setup_rating<<<BLOCKS, threads>>>(inst, i);
+		CUDA_CALL(cudaGetLastError());
+		i += threads.x;
+	} while((i + threads.x) <= inst.icount);
+
+	if(threads.x == 512 && (inst.icount - i) != 0) {
+		setup_rating<<<BLOCKS, (inst.icount - i)>>>(inst, i);
+		CUDA_CALL(cudaGetLastError());
+	}
+}

@@ -62,9 +62,6 @@ struct c_instance
 };
 
 void c_inst_init(struct c_instance& inst, int matrix_width);
-void c_inst_cleanup(struct c_instance& inst,
-		    struct c_instance* dev_inst);
-
-struct c_instance*
-c_inst_create_dev_inst(struct c_instance& inst, int** dev_rules);
+void c_inst_cleanup(struct c_instance& inst);
+int* c_create_dev_rules(struct c_instance& inst);
 #endif /* C_INSTANCE_H_ */

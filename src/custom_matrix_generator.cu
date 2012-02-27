@@ -25,9 +25,7 @@
 
 #include "custom/c_instance.h"
 #include "custom/c_setup.h"
-#include "custom/c_rating.h"
 #include "custom/c_print.h"
-
 #include "custom/c_rating2.h"
 
 #include "ya_malloc.h"
@@ -278,41 +276,21 @@ static void parse_configuration(struct c_instance&    inst,
 	parse_rules(inst, argv[optind]);
 }
 
-void setup_rating(struct c_instance& inst)
-{
-	dim3 threads(inst.mdim, inst.mdim);
-	dim3 blocks(BLOCKS, min(inst.icount, 512));
-
-	int i = 0;
-	do{
-		setup_rating<<<blocks, threads>>>(inst, i);
-		CUDA_CALL(cudaGetLastError());
-		i += blocks.y;
-	} while((i + blocks.y) <= inst.icount);
-
-	if(blocks.y == 512 && (inst.icount - i) != 0) {
-		dim3 rest(BLOCKS, inst.icount - i);
-		setup_rating<<<rest, threads>>>(inst, i);
-		CUDA_CALL(cudaGetLastError());
-	}
-}
-
 int main(int argc, char** argv)
 {
 	struct c_instance inst;
-	struct matrix_option mopt;
-	struct c_instance *dev_inst;
 	struct c_instance host_inst;
-	int* dev_rules;
+	struct matrix_option mopt;
 	size_t freeBefore, freeAfter, total;
 
 	srand(time(0));
-	parse_configuration(inst, mopt, argc, argv);
+	parse_configuration(host_inst, mopt, argc, argv);
 
 	CUDA_CALL(cudaMemGetInfo(&freeBefore, &total));
-	c_inst_init(inst, mopt.matrix_dim);
-	host_inst = inst;
-	dev_inst  = c_inst_create_dev_inst(inst, &dev_rules);
+	c_inst_init(host_inst, mopt.matrix_dim);
+
+	inst = host_inst;
+	inst.rules = c_create_dev_rules(inst);
 
 	int3* stack;
 	unsigned int* top;
@@ -409,8 +387,10 @@ int main(int argc, char** argv)
 	}
 	printf("\n");
 
-	c_inst_cleanup(inst, dev_inst);
-	cudaFree(dev_rules);
+	c_inst_cleanup(inst);
+	free(host_inst.rules);
+	cudaFree(inst.rules);
+	cudaFree(stack);
 	cudaThreadExit();
 
 	if(rounds == -1)

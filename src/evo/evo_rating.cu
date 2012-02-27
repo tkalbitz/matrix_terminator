@@ -135,9 +135,17 @@ __device__ void evo_result_rating(const struct instance * const inst,
                 }
         }
 	__syncthreads();
+	const float lhs = res[ty][tx];
+	const float rhs = R_ROW(ty)[mem->r_zero + tx];
+	const float r = lhs - rhs;
+
+	const float f = (lhs == 0.f ? 1000.f : 1.f );
+	res[ty][tx] = (rhs > lhs ? (f * (r * r)) : 0.f) + rating;
+
+
 	// keep only negative numbers
-	res[ty][tx] = fabs(min(R_ROW(ty)[mem->r_zero + tx] - res[ty][tx], 0.));
-	res[ty][tx] = __dmul_rn(res[ty][tx], res[ty][tx]);
+//	res[ty][tx] = fabs(min(R_ROW(ty)[mem->r_zero + tx] - res[ty][tx], 0.));
+//	res[ty][tx] = __dmul_rn(res[ty][tx], res[ty][tx]);
 	__syncthreads();
 
 	double c = 0.0;

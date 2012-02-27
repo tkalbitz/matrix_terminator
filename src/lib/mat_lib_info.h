@@ -28,6 +28,13 @@ struct pso_info_t
 	struct pso_instance* inst;
 };
 
+struct c_info_t
+{
+	char is_initialized;
+	struct c_instance* inst;
+};
+
+
 extern "C"
 {
 	void mat_lib_init();
@@ -43,6 +50,10 @@ struct evo_info_t* evo_get_default();
 struct pso_info_t* pso_get_empty(int* const instance);
 struct pso_info_t* pso_get(const int instance);
 struct pso_info_t* pso_get_default();
+
+struct c_info_t* c_get_empty(int* const instance);
+struct c_info_t* c_get(const int inst);
+struct c_info_t* c_get_default();
 
 int get_rules_count(const int * const rules,
 		    const size_t      rules_len);

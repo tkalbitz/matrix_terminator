@@ -17,18 +17,19 @@
 #define MAT_WIDTH 5
 
 static int* parse_rules(const char *crules);
-static void print_solution(const double* const result);
+static void print_solution(const float* const result);
 
 int main(int argc, char **argv)
 {
 	/* rule where a solution should be found */
-	char* crules = "YaaaYbXbbXbabXbbbXabbX";
+	char* crules = "XaabbXbbbaaaX";
+//	char* crules = "YaaaYbXbbXbabXbbbXabbX";
 	int*  rules  = parse_rules(crules);
 
 	/* the solution will be stored here */
-	double * result = ya_malloc(2 /* matrizes in the rules */ *
-				    MAT_WIDTH /* elements per matrix */ *
-				    MAT_WIDTH /* rows */ * sizeof(double));
+	float * result = ya_malloc(2 /* matrizes in the rules */ *
+				   MAT_WIDTH /* elements per matrix */ *
+				   MAT_WIDTH /* rows */ * sizeof(*result));
 
 	/* initialize the library and allocate instance slots */
 	mat_lib_init();
@@ -37,7 +38,7 @@ int main(int argc, char **argv)
 	 * Create a instance with a desired matrix width and rule set. All
 	 * configuration values are set to reasonable defaults.
 	 */
-	const int inst = evo_create_instance(MAT_WIDTH, rules, strlen(crules));
+	const int inst = c_create_instance(MAT_WIDTH, 100, rules, strlen(crules));
 	if(inst < 0) {
 		printf("Something bad happened at init: %d\n", inst);
 		goto end;
@@ -46,14 +47,15 @@ int main(int argc, char **argv)
 	printf("My instance is: %d\n", inst);
 
 	/* set max value of matrix elements to 8 */
-	evo_set_params(inst, 8, -1 ,-1, -1, -1, -1, -1);
+	c_set_params(inst, 8, -1 ,-1, -1, -1);
 
 	/*
 	 * try to find a solution for the given instance in 2000 rounds and
 	 * store a solution in the given pointer.
 	 */
-	const int rounds = 2000;
-	int ret  = evo_run(inst, rounds, result);
+	const int rounds = 10000;
+	const int asteps = 1000;
+	int ret  = c_run(inst, rounds, asteps, result);
 	if(ret < 0) {
 		printf("Something bad happened at run: %d\n", ret);
 		goto end;
@@ -70,7 +72,7 @@ end:
 	free(rules);
 
 	/* destroy the created instance and free the memory */
-	evo_destroy_instance(inst);
+	c_destroy_instance(inst);
 
 	/* destroy all create slots and management structures */
 	mat_lib_destroy();
@@ -104,7 +106,7 @@ static int* parse_rules(const char *crules)
 	return rules;
 }
 
-static void print_solution(const double* const result)
+static void print_solution(const float* const result)
 {
 	printf("Solution:\n");
 	for(int i = 0; i < 2 * MAT_WIDTH * MAT_WIDTH; i++) {
