@@ -88,7 +88,7 @@ int c_destroy_instance(const int instance)
 }
 
 int c_set_params(int instance,
-		 float max, float delta, int match,
+		 float max, float delta, float eps, int match,
 		 int cond_left, int cond_right)
 {
 	struct c_info_t* info = c_get(instance);
@@ -117,6 +117,8 @@ int c_set_params(int instance,
 		info->inst->parent_max = max;
 	if(delta > 0)
 		info->inst->delta = delta;
+	if(eps >= 0)
+		info->inst->eps = eps;
 	if(match >= 0)
 		info->inst->match = match;
 	if(cond_left >= 0)
@@ -127,10 +129,11 @@ int c_set_params(int instance,
 	return 0;
 }
 
-int c_set_def_params(float max, float delta, int match,
+int c_set_def_params(float max, float delta, float eps, int match,
 		     int cond_left, int cond_right)
 {
-	return c_set_params(DEF_INST, max, delta, match, cond_left, cond_right);
+	return c_set_params(DEF_INST, max, delta, eps,
+			     match, cond_left, cond_right);
 }
 
 

@@ -46,7 +46,7 @@ int main(int argc, char **argv)
 	printf("My instance is: %d\n", inst);
 
 	/* set max value of matrix elements to 8 */
-	c_set_params(inst, 8, -1 ,-1, -1, -1);
+	c_set_params(inst, 8, -1 , -1, -1, -1, -1);
 
 	/*
 	 * try to find a solution for the given instance in 2000 rounds and

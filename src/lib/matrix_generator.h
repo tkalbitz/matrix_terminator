@@ -236,6 +236,8 @@ int pso_run(const int      instance,
  *
  * @param instance   (in) The instance for which the value should be set.
  * @param max        (in) The maximum value of the matrix element (must be > 0).
+ * @param delta      (in) Delta which is used to increase and decrease values.
+ * @param eps        (in) Maximum epsilon.
  * @param match      (in) The match value (must MATCH_ALL OR MATCH_ANY).
  * @param cond_left  (in) The constraint which all factor matrices have to
  *                        match. This has to be one of the values
@@ -249,7 +251,7 @@ int pso_run(const int      instance,
  * @return = 0 at success, at error < 0
  */
 int c_set_params(int instance,
-		 float max, float delta, int match,
+		 float max, float delta, float eps, int match,
 		 int cond_left, int cond_right);
 
 /**
@@ -260,6 +262,8 @@ int c_set_params(int instance,
  *
  * @param instance   (in) The instance for which the value should be set.
  * @param max        (in) The maximum value of the matrix element (must be > 0).
+ * @param delta      (in) Delta which is used to increase and decrease values.
+ * @param eps        (in) Maximum epsilon.
  * @param match      (in) The match value (must MATCH_ALL OR MATCH_ANY).
  * @param cond_left  (in) The constraint which all factor matrices have to
  *                        match. This has to be one of the values
@@ -272,7 +276,7 @@ int c_set_params(int instance,
  *
  * @return = 0 at success, at error < 0
  */
-int c_set_def_params(float max, float delta, int match,
+int c_set_def_params(float max, float delta, float eps, int match,
 		     int cond_left, int cond_right);
 
 /**
