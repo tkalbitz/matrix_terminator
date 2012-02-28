@@ -105,19 +105,29 @@ static int* parse_rules(const char *crules)
 	return rules;
 }
 
-static void print_solution(const float* const result)
-{
-	printf("Solution:\n");
-	for(int i = 0; i < 2 * MAT_WIDTH * MAT_WIDTH; i++) {
-		if(i != 0 && i % MAT_WIDTH == 0)
-			printf("| ");
 
-		if(i != 0 && i % (2 * MAT_WIDTH) == 0)
+static void print_solution(const float* const res) {
+	for(int m = 0; m < 2; m++) {
+		char matrix = 'A' + m;
+		printf("%c: matrix(\n", matrix);
+
+		for (int h = 0; h < MAT_WIDTH; h++) {
+			int pos = m * MAT_WIDTH*MAT_WIDTH + h * MAT_WIDTH;
+			printf("[ ");
+
+			for (int w = 0; w < MAT_WIDTH - 1; w++) {
+				printf("%10.9e, ", res[pos + w]);
+			}
+
+			printf("%10.9e ]", res[pos + MAT_WIDTH - 1]);
+
+			if(h < (MAT_WIDTH - 1))
+				printf(",");
 			printf("\n");
-
-		printf("%5.4e, ", result[i]);
+		}
+		printf(");\n%c: factor(%c);\n\n", matrix, matrix);
 	}
-	printf("|\n");
+
+	printf("\n");
+
 }
-
-

@@ -12,7 +12,7 @@
 
 void print_matrix_pretty(FILE* f, struct c_instance& inst, int block, int bpos)
 {
-	int width = inst.itotal * sizeof(float);
+	const int width = inst.itotal * sizeof(float);
 	float* global_cpy = (float*)ya_malloc(width);
 	memset(global_cpy, 1, width);
 

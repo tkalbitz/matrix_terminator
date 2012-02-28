@@ -45,7 +45,7 @@ struct c_instance
 
 	float* res;              /* tmp space for the rating function */
 	float* best;             /* best rating of the different blocks */
-	int*    best_idx;         /* where is the best located */
+	int*   best_idx;         /* where is the best located */
 
 	curandState *rnd_states;  /* random number generator states */
 

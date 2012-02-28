@@ -7,6 +7,9 @@
  * http://www.gnu.org/licenses/old-licenses/gpl-2.0.html
  */
 
+#include <math.h>
+#include <float.h>
+
 extern "C" {
 #include "matrix_generator.h"
 }
@@ -14,6 +17,23 @@ extern "C" {
 #include "custom/c_instance.h"
 #include "mat_lib_info.h"
 #include "ya_malloc.h"
+
+static void set_eps(struct c_instance* inst)
+{
+	int max_len = 0;
+	int cur_len = 0;
+
+	for(size_t i = 0; i < inst->rules_len; i++) {
+		if(inst->rules[i] < MUL_SPECIAL) {
+			max_len = max(max_len, cur_len);
+			cur_len = 0;
+		} else {
+			cur_len++;
+		}
+	}
+
+	inst->eps = max(powf(inst->delta, (float)max_len), FLT_EPSILON);
+}
 
 int c_create_instance(const int         matrix_width,
 		      const int         icount,
@@ -43,11 +63,11 @@ int c_create_instance(const int         matrix_width,
 	memcpy(inst->rules, rules, sizeof(int) * rules_len);
 
 	inst->icount = icount;
-
 	int rules_count = get_rules_count(rules, rules_len);
 	if(rules_count < 0)
 		return rules_count;
 	inst->rules_count = rules_count;
+	set_eps(inst);
 
 	c_inst_init(*inst, matrix_width);
 	return free_inst;

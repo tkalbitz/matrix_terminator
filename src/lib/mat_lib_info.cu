@@ -44,9 +44,9 @@ void mat_lib_init()
 	struct pso_instance* pso_inst = pso_def_info.inst;
 	struct c_instance* c_inst = c_def_info.inst;
 
-	c_inst->match   = MATCH_ANY;
-	pso_inst->match = MATCH_ANY;
-	evo_inst->match = MATCH_ANY;
+	c_inst->match   = MATCH_ALL;
+	pso_inst->match = MATCH_ALL;
+	evo_inst->match = MATCH_ALL;
 
 	c_inst->cond_left   = COND_UPPER_LEFT_LOWER_RIGHT;
 	pso_inst->cond_left = COND_UPPER_LEFT_LOWER_RIGHT;

@@ -35,7 +35,7 @@ extern "C"
 
 static void copy_result(struct c_instance& inst, float* dest, int block, int bpos)
 {
-	int width = inst.itotal * sizeof(float);
+	const int width = inst.itotal * sizeof(float);
 	float* global_cpy = (float*)ya_malloc(width);
 	memset(global_cpy, 1, width);
 
@@ -45,8 +45,7 @@ static void copy_result(struct c_instance& inst, float* dest, int block, int bpo
 	int block_offset = inst.width_per_inst * inst.icount * block;
 	float* ptr = global_cpy + block_offset + bpos * inst.width_per_inst;
 
-	memcpy(dest, ptr, inst.width_per_inst);
-
+	memcpy(dest, ptr, inst.width_per_inst * sizeof(*dest));
 	free(global_cpy);
 }
 
@@ -88,7 +87,7 @@ int c_run(const int     instance,
 	float* rating = (float*)ya_malloc(inst.icount * sizeof(float));
 	int* best_idx = (int*)ya_malloc(BLOCKS * sizeof(best_idx));
 
-	int rounds = -1;
+	int rounds = INT_MAX;
 	int block = 0; int pos = 0;
 
 	for(unsigned long i = 0; i < cycles; i++) {
@@ -116,7 +115,7 @@ int c_run(const int     instance,
 	cudaFree(inst.rules);
 	cudaFree(stack);
 
-	if(rounds > -1) {
+	if(rounds != INT_MAX) {
 		copy_result(inst, result, block, pos);
 	}
 
