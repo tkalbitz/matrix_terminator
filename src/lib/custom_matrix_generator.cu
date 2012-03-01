@@ -67,7 +67,7 @@ int c_run(const int     instance,
 	int3* stack;
 	unsigned int* top;
 	const size_t slen = BLOCKS * inst.rules_count * inst.width_per_matrix;
-	CUDA_CALL(cudaMalloc(&stack, 2 * slen * sizeof(*stack)));
+	CUDA_CALL(cudaMalloc(&stack, inst.num_matrices * slen * sizeof(*stack)));
 	CUDA_CALL(cudaMalloc(&top, BLOCKS * sizeof(*top)));
 
 	dim3 threads(inst.mdim, inst.mdim);
