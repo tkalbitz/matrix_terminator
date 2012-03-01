@@ -177,7 +177,7 @@ __device__ void path_mutate_p2(struct c_instance& inst,
 	/* put new weights on the path */
 	for(; *rules != MUL_SEP; rules++) {
 		goal = *(rules+1) < 0 ? r : 1 + curand(&rnd) % (mdim - 2);
-		float* pos = sind + (*rules) * iwidth + l * mdim + goal;
+		float* pos = sind + (*rules) * mdim * mdim + l * mdim + goal;
 		*pos = max(*pos + inst.delta, 1.);
 		l = goal;
 	}
