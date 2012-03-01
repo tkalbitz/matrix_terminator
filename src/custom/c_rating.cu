@@ -274,6 +274,30 @@ __global__ void all_in_one_kernel(struct c_instance inst,
 		inst.rnd_states[bbx * mdim + tx] = srnd[tx];
 }
 
+#define case_for_kernel(num,dim) case dim: \
+  all_in_one_kernel<num, dim, COND_UPPER_RIGHT><<<blocks, threads, space>>> \
+      (inst, stack, top, asteps); \
+  CUDA_CALL(cudaGetLastError()); \
+  break;
+
+#define switch_for_num(num) \
+switch(inst.mdim) { \
+  case_for_kernel(num,5) \
+  case_for_kernel(num,6) \
+  case_for_kernel(num,7) \
+  case_for_kernel(num,8) \
+  case_for_kernel(num,9) \
+  case_for_kernel(num,10) \
+  case_for_kernel(num,11) \
+  case_for_kernel(num,12) \
+  case_for_kernel(num,13) \
+  case_for_kernel(num,14) \
+  case_for_kernel(num,15) \
+  case_for_kernel(num,16) \
+}
+
+#define case_for_num(num) case num: switch_for_num(num); break;
+
 void start_astep(struct c_instance& inst,
 		int3*          __restrict__ stack,
 		unsigned int*  __restrict__ top,
@@ -285,56 +309,15 @@ void start_astep(struct c_instance& inst,
 	dim3 blocks(BLOCKS);
 	dim3 threads(inst.mdim, inst.mdim);
 
-	if(inst.cond_right == COND_UPPER_RIGHT && inst.num_matrices == 2) {
-		switch(inst.mdim) {
-		case 5:
-			all_in_one_kernel<2, 5, COND_UPPER_RIGHT><<<blocks, threads, space>>>(inst, stack, top, asteps);
-			CUDA_CALL(cudaGetLastError());
-			break;
-		case 6:
-			all_in_one_kernel<2, 6, COND_UPPER_RIGHT><<<blocks, threads, space>>>(inst, stack, top, asteps);
-			CUDA_CALL(cudaGetLastError());
-			break;
-		case 7:
-			all_in_one_kernel<2, 7, COND_UPPER_RIGHT><<<blocks, threads, space>>>(inst, stack, top, asteps);
-			CUDA_CALL(cudaGetLastError());
-			break;
-		case 8:
-			all_in_one_kernel<2, 8, COND_UPPER_RIGHT><<<blocks, threads, space>>>(inst, stack, top, asteps);
-			CUDA_CALL(cudaGetLastError());
-			break;
-		case 9:
-			all_in_one_kernel<2, 9, COND_UPPER_RIGHT><<<blocks, threads, space>>>(inst, stack, top, asteps);
-			CUDA_CALL(cudaGetLastError());
-			break;
-		case 10:
-			all_in_one_kernel<2, 10, COND_UPPER_RIGHT><<<blocks, threads, space>>>(inst, stack, top, asteps);
-			CUDA_CALL(cudaGetLastError());
-			break;
-		case 11:
-			all_in_one_kernel<2, 11, COND_UPPER_RIGHT><<<blocks, threads, space>>>(inst, stack, top, asteps);
-			CUDA_CALL(cudaGetLastError());
-			break;
-		case 12:
-			all_in_one_kernel<2, 12, COND_UPPER_RIGHT><<<blocks, threads, space>>>(inst, stack, top, asteps);
-			CUDA_CALL(cudaGetLastError());
-			break;
-		case 13:
-			all_in_one_kernel<2, 13, COND_UPPER_RIGHT><<<blocks, threads, space>>>(inst, stack, top, asteps);
-			CUDA_CALL(cudaGetLastError());
-			break;
-		case 14:
-			all_in_one_kernel<2, 14, COND_UPPER_RIGHT><<<blocks, threads, space>>>(inst, stack, top, asteps);
-			CUDA_CALL(cudaGetLastError());
-			break;
-		case 15:
-			all_in_one_kernel<2, 15, COND_UPPER_RIGHT><<<blocks, threads, space>>>(inst, stack, top, asteps);
-			CUDA_CALL(cudaGetLastError());
-			break;
-		case 16:
-			all_in_one_kernel<2, 16, COND_UPPER_RIGHT><<<blocks, threads, space>>>(inst, stack, top, asteps);
-			CUDA_CALL(cudaGetLastError());
-			break;
-		}
+	if(inst.cond_right == COND_UPPER_RIGHT) {
+	  switch (inst.num_matrices) {
+	    case_for_num(2);
+	    case_for_num(3);
+	    case_for_num(4);
+	    case_for_num(5);
+	    case_for_num(6);
+	    case_for_num(7);
+	    case_for_num(8);
+	  }
 	}
 }

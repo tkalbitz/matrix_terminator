@@ -305,7 +305,7 @@ int main(int argc, char** argv)
 	int3* stack;
 	unsigned int* top;
 	const size_t slen = BLOCKS * inst.rules_count * inst.width_per_matrix;
-	CUDA_CALL(cudaMalloc(&stack, 2 * slen * sizeof(*stack)));
+	CUDA_CALL(cudaMalloc(&stack, inst.num_matrices * slen * sizeof(*stack)));
 	CUDA_CALL(cudaMalloc(&top, BLOCKS * sizeof(*top)));
 
 	dim3 threads(inst.mdim, inst.mdim);
@@ -390,12 +390,6 @@ int main(int argc, char** argv)
 	print_matrix_pretty(stdout, inst, block, pos);
 	print_rules(stdout, host_inst);
 	printf("Clean up and exit.\n");
-
-	CUDA_CALL(cudaMemcpy(rating, inst.rating, inst.icount * sizeof(*rating), cudaMemcpyDeviceToHost));
-	for(int i = 0; i < inst.icount; i++) {
-		printf("%.2e ", rating[i]);
-	}
-	printf("\n");
 
 	c_inst_cleanup(inst);
 	free(host_inst.rules);

@@ -32,23 +32,6 @@ __device__ inline int get_max_thread_id() {
 	return uniqueThreadIndex;
 }
 
-__device__ static float new_value(struct c_instance& inst,
-					   curandState* const rnd_state)
-{
-	/* we want to begin with small numbers */
-	const int tmp = (inst.parent_max > 10) ? 10 : (int)inst.parent_max;
-	const int rnd_val = (curand(rnd_state) % (tmp - 1)) + 1;
-	int factor = (int)(rnd_val / inst.delta);
-	if((factor * inst.delta) < 1.0)
-		factor++;
-
-	const float val = factor * inst.delta;
-	if(val < 1.0)
-		return 1.0;
-
-	return val;
-}
-
 __global__ void setup_c_rnd_kernel(struct c_instance inst,
 				   const int seed)
 {
@@ -79,7 +62,6 @@ setup_instances_kernel(struct c_instance inst)
 	const int max_id = get_max_thread_id();
 	curandState rnd = inst.rnd_states[id];
 
-	const int max1 = (int)inst.parent_max;
 	const float delta = inst.delta;
 	int x;
 	float tmp;
@@ -91,29 +73,6 @@ setup_instances_kernel(struct c_instance inst)
 		inst.instances[x] = tmp;
 	}
 
-	__syncthreads();
-
-	const int matrices = inst.num_matrices * inst.icount * BLOCKS;
-
-	if(inst.cond_left == COND_UPPER_LEFT) {
-		for(x = id; x < matrices; x += max_id) {
-			const int matrix = x * inst.width_per_matrix;
-                        inst.instances[matrix] = new_value(inst, &rnd);
-		}
-	} else if(inst.cond_left == COND_UPPER_RIGHT) {
-		for(x = id; x < matrices; x += max_id) {
-			const int matrix = x * inst.width_per_matrix +
-					inst.mdim - 1;
-                        inst.instances[matrix] = new_value(inst, &rnd);
-		}
-	} else if(inst.cond_left == COND_UPPER_LEFT_LOWER_RIGHT) {
-		for(x = id; x < matrices; x += max_id) {
-			const int matrix1 = x * inst.width_per_matrix;
-			const int matrix2 = (x + 1) * inst.width_per_matrix - 1;
-                        inst.instances[matrix1] = new_value(inst, &rnd);
-                        inst.instances[matrix2] = new_value(inst, &rnd);
-		}
-	}
 	inst.rnd_states[id] = rnd;
 }
 

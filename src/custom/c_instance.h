@@ -29,7 +29,6 @@ struct c_instance
 	int icount;               /* number of instances */
 
 	int itotal;               /* number of bytes for all instances */
-	int stotal;               /* number of bytes for all search instances */
 
 	int width_per_inst;       /* number elements for one instance */
 	int width_per_matrix;     /* number elements for one matrix */
@@ -37,13 +36,6 @@ struct c_instance
 	float* instances;        /* all instances */
 	float* rating;           /* rating of the instances */
 
-	float* sinstances;       /* search space instances */
-	float* srating;          /* rating of search space instances */
-
-	float* tmp;              /* copy of the current element */
-	float* tmprat;           /* copy of the current element */
-
-	float* res;              /* tmp space for the rating function */
 	float* best;             /* best rating of the different blocks */
 	int*   best_idx;         /* where is the best located */
 

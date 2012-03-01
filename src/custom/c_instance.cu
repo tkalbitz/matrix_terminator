@@ -43,23 +43,13 @@ void alloc_instance_mem(struct c_instance& inst)
 	assert(inst.num_matrices != 0);
 
 	const size_t ilen = inst.itotal * sizeof(float);
-	const size_t slen = inst.stotal * sizeof(float);
-	const size_t tlen = BLOCKS * inst.width_per_inst * sizeof(float);
-	const size_t reslen = inst.icount * inst.mdim * inst.mdim * BLOCKS *
-				sizeof(float);
 
-	CUDA_CALL(cudaMalloc(&(inst.tmp),        tlen));
-	CUDA_CALL(cudaMalloc(&(inst.tmprat),     BLOCKS * sizeof(float)));
 	CUDA_CALL(cudaMalloc(&(inst.instances),  ilen));
-	CUDA_CALL(cudaMalloc(&(inst.sinstances), slen));
 	CUDA_CALL(cudaMalloc(&(inst.best), BLOCKS * sizeof(*inst.best)));
 	CUDA_CALL(cudaMalloc(&(inst.best_idx), BLOCKS * sizeof(*inst.best_idx)));
 
 	const size_t ratlen = BLOCKS * inst.icount * sizeof(*inst.rating);
 	CUDA_CALL(cudaMalloc(&(inst.rating), ratlen));
-	CUDA_CALL(cudaMalloc(&(inst.srating), BLOCKS * sizeof(*inst.srating)));
-
-	CUDA_CALL(cudaMalloc(&(inst.res), reslen));
 }
 
 void c_inst_init(struct c_instance& inst, int matrix_width)
@@ -71,7 +61,6 @@ void c_inst_init(struct c_instance& inst, int matrix_width)
 	inst.width_per_inst = inst.num_matrices * inst.mdim * inst.mdim;
 
 	inst.itotal = inst.width_per_inst * inst.icount * BLOCKS;
-	inst.stotal = inst.width_per_inst * BLOCKS;
 
 	alloc_instance_mem(inst);
 	init_rnd_generator(inst, (int)time(0));
@@ -80,15 +69,10 @@ void c_inst_init(struct c_instance& inst, int matrix_width)
 void c_inst_cleanup(struct c_instance& inst)
 {
 	cudaFree(inst.rnd_states);
-	cudaFree(inst.res);
 	cudaFree(inst.instances);
-	cudaFree(inst.sinstances);
 	cudaFree(inst.rating);
-	cudaFree(inst.srating);
 	cudaFree(inst.best);
 	cudaFree(inst.best_idx);
-	cudaFree(inst.tmp);
-	cudaFree(inst.tmprat);
 }
 
 int* c_create_dev_rules(struct c_instance& inst)
