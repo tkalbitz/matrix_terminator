@@ -162,12 +162,12 @@ __device__ void path_mutate_p2(struct c_instance& inst,
 
 	/* we have to jump to the rule for that entry */
 	while(cur_rule != entry.z) {
-		while(*rules != MUL_SEP)
+		while(*rules >= MUL_SPECIAL)
 			rules++;
 
 		rules++;
 
-		while(*rules != MUL_SEP)
+		while(*rules >= MUL_SPECIAL)
 			rules++;
 
 		rules++;
@@ -175,7 +175,7 @@ __device__ void path_mutate_p2(struct c_instance& inst,
 	}
 
 	/* put new weights on the path */
-	for(; *rules != MUL_SEP; rules++) {
+	for(; *rules >= MUL_SPECIAL; rules++) {
 		goal = *(rules+1) < 0 ? r : 1 + curand(&rnd) % (mdim - 2);
 		float* pos = sind + (*rules) * mdim * mdim + l * mdim + goal;
 		*pos = max(*pos + inst.delta, 1.);

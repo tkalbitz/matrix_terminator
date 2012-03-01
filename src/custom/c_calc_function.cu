@@ -52,7 +52,7 @@ __device__ const int* eval_interpret_rule(const int* rule, float* rres)
 	/*
 	 * calculate the first result
 	 */
-	const int mat2 = *rule * mdim * mdim;
+	const int mat2 = (*rule) * mdim * mdim;
 
 	*rres = sind[mat + RIDX(ty, 0)] * sind[mat2 + RIDX(0, tx)];
 	for(int i = 1; i < mdim; i++) {
@@ -72,7 +72,7 @@ __device__ const int* eval_interpret_rule(const int* rule, float* rres)
 
 	/* multiply rest of the rule */
 	for(; *arule >= MUL_SPECIAL; arule++, rule++) {
-		mat = *rule * mdim * mdim;
+		mat = (*rule) * mdim * mdim;
 
 		/* result rows */
 		*rres = res[RIDX(ty, 0)] * sind[mat + RIDX(0, tx)];
@@ -85,7 +85,7 @@ __device__ const int* eval_interpret_rule(const int* rule, float* rres)
 		__syncthreads();
 	}
 
-	mat = *rule * mdim * mdim;
+	mat = (*rule) * mdim * mdim;
 
 	/* result rows */
 	*rres = res[RIDX(ty, 0)] * sind[mat + RIDX(0, tx)];
