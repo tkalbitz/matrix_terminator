@@ -383,6 +383,7 @@ int main(int argc, char** argv)
 	free(rating);
 	free(best_idx);
 
+	pos = min(pos, inst.icount - 1);
 	printf("Time needed: %f\n", elapsedTimeTotal);
 	printf("Needed rounds: %d\n", rounds);
 	printf("Result is block: %d, pos: %d\n", block, pos);

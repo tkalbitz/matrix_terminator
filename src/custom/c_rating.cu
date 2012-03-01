@@ -306,6 +306,16 @@ void start_astep(struct c_instance& inst,
 	size_t space =(inst.num_matrices * inst.mdim * inst.mdim +
 			inst.mdim * inst.mdim) * sizeof(float);
 
+	#if __CUDA_ARCH__ >= 200
+		const int max_shm = 48128;
+	#else
+		const int max_shm = 15360;
+	#endif
+	if(space > max_shm) {
+		printf("Can't fit all matrices in shm. Skipping calculation!\n");
+		return;
+	}
+
 	dim3 blocks(BLOCKS);
 	dim3 threads(inst.mdim, inst.mdim);
 
@@ -318,6 +328,12 @@ void start_astep(struct c_instance& inst,
 	    case_for_num(6);
 	    case_for_num(7);
 	    case_for_num(8);
+	    case_for_num(9);
+	    case_for_num(10);
+	  default:
+		  printf("No rule defined for that matrix counts"
+				  "Skipping calculation.\n");
+		  fflush(stdout);
 	  }
 	}
 }
