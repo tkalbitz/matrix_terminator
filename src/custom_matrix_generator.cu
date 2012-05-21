@@ -60,6 +60,7 @@ static void print_usage()
 	printf("  -w|--matrix-dim       <2 - %d>        -- default: 5\n",        MATRIX_WIDTH);
 	printf("  -i|--instances                          -- default: 100\n");
 	printf("  -a|--asteps                             -- default: 25\n");
+	printf("  -e|--eps                                -- default: reasonable\n");
 	printf("  -x|--enable-maxima\n\n");
 	printf("Rules should be supplied in the form:\n");
 	printf("  X10X01X110X0011X or XbaXabXbbaXaabbX\n");
@@ -116,7 +117,8 @@ static void parse_rules(struct c_instance& inst, const char *rules)
 		}
 	}
 
-	inst.eps = max(powf(inst.delta, (float)max_len), FLT_EPSILON);
+	if(inst.eps == 0.f)
+	    inst.eps = max(powf(inst.delta, (float)max_len), FLT_EPSILON);
 }
 
 static void parse_configuration(struct c_instance&    inst,
@@ -132,12 +134,14 @@ static void parse_configuration(struct c_instance&    inst,
 	inst.delta       = 0.1;
 	inst.parent_max  = PARENT_MAX;
 	inst.icount      = 100;
+	inst.eps         = 0.f;
 
 	mopt.rounds          = 500;
 	mopt.enable_maxima   = 0;
 	mopt.plot_log_enable = 0;
 	mopt.matrix_dim      = 5;
 	mopt.asteps          = 25;
+
 
 	struct option opt[] =
 	{
@@ -153,10 +157,11 @@ static void parse_configuration(struct c_instance&    inst,
 		{"matrix-dim"        , required_argument, 0, 'w'},
 		{"instances"         , required_argument, 0, 'i'},
 		{"asteps"            , required_argument, 0, 'a'},
+		{"eps"               , required_argument, 0, 'e'},
 		{0, 0, 0, 0}
 	};
 
-	while((c = getopt_long(argc, argv, "m:l:r:c:d:hp:xg:w:i:a:",
+	while((c = getopt_long(argc, argv, "m:l:r:c:d:hp:xg:w:i:a:e:",
 			      opt, &idx)) != EOF) {
 		switch(c) {
 		case 'm':
@@ -211,6 +216,9 @@ static void parse_configuration(struct c_instance&    inst,
 		case 'd':
 			inst.delta = strtod(optarg, NULL);
 			break;
+        case 'e':
+            inst.eps = strtod(optarg, NULL);
+            break;
 		case 'w':
 			mopt.matrix_dim = (int)strtod(optarg, NULL);
 			if(mopt.matrix_dim < 2 ||
@@ -255,6 +263,7 @@ static void parse_configuration(struct c_instance&    inst,
 			case 's':
 			case 'i':
 			case 'a':
+			case 'e':
 				fprintf(stderr, "Option -%c requires an "
 						"argument!\n", optopt);
 				exit(EXIT_FAILURE);
