@@ -325,7 +325,7 @@ int main(int argc, char** argv)
 			(freeBefore - freeAfter) / 1024 / 1024.f,
 			total / 1024 / 1024.f);
 
-	printf("Using %u instances, %u asteps and %d eps.\n",
+	printf("Using %u instances, %u asteps and %f eps.\n",
 	            inst.icount, mopt.asteps, inst.eps);
 
 	setup_best_kernel<<<1, BLOCKS>>>(inst);
