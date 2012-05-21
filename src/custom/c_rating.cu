@@ -189,7 +189,7 @@ template<int mnum, int mdim, int mcond>
 __global__ void all_in_one_kernel(struct c_instance inst,
 				  int3*          __restrict__ stack,
                 		  unsigned int*  __restrict__ top,
-                		  const int lucky)
+                		  const int search_steps)
 {
 	const int bbx = blockIdx.x;
 
@@ -230,7 +230,7 @@ __global__ void all_in_one_kernel(struct c_instance inst,
 		old_rat = shrd_rating;
 	__syncthreads();
 
-	for(int steps = 0; steps < lucky; steps++) {
+	for(int steps = 0; steps < search_steps; steps++) {
 		/* rnd numbers for this iteration */
 		if(ty == 0 && tx < MAX_RND)
 			r[tx] = curand(&srnd[tx]);
@@ -254,7 +254,7 @@ __global__ void all_in_one_kernel(struct c_instance inst,
 
 		/* restore old version when it's worse */
 		if(tx == 0 && ty == 0) {
-			const int luck = r[4] % lucky;
+			const int luck = r[4] % search_steps;
 
 			if(shrd_rating > old_rat && luck) {
 				sind[mut_pos] = old_val;
@@ -277,23 +277,23 @@ __global__ void all_in_one_kernel(struct c_instance inst,
 #define case_for_kernel(num,dim) case dim: \
   all_in_one_kernel<num, dim, COND_UPPER_RIGHT><<<blocks, threads, space>>> \
       (inst, stack, top, asteps); \
-  CUDA_CALL(cudaGetLastError()); \
+  CUDA_CALL(cudaGetLastError());  \
   break;
 
 #define switch_for_num(num) \
-switch(inst.mdim) { \
-  case_for_kernel(num,5) \
-  case_for_kernel(num,6) \
-  case_for_kernel(num,7) \
-  case_for_kernel(num,8) \
-  case_for_kernel(num,9) \
-  case_for_kernel(num,10) \
-  case_for_kernel(num,11) \
-  case_for_kernel(num,12) \
-  case_for_kernel(num,13) \
-  case_for_kernel(num,14) \
-  case_for_kernel(num,15) \
-  case_for_kernel(num,16) \
+switch(inst.mdim) {         \
+  case_for_kernel(num,5)    \
+  case_for_kernel(num,6)    \
+  case_for_kernel(num,7)    \
+  case_for_kernel(num,8)    \
+  case_for_kernel(num,9)    \
+  case_for_kernel(num,10)   \
+  case_for_kernel(num,11)   \
+  case_for_kernel(num,12)   \
+  case_for_kernel(num,13)   \
+  case_for_kernel(num,14)   \
+  case_for_kernel(num,15)   \
+  case_for_kernel(num,16)   \
 }
 
 #define case_for_num(num) case num: switch_for_num(num); break;
@@ -303,13 +303,13 @@ void start_astep(struct c_instance& inst,
 		unsigned int*  __restrict__ top,
 		unsigned int asteps)
 {
-	size_t space =(inst.num_matrices * inst.mdim * inst.mdim +
+	size_t space = (inst.num_matrices * inst.mdim * inst.mdim +
 			inst.mdim * inst.mdim) * sizeof(float);
 
 	#if __CUDA_ARCH__ >= 200
-		const int max_shm = 48128;
+		const size_t max_shm = 48128;
 	#else
-		const int max_shm = 15360;
+		const size_t max_shm = 15360;
 	#endif
 	if(space > max_shm) {
 		printf("Can't fit all matrices in shm. Skipping calculation!\n");

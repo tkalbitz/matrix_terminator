@@ -4,7 +4,7 @@ CUDA_INCLUDE_DIRECTORIES(
   ${CMAKE_CURRENT_SOURCE_DIR}/..
 )
 
-CUDA_ADD_LIBRARY( evo_matrix_generator
+CUDA_ADD_LIBRARY( matrixsolver
   evo_matrix_generator.cu
   ccpso2_matrix_generator.cu
   custom_matrix_generator.cu
@@ -51,5 +51,5 @@ ADD_EXECUTABLE( mat_lib_test
   matrix_generator.h
 )  
 
-add_dependencies(mat_lib_test evo_matrix_generator)
-target_link_libraries(mat_lib_test evo_matrix_generator) 
+add_dependencies(mat_lib_test matrixsolver)
+target_link_libraries(mat_lib_test matrixsolver) 

@@ -43,8 +43,8 @@ void mat_lib_destroy();
  * @return A number >= which is a valid instance. A number < 0 is an error.
  */
 int evo_create_instance(const int         matrix_width,
-		        const int * const rules,
-		        const size_t      rules_len);
+                        const int * const rules,
+                        const size_t      rules_len);
 
 /**
  * Destroys a instance if it isn't needed anymore.
@@ -70,8 +70,8 @@ int evo_destroy_instance(const int instance);
  *         = INT_MAX no solution found
  */
 int evo_run(const int instance,
-	    const int      cycles,
-	    double* const  result);
+            const int      cycles,
+            double* const  result);
 
 #define MATCH_ALL 0
 #define MATCH_ANY 1
@@ -106,9 +106,9 @@ int evo_run(const int instance,
  * @return = 0 at success, at error < 0
  */
 int evo_set_params(int instance,
-		   double max, double delta, int match,
-		   int cond_left, int cond_right,
-		   double mut_rate, double strgy_parm);
+                   double max, double delta, int match,
+                   int cond_left, int cond_right,
+                   double mut_rate, double strgy_parm);
 
 /**
  * Set all default evo parameter which will be used when ever a new instance is
@@ -135,8 +135,8 @@ int evo_set_params(int instance,
  * @return = 0 at success, at error < 0
  */
 int evo_set_def_params(double max, double delta, int match,
-		       int cond_left, int cond_right,
-		       double mut_rate, double strgy_parm);
+                       int cond_left, int cond_right,
+                       double mut_rate, double strgy_parm);
 
 /**
  * Set all pso parameter, which will be used when pso_run is called for the
@@ -160,8 +160,8 @@ int evo_set_def_params(double max, double delta, int match,
  * @return = 0 at success, at error < 0
  */
 int pso_set_params(int instance,
-		   double max, double delta, int match,
-		   int cond_left, int cond_right);
+                   double max, double delta, int match,
+                   int cond_left, int cond_right);
 
 /**
  * Set all default pso parameter which will be used when ever a new instance is
@@ -184,7 +184,7 @@ int pso_set_params(int instance,
  * @return = 0 at success, at error < 0
  */
 int pso_set_def_params(double max, double delta, int match,
-		       int cond_left, int cond_right);
+                       int cond_left, int cond_right);
 
 /**
  * Create a instance of the pso. Reasonable defaults are set which are
@@ -197,8 +197,8 @@ int pso_set_def_params(double max, double delta, int match,
  * @return A number >= which is a valid instance. A number < 0 is an error.
  */
 int pso_create_instance(const int         matrix_width,
-		        const int * const rules,
-		        const size_t      rules_len);
+                        const int * const rules,
+                        const size_t      rules_len);
 
 /**
  * Destroys a instance if it isn't needed anymore.
@@ -224,8 +224,8 @@ int pso_destroy_instance(const int instance);
  *         = INT_MAX no solution found
  */
 int pso_run(const int      instance,
-	    const int      cycles,
-	    double* const  result);
+            const int      cycles,
+	        double* const  result);
 
 /**
  * Set all custom algorithm parameter, which will be used when c_run is called
@@ -251,8 +251,8 @@ int pso_run(const int      instance,
  * @return = 0 at success, at error < 0
  */
 int c_set_params(int instance,
-		 float max, float delta, float eps, int match,
-		 int cond_left, int cond_right);
+                 float max, float delta, float eps, int match,
+		         int cond_left, int cond_right);
 
 /**
  * Set all default custom algorithm parameter which will be used when ever a new
@@ -260,7 +260,6 @@ int c_set_params(int instance,
  * forbidden or the parameter is out of range E_INVALID_VALUE is returned. It is
  * guaranteed that no parameter was changed when a error is returned.
  *
- * @param instance   (in) The instance for which the value should be set.
  * @param max        (in) The maximum value of the matrix element (must be > 0).
  * @param delta      (in) Delta which is used to increase and decrease values.
  * @param eps        (in) Maximum epsilon.
@@ -277,7 +276,7 @@ int c_set_params(int instance,
  * @return = 0 at success, at error < 0
  */
 int c_set_def_params(float max, float delta, float eps, int match,
-		     int cond_left, int cond_right);
+		             int cond_left, int cond_right);
 
 /**
  * Create a instance of the custom algorithm. Reasonable defaults are set which
@@ -290,10 +289,10 @@ int c_set_def_params(float max, float delta, float eps, int match,
  *
  * @return A number >= which is a valid instance. A number < 0 is an error.
  */
-int c_create_instance(const int         matrix_width,
-		      const int         icount,
-		      const int * const rules,
-		      const size_t      rules_len);
+int c_create_instance(const int matrix_width,
+                      const int         icount,
+                      const int * const rules,
+                      const size_t      rules_len);
 
 /**
  * Destroys a instance if it isn't needed anymore.
@@ -320,9 +319,8 @@ int c_destroy_instance(const int instance);
  *         = INT_MAX no solution found
  */
 int c_run(const int      instance,
-	  const int      cycles,
-	  const int      asteps,
-	  float* const  result);
-
+          const int      cycles,
+          const int      asteps,
+          float* const  result);
 
 #endif /* MATRIX_GENERATOR_H_ */

@@ -203,7 +203,7 @@ struct c_info_t* c_get_default()
 }
 
 int get_rules_count(const int * const rules,
-		    const size_t      rules_len)
+                    const size_t      rules_len)
 {
 	uint8_t tmp = 0;
 	int rules_count = 0;
