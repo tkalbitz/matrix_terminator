@@ -325,7 +325,8 @@ int main(int argc, char** argv)
 			(freeBefore - freeAfter) / 1024 / 1024.f,
 			total / 1024 / 1024.f);
 
-	printf("Using %u instances and %u asteps.\n", inst.icount, mopt.asteps);
+	printf("Using %u instances, %u asteps and %d eps.\n",
+	            inst.icount, mopt.asteps, inst.eps);
 
 	setup_best_kernel<<<1, BLOCKS>>>(inst);
 	CUDA_CALL(cudaGetLastError());
