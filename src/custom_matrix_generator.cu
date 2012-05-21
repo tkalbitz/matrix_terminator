@@ -325,7 +325,7 @@ int main(int argc, char** argv)
 			(freeBefore - freeAfter) / 1024 / 1024.f,
 			total / 1024 / 1024.f);
 
-	printf("Using %u instances, %u asteps and %f eps.\n",
+	printf("Using %u instances, %u asteps and %g eps.\n",
 	            inst.icount, mopt.asteps, inst.eps);
 
 	setup_best_kernel<<<1, BLOCKS>>>(inst);
@@ -367,8 +367,7 @@ int main(int argc, char** argv)
 		cudaEventDestroy(stop);
 
 		if(i % 100 == 0) {
-			printf("Time: %10.2f ", elapsedTimeTotal);
-			printf("%6ld: ", i / 1000);
+			printf("Round: %7ld Time: %10.2f: ", i, elapsedTimeTotal);
 			CUDA_CALL(cudaMemcpy(rating, inst.best, BLOCKS * sizeof(*rating), cudaMemcpyDeviceToHost));
 			CUDA_CALL(cudaMemcpy(best_idx, inst.best_idx, BLOCKS * sizeof(*best_idx), cudaMemcpyDeviceToHost));
 			pos   = best_idx[0];
