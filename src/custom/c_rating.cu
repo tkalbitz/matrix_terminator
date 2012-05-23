@@ -176,7 +176,16 @@ __device__ void path_mutate_p2(struct c_instance& inst,
 
 	/* put new weights on the path */
 	for(; *rules >= MUL_SPECIAL; rules++) {
-		goal = *(rules+1) < 0 ? r : 1 + curand(&rnd) % (mdim - 2);
+		/*
+		 * mod 0 is a bug and mod 1 returns always 0
+		 * so we have to offer an alternative
+		 */
+		if(mdim < 4) {
+			goal = *(rules+1) < 0 ? r : curand(&rnd) % mdim;
+		} else {
+			goal = *(rules+1) < 0 ? r : 1 + curand(&rnd) % (mdim - 2);
+		}
+
 		float* pos = sind + (*rules) * mdim * mdim + l * mdim + goal;
 		*pos = max(*pos + inst.delta, 1.);
 		l = goal;
@@ -187,9 +196,9 @@ __device__ void path_mutate_p2(struct c_instance& inst,
 
 template<int mnum, int mdim, int mcond>
 __global__ void all_in_one_kernel(struct c_instance inst,
-				  int3*          __restrict__ stack,
-                		  unsigned int*  __restrict__ top,
-                		  const int search_steps)
+                        int3*          __restrict__ stack,
+                        unsigned int*  __restrict__ top,
+                		const int search_steps)
 {
 	const int bbx = blockIdx.x;
 
@@ -239,8 +248,18 @@ __global__ void all_in_one_kernel(struct c_instance inst,
 
 		if(tx == 0 && ty == 0) {
 			const int mat  =      r[0] % mnum;
-			const int row  =      r[1] % (mdim -1);
-			const int col  = 1 +  r[2] % (mdim -1);
+			int row;
+			int col;
+
+			/* mod 1 returns always 0 so we have to offer an alternative */
+			if(mdim < 3) {
+				row  = r[1] % mdim;
+				col  = 1 + r[2] % mdim;
+			} else {
+				row  =     r[1] % (mdim-1);
+				col  = 1 + r[2] % (mdim-1);
+			}
+
 			const int diff = 2 * (r[3] % 2) - 1 ;
 			mut_pos = mat * mdim*mdim + row * mdim + col;
 			old_val = sind[mut_pos];
@@ -282,6 +301,9 @@ __global__ void all_in_one_kernel(struct c_instance inst,
 
 #define switch_for_num(num) \
 switch(inst.mdim) {         \
+  case_for_kernel(num,2)    \
+  case_for_kernel(num,3)    \
+  case_for_kernel(num,4)    \
   case_for_kernel(num,5)    \
   case_for_kernel(num,6)    \
   case_for_kernel(num,7)    \
@@ -320,20 +342,20 @@ void start_astep(struct c_instance& inst,
 	dim3 threads(inst.mdim, inst.mdim);
 
 	if(inst.cond_right == COND_UPPER_RIGHT) {
-	  switch (inst.num_matrices) {
-	    case_for_num(2);
-	    case_for_num(3);
-	    case_for_num(4);
-	    case_for_num(5);
-	    case_for_num(6);
-	    case_for_num(7);
-	    case_for_num(8);
-	    case_for_num(9);
-	    case_for_num(10);
-	  default:
-		  printf("No rule defined for that matrix counts"
-				  "Skipping calculation.\n");
-		  fflush(stdout);
-	  }
+		switch (inst.num_matrices) {
+		case_for_num(2);
+		case_for_num(3);
+		case_for_num(4);
+		case_for_num(5);
+		case_for_num(6);
+		case_for_num(7);
+		case_for_num(8);
+		case_for_num(9);
+		case_for_num(10);
+		default:
+			printf("No rule defined for that matrix counts"
+					"Skipping calculation.\n");
+			fflush(stdout);
+		}
 	}
 }
