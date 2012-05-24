@@ -352,10 +352,21 @@ void start_astep(struct c_instance& inst,
 		case_for_num(8);
 		case_for_num(9);
 		case_for_num(10);
+		case_for_num(11);
+		case_for_num(12);
+		case_for_num(13);
+		case_for_num(14);
+		case_for_num(15);
+		case_for_num(16);
+		case_for_num(17);
+		case_for_num(18);
+		case_for_num(19);
+		case_for_num(20);
 		default:
 			printf("No rule defined for that matrix counts"
 					"Skipping calculation.\n");
 			fflush(stdout);
+			exit(0);
 		}
 	}
 }
