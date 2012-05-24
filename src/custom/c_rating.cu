@@ -253,7 +253,7 @@ __global__ void all_in_one_kernel(struct c_instance inst,
 
 			/* mod 1 returns always 0 so we have to offer an alternative */
 			if(mdim < 3) {
-				row  = r[1] % mdim;
+				row  = r[1]     % mdim;
 				col  = 1 + r[2] % mdim;
 			} else {
 				row  =     r[1] % (mdim-1);
