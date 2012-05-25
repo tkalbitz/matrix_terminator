@@ -321,6 +321,7 @@ switch(inst.mdim) {         \
 #define case_for_num(num) case num: switch_for_num(num); break;
 
 void start_astep(struct c_instance& inst,
+		int blocks,
 		int3*          __restrict__ stack,
 		unsigned int*  __restrict__ top,
 		unsigned int asteps)
@@ -338,7 +339,6 @@ void start_astep(struct c_instance& inst,
 		return;
 	}
 
-	dim3 blocks(BLOCKS);
 	dim3 threads(inst.mdim, inst.mdim);
 
 	if(inst.cond_right == COND_UPPER_RIGHT) {

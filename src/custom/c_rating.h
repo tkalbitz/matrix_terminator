@@ -10,6 +10,7 @@
 #ifndef C_RATING2_H_
 #define C_RATING2_H_
 
-void start_astep(struct c_instance& inst, int3* stack, unsigned int* top, unsigned int asteps);
+void start_astep(struct c_instance& inst, int blocks,
+		 int3* stack, unsigned int* top, unsigned int asteps);
 
 #endif /* C_RATING2_H_ */

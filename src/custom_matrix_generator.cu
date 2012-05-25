@@ -33,6 +33,7 @@
 
 struct matrix_option {
 	int      matrix_dim;
+	int	 blocks;
 	uint32_t rounds;
 	char enable_maxima;
 	char plot_log_enable;
@@ -56,11 +57,12 @@ static void print_usage()
 	printf("	   uleft_lright -- upper left and lower right has to be >= 1\n\n");
 	printf("  -d|--delta  <float number>              -- default: 0.1\n");
 	printf("  -c|--rounds <number>                    -- default: 500\n\n");
-	printf("  -p|--parent-max         <float number>  -- default: %.2f\n",   PARENT_MAX);
-	printf("  -w|--matrix-dim       <2 - %d>        -- default: 5\n",        MATRIX_WIDTH);
+	printf("  -p|--parent-max         <float number>  -- default: %.2f\n",  PARENT_MAX);
+	printf("  -w|--matrix-dim         <2 - %d>        -- default: 5\n",     MATRIX_WIDTH);
 	printf("  -i|--instances                          -- default: 100\n");
 	printf("  -a|--asteps                             -- default: 25\n");
 	printf("  -e|--eps                                -- default: reasonable\n");
+	printf("  -b|--blocks                             -- default: %d\n", BLOCKS);
 	printf("  -x|--enable-maxima\n\n");
 	printf("Rules should be supplied in the form:\n");
 	printf("  X10X01X110X0011X or XbaXabXbbaXaabbX\n");
@@ -141,7 +143,7 @@ static void parse_configuration(struct c_instance&    inst,
 	mopt.plot_log_enable = 0;
 	mopt.matrix_dim      = 5;
 	mopt.asteps          = 25;
-
+	mopt.blocks          = BLOCKS;
 
 	struct option opt[] =
 	{
@@ -158,10 +160,11 @@ static void parse_configuration(struct c_instance&    inst,
 		{"instances"         , required_argument, 0, 'i'},
 		{"asteps"            , required_argument, 0, 'a'},
 		{"eps"               , required_argument, 0, 'e'},
+		{"blocks"            , required_argument, 0, 'b'},
 		{0, 0, 0, 0}
 	};
 
-	while((c = getopt_long(argc, argv, "m:l:r:c:d:hp:xg:w:i:a:e:",
+	while((c = getopt_long(argc, argv, "m:l:r:c:d:hp:xg:w:i:a:e:b:",
 			      opt, &idx)) != EOF) {
 		switch(c) {
 		case 'm':
@@ -212,6 +215,9 @@ static void parse_configuration(struct c_instance&    inst,
 			break;
 		case 'c':
 			mopt.rounds = strtoul(optarg, NULL, 10);
+			break;
+		case 'b':
+			mopt.blocks = strtoul(optarg, NULL, 10);
 			break;
 		case 'd':
 			inst.delta = strtod(optarg, NULL);
@@ -264,6 +270,7 @@ static void parse_configuration(struct c_instance&    inst,
 			case 'i':
 			case 'a':
 			case 'e':
+			case 'b':
 				fprintf(stderr, "Option -%c requires an "
 						"argument!\n", optopt);
 				exit(EXIT_FAILURE);
@@ -306,19 +313,19 @@ int main(int argc, char** argv)
 	parse_configuration(host_inst, mopt, argc, argv);
 
 	CUDA_CALL(cudaMemGetInfo(&freeBefore, &total));
-	c_inst_init(host_inst, mopt.matrix_dim);
+	c_inst_init(host_inst, mopt.blocks, mopt.matrix_dim);
 
 	inst = host_inst;
 	inst.rules = c_create_dev_rules(inst);
 
 	int3* stack;
 	unsigned int* top;
-	const size_t slen = BLOCKS * inst.rules_count * inst.width_per_matrix;
+	const size_t slen = mopt.blocks * inst.rules_count * inst.width_per_matrix;
 	CUDA_CALL(cudaMalloc(&stack, inst.num_matrices * slen * sizeof(*stack)));
-	CUDA_CALL(cudaMalloc(&top, BLOCKS * sizeof(*top)));
+	CUDA_CALL(cudaMalloc(&top, mopt.blocks * sizeof(*top)));
 
 	dim3 threads(inst.mdim, inst.mdim);
-	dim3 blocks(BLOCKS);
+	dim3 blocks(mopt.blocks);
 
 	CUDA_CALL(cudaMemGetInfo(&freeAfter, &total));
 	printf("Allocated %.2f MiB from %.2f MiB\n",
@@ -328,23 +335,23 @@ int main(int argc, char** argv)
 	printf("Using %u instances, %u asteps and %g eps.\n",
 	            inst.icount, mopt.asteps, inst.eps);
 
-	setup_best_kernel<<<1, BLOCKS>>>(inst);
+	setup_best_kernel<<<1, mopt.blocks>>>(inst);
 	CUDA_CALL(cudaGetLastError());
 
 	setup_instances_kernel<<<1, 320>>>(inst);
 	CUDA_CALL(cudaGetLastError());
 
-	patch_matrix_kernel<<<BLOCKS, inst.mdim>>>(inst);
+	patch_matrix_kernel<<<mopt.blocks, inst.mdim>>>(inst);
 	CUDA_CALL(cudaGetLastError());
 
-	setup_rating(inst);
+	setup_rating(inst, mopt.blocks);
 
 	cudaEvent_t start, stop;
 	float elapsedTime;
 	float elapsedTimeTotal = 0.f;
 
 	float* rating   = (float*)ya_malloc(inst.icount * sizeof(float));
-	int* best_idx = (int*)ya_malloc(BLOCKS * sizeof(best_idx));
+	int* best_idx = (int*)ya_malloc(mopt.blocks * sizeof(best_idx));
 
 	int rounds = -1;
 	int block = 0; int pos = 0;
@@ -355,7 +362,7 @@ int main(int argc, char** argv)
 		// Start record
 		cudaEventRecord(start, 0);
 
-		start_astep(inst, stack, top, mopt.asteps);
+		start_astep(inst, mopt.blocks, stack, top, mopt.asteps);
 
 		cudaEventRecord(stop, 0);
 		cudaEventSynchronize(stop);
@@ -368,11 +375,11 @@ int main(int argc, char** argv)
 
 		if(i % 100 == 0) {
 			printf("Round: %7ld Time: %10.2f: ", i, elapsedTimeTotal);
-			CUDA_CALL(cudaMemcpy(rating, inst.best, BLOCKS * sizeof(*rating), cudaMemcpyDeviceToHost));
-			CUDA_CALL(cudaMemcpy(best_idx, inst.best_idx, BLOCKS * sizeof(*best_idx), cudaMemcpyDeviceToHost));
+			CUDA_CALL(cudaMemcpy(rating, inst.best, mopt.blocks * sizeof(*rating), cudaMemcpyDeviceToHost));
+			CUDA_CALL(cudaMemcpy(best_idx, inst.best_idx, mopt.blocks * sizeof(*best_idx), cudaMemcpyDeviceToHost));
 			pos   = best_idx[0];
 
-			for(int j = 0; j < BLOCKS; j++) {
+			for(int j = 0; j < mopt.blocks; j++) {
 				printf("%.2e ", rating[j]);
 
 				if(rating[j] == 0.) {

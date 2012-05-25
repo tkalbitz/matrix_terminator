@@ -53,7 +53,7 @@ struct c_instance
 		reserved:1;
 };
 
-void c_inst_init(struct c_instance& inst, int matrix_width);
+void c_inst_init(struct c_instance& inst, int blocks, int matrix_width);
 void c_inst_cleanup(struct c_instance& inst);
 int* c_create_dev_rules(struct c_instance& inst);
 #endif /* C_INSTANCE_H_ */

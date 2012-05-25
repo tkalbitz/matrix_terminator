@@ -69,7 +69,7 @@ c_create_instance(const int matrix_width, const int icount,
     inst->rules_count = rules_count;
     set_eps(inst);
 
-    c_inst_init(*inst, matrix_width);
+    c_inst_init(*inst, BLOCKS, matrix_width);
     return free_inst;
 }
 

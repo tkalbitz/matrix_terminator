@@ -82,7 +82,7 @@ int c_run(const int     instance,
 	patch_matrix_kernel<<<BLOCKS, inst.mdim>>>(inst);
 	CUDA_CALL(cudaGetLastError());
 
-	setup_rating(inst);
+	setup_rating(inst, BLOCKS);
 
 	float* rating = (float*)ya_malloc(inst.icount * sizeof(float));
 	int* best_idx = (int*)ya_malloc(BLOCKS * sizeof(best_idx));
@@ -91,7 +91,7 @@ int c_run(const int     instance,
 	int block = 0; int pos = 0;
 
 	for(unsigned long i = 0; i < cycles; i++) {
-		start_astep(inst, stack, top, asteps);
+		start_astep(inst, BLOCKS, stack, top, asteps);
 
 		if(i % 100 == 0) {
 			CUDA_CALL(cudaMemcpy(rating, inst.best, BLOCKS * sizeof(*rating), cudaMemcpyDeviceToHost));

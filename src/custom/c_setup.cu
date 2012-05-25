@@ -32,10 +32,10 @@ __device__ inline int get_max_thread_id() {
 	return uniqueThreadIndex;
 }
 
-__global__ void setup_c_rnd_kernel(struct c_instance inst,
+__global__ void setup_c_rnd_kernel(struct c_instance inst, int blocks,
 				   const int seed)
 {
-	const int end = 320 * BLOCKS;
+	const int end = 320 * blocks;
 	for(int i = tx; i < end; i+= blockDim.x)
 		curand_init(seed + i, i, 0, &(inst.rnd_states[i]));
 }
@@ -82,25 +82,25 @@ __global__ void setup_best_kernel(struct c_instance inst)
 	inst.best[tx] = FLT_MAX;
 }
 
-__global__ void setup_rating(struct c_instance inst, int xoff)
+__global__ void setup_rating_kernel(struct c_instance inst, int xoff)
 {
 	const int idx = blockIdx.x * inst.icount + tx + xoff;
 	inst.rating[idx] = FLT_MAX;
 }
 
-void setup_rating(struct c_instance& inst)
+void setup_rating(struct c_instance& inst, int blocks)
 {
 	dim3 threads(min(inst.icount, 512));
 
 	int i = 0;
 	do{
-		setup_rating<<<BLOCKS, threads>>>(inst, i);
+		setup_rating_kernel<<<blocks, threads>>>(inst, i);
 		CUDA_CALL(cudaGetLastError());
 		i += threads.x;
 	} while((i + threads.x) <= inst.icount);
 
 	if(threads.x == 512 && (inst.icount - i) != 0) {
-		setup_rating<<<BLOCKS, (inst.icount - i)>>>(inst, i);
+		setup_rating_kernel<<<blocks, (inst.icount - i)>>>(inst, i);
 		CUDA_CALL(cudaGetLastError());
 	}
 }
