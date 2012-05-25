@@ -350,8 +350,8 @@ int main(int argc, char** argv)
 	float elapsedTime;
 	float elapsedTimeTotal = 0.f;
 
-	float* rating   = (float*)ya_malloc(inst.icount * sizeof(float));
-	int* best_idx = (int*)ya_malloc(mopt.blocks * sizeof(best_idx));
+	float* rating   = (float*)ya_malloc(mopt.blocks * sizeof(*rating));
+	int* best_idx = (int*)ya_malloc(mopt.blocks * sizeof(*best_idx));
 
 	int rounds = -1;
 	int block = 0; int pos = 0;
